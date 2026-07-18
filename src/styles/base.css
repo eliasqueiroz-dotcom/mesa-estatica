@@ -1,0 +1,49 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+h1,
+h2,
+h3,
+.label {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+button {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--concrete-1);
+  color: var(--ink);
+  border: 1px solid var(--concrete-2);
+  border-radius: 2px;
+  padding: 0.5em 1em;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--rede-dim);
+  box-shadow: 0 0 0 1px var(--rede-glow);
+}
