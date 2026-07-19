@@ -63,6 +63,12 @@ function paraGrupos(r: RollResults): GrupoResultado[] {
   }));
 }
 
+interface PedidoRolagem {
+  termos: RollTermo[];
+  onComplete: (grupos: GrupoResultado[]) => void;
+  colorset: ColorsetId;
+}
+
 export function useDiceBox(containerId: string, enabled = true) {
   const boxRef = useRef<DiceBox | null>(null);
   const [ready, setReady] = useState(false);
@@ -73,6 +79,9 @@ export function useDiceBox(containerId: string, enabled = true) {
   const rolandoRef = useRef(false);
   /** evita chamar updateConfig (recarrega tema) toda rolagem — só quando o colorset pedido muda. */
   const colorsetAtualRef = useRef<ColorsetId>('rede');
+  /** fila de rolagens pedidas enquanto a bandeja já estava ocupada — tocam sozinhas, em ordem,
+   *  assim que a rolagem em andamento assenta. Nenhum clique se perde. */
+  const filaRef = useRef<PedidoRolagem[]>([]);
 
   useEffect(() => {
     if (!enabled) {
@@ -80,6 +89,8 @@ export function useDiceBox(containerId: string, enabled = true) {
       setErro(null);
       boxRef.current?.clearDice();
       boxRef.current = null;
+      filaRef.current = [];
+      rolandoRef.current = false;
       document.getElementById(containerId)?.replaceChildren();
       return;
     }
@@ -120,37 +131,54 @@ export function useDiceBox(containerId: string, enabled = true) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerId, enabled]);
 
+  // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima
+  // reescreve notationVectors/diceList (estado único da instância) e derruba o resultado da
+  // primeira — por isso só UMA chamada real de roll() está em voo por vez. Pedidos que chegam
+  // nesse meio-tempo entram na fila e tocam sozinhos, em ordem, sem o mestre precisar clicar de novo.
+  const executarRolagem = async (pedido: PedidoRolagem) => {
+    const box = boxRef.current;
+    if (!box) {
+      filaRef.current = [];
+      rolandoRef.current = false;
+      setRolando(false);
+      return;
+    }
+    try {
+      // só recarrega o tema se o colorset pedido for diferente do atual — updateConfig é async
+      // e refaz o loadTheme, então evitar isso em toda rolagem honesta (padrão 'rede').
+      if (pedido.colorset !== colorsetAtualRef.current) {
+        await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
+        colorsetAtualRef.current = pedido.colorset;
+      }
+      const r = await box.roll(montarNotacao(pedido.termos));
+      pedido.onComplete(paraGrupos(r));
+    } catch (e: unknown) {
+      setErro(String(e));
+    } finally {
+      const proximo = filaRef.current.shift();
+      if (proximo) {
+        void executarRolagem(proximo);
+      } else {
+        rolandoRef.current = false;
+        setRolando(false);
+      }
+    }
+  };
+
   const rolar = (
     notacao: string | RollTermo | RollTermo[],
     onComplete: (grupos: GrupoResultado[]) => void,
     colorset: ColorsetId = 'rede',
   ) => {
-    const box = boxRef.current;
-    // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima
-    // reescreve notationVectors/diceList (estado único da instância) e derruba o resultado da
-    // primeira — por isso o cadeado é aqui, no único ponto que os 5 roladores compartilham.
-    if (!box || rolandoRef.current) return;
+    if (!boxRef.current) return;
+    const pedido: PedidoRolagem = { termos: normalizarTermos(notacao), onComplete, colorset };
+    if (rolandoRef.current) {
+      filaRef.current.push(pedido);
+      return;
+    }
     rolandoRef.current = true;
     setRolando(true);
-    const termos = normalizarTermos(notacao);
-
-    (async () => {
-      try {
-        // só recarrega o tema se o colorset pedido for diferente do atual — updateConfig é async
-        // e refaz o loadTheme, então evitar isso em toda rolagem honesta (padrão 'rede').
-        if (colorset !== colorsetAtualRef.current) {
-          await box.updateConfig({ theme_customColorset: COLORSETS[colorset] });
-          colorsetAtualRef.current = colorset;
-        }
-        const r = await box.roll(montarNotacao(termos));
-        onComplete(paraGrupos(r));
-      } catch (e: unknown) {
-        setErro(String(e));
-      } finally {
-        rolandoRef.current = false;
-        setRolando(false);
-      }
-    })();
+    void executarRolagem(pedido);
   };
 
   return { ready, erro, rolando, rolar };
