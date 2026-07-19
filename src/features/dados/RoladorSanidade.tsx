@@ -27,7 +27,12 @@ export function extrairResultadosSanidade(grupos: RollGroupResult[], perdaTermo:
 
 interface RoladorSanidadeProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
+  rolar: (
+    notacao: RollTermo[],
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+  ) => void;
 }
 
 export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) {
@@ -80,7 +85,7 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
         ficha.id,
       );
       ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-    }, 'ruido');
+    }, 'ruido', ficha.id);
   };
 
   return (

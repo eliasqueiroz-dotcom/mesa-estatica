@@ -18,7 +18,9 @@ interface QuickRollOverlayProps {
  */
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {
   const habilitado = abaAtual !== 'dados' && aberto;
-  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado);
+  // baseScale menor: o painel é ~metade da bandeja principal, então o dado no padrão (100) fica
+  // grande demais pra área. 45 deixa o d20 proporcional ao container pequeno.
+  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado, 45);
   const fichas = useStore((s) => s.fichas);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
   const registrarLog = useStore((s) => s.registrarLog);
@@ -36,7 +38,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         `${ficha?.nome || 'd20 rápido'} · rolagem rápida (sem perícia/DT) → ${valor}`,
         ficha?.id ?? null,
       );
-    });
+    }, 'rede', ficha?.id ?? null);
   };
 
   // atalho "R": se a bandeja já estava pronta, rola na hora; senão só abre o painel (a física

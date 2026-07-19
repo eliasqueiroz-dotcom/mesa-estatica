@@ -6,7 +6,12 @@ import { useStore } from '../../state/store';
 
 interface RoladorSurtoProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
+  rolar: (
+    notacao: RollTermo[],
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+  ) => void;
 }
 
 export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
@@ -36,7 +41,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
           ficha.id,
         );
       }
-    }, 'ruido');
+    }, 'ruido', ficha.id);
   };
 
   const escolher = (lado: 'A' | 'B') => {

@@ -9,7 +9,12 @@ const DT_GATILHO = 12;
 
 interface RoladorTraumaProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
+  rolar: (
+    notacao: RollTermo[],
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+  ) => void;
 }
 
 export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
@@ -66,7 +71,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
           ficha.id,
         );
       }
-    }, 'ruido');
+    }, 'ruido', ficha.id);
   };
 
   const perderSanidade = () => {
@@ -80,6 +85,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
         setResolvido(true);
       },
       'ruido',
+      ficha.id,
     );
   };
 

@@ -1,98 +1,129 @@
 /**
- * Canal de rolagem forçada (modo determinístico do mestre).
+ * Fila de rolagem forçada (modo determinístico do mestre).
  *
- * Padrão: rolagem honesta (física). Quando o mestre enfileira valores pela JANELA DE CONTROLE
- * separada (fora da tela compartilhada no Discord), a próxima rolagem cai nesses valores — a lib
- * dice-box-threejs faz o swap da face, então é indistinguível de uma rolagem real na tela.
+ * Padrão: rolagem honesta (física). O mestre pode ENFILEIRAR resultados forçados pela JANELA DE
+ * CONTROLE separada (fora da tela compartilhada no Discord). Cada entrada pode ser amarrada a um
+ * personagem (só é consumida quando AQUELE personagem rola) ou marcada como "qualquer" (casa com a
+ * próxima rolagem de quem for). Ao rolar, a lib dice-box-threejs faz swap da face — indistinguível
+ * de uma rolagem real na tela.
  *
  * Comunicação entre a janela principal (compartilhada) e a de controle (escondida) via
- * BroadcastChannel — mesmo origin, sem backend, funciona offline.
+ * BroadcastChannel — mesmo origin, sem backend, funciona offline. Mensagens são baseadas em AÇÃO
+ * (adicionar/remover/limpar) e aplicadas à fila local de cada janela, então adição (na de controle)
+ * e consumo (na principal) não se atropelam.
  */
 
 const CANAL = 'estatica-forcar-dados';
 
-export interface EstadoForca {
-  /** valores a forçar, um por dado, na ordem da rolagem. null = honesto. */
-  valores: number[] | null;
-  /** se true, força só a PRÓXIMA rolagem e depois volta ao honesto; senão, persiste. */
-  umaVez: boolean;
+export interface EntradaForca {
+  id: string;
+  /** null = qualquer personagem (casa com todos). */
+  personagemId: string | null;
+  /** rótulo pra exibir na fila sem depender do store da outra janela. */
+  personagemNome: string;
+  /** valor bruto por dado, na ordem da rolagem. */
+  valores: number[];
 }
 
 type Mensagem =
-  | { tipo: 'forcar'; valores: number[]; umaVez: boolean }
+  | { tipo: 'adicionar'; entrada: EntradaForca }
+  | { tipo: 'remover'; id: string }
   | { tipo: 'limpar' }
   | { tipo: 'pedirEstado' }
-  | { tipo: 'estado'; estado: EstadoForca };
+  | { tipo: 'estado'; fila: EntradaForca[] };
 
 const canal = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CANAL) : null;
 
-let estado: EstadoForca = { valores: null, umaVez: true };
-const ouvintes = new Set<(e: EstadoForca) => void>();
+let fila: EntradaForca[] = [];
+const ouvintes = new Set<(f: EntradaForca[]) => void>();
 
 function notificar() {
-  for (const o of ouvintes) o(estado);
+  const snapshot = [...fila];
+  for (const o of ouvintes) o(snapshot);
 }
 
 canal?.addEventListener('message', (ev: MessageEvent<Mensagem>) => {
   const msg = ev.data;
-  if (msg.tipo === 'forcar') {
-    estado = { valores: msg.valores, umaVez: msg.umaVez };
-    notificar();
-  } else if (msg.tipo === 'limpar') {
-    estado = { valores: null, umaVez: true };
-    notificar();
-  } else if (msg.tipo === 'pedirEstado') {
-    canal?.postMessage({ tipo: 'estado', estado } satisfies Mensagem);
-  } else if (msg.tipo === 'estado') {
-    estado = msg.estado;
-    notificar();
+  switch (msg.tipo) {
+    case 'adicionar':
+      if (!fila.some((e) => e.id === msg.entrada.id)) {
+        fila = [...fila, msg.entrada];
+        notificar();
+      }
+      break;
+    case 'remover':
+      fila = fila.filter((e) => e.id !== msg.id);
+      notificar();
+      break;
+    case 'limpar':
+      fila = [];
+      notificar();
+      break;
+    case 'pedirEstado':
+      canal?.postMessage({ tipo: 'estado', fila } satisfies Mensagem);
+      break;
+    case 'estado':
+      fila = msg.fila;
+      notificar();
+      break;
   }
 });
 
-/** Chamado pela janela de controle: enfileira valores forçados para a(s) próxima(s) rolagem(ns). */
-export function enviarForcados(valores: number[], umaVez = true) {
-  estado = { valores, umaVez };
-  canal?.postMessage({ tipo: 'forcar', valores, umaVez } satisfies Mensagem);
+/** Janela de controle: enfileira um resultado forçado, opcionalmente amarrado a um personagem. */
+export function enfileirarForcado(valores: number[], personagemId: string | null, personagemNome: string) {
+  const entrada: EntradaForca = { id: crypto.randomUUID(), personagemId, personagemNome, valores };
+  fila = [...fila, entrada];
+  canal?.postMessage({ tipo: 'adicionar', entrada } satisfies Mensagem);
   notificar();
 }
 
-/** Chamado pela janela de controle: cancela o modo forçado, volta ao honesto. */
+export function removerForcado(id: string) {
+  fila = fila.filter((e) => e.id !== id);
+  canal?.postMessage({ tipo: 'remover', id } satisfies Mensagem);
+  notificar();
+}
+
 export function limparForcados() {
-  estado = { valores: null, umaVez: true };
+  fila = [];
   canal?.postMessage({ tipo: 'limpar' } satisfies Mensagem);
   notificar();
 }
 
-/** Janela de controle pede o estado atual (ex: ao abrir). */
+/** Pede o estado atual às outras janelas — a que tiver a fila responde com ela cheia. */
 export function pedirEstado() {
   canal?.postMessage({ tipo: 'pedirEstado' } satisfies Mensagem);
 }
 
-export function estadoAtual(): EstadoForca {
-  return estado;
+// Ao carregar em QUALQUER janela (principal ou controle), sincroniza a fila com quem já estiver
+// aberto — assim uma janela principal aberta depois de enfileirar ainda recebe a fila pendente.
+pedirEstado();
+
+export function filaAtual(): EntradaForca[] {
+  return [...fila];
 }
 
-export function assinar(ouvinte: (e: EstadoForca) => void): () => void {
+export function assinar(ouvinte: (f: EntradaForca[]) => void): () => void {
   ouvintes.add(ouvinte);
   return () => ouvintes.delete(ouvinte);
 }
 
 /**
  * Consumido pela janela principal (useDiceBox) no momento da rolagem.
- * Retorna exatamente `totalDados` valores (corta se sobra, repete o último se falta) ou null (honesto).
- * Se `umaVez`, limpa após consumir.
+ * Pega a PRIMEIRA entrada da fila que casa com o personagem que está rolando (entrada "qualquer"
+ * casa com todos), remove-a, e retorna exatamente `totalDados` valores (corta se sobra, repete o
+ * último se falta) — ou null (honesto) se nada casa.
  */
-export function consumirForcados(totalDados: number): number[] | null {
-  if (!estado.valores || estado.valores.length === 0) return null;
-  const origem = estado.valores;
+export function consumirForcados(totalDados: number, personagemId: string | null = null): number[] | null {
+  const idx = fila.findIndex((e) => e.personagemId === null || e.personagemId === personagemId);
+  if (idx === -1) return null;
+  const entrada = fila[idx];
+  fila = fila.filter((_, i) => i !== idx);
+  canal?.postMessage({ tipo: 'remover', id: entrada.id } satisfies Mensagem);
+  notificar();
+  const origem = entrada.valores;
   const resultado: number[] = [];
   for (let i = 0; i < totalDados; i++) {
     resultado.push(origem[i] ?? origem[origem.length - 1]);
-  }
-  if (estado.umaVez) {
-    estado = { valores: null, umaVez: true };
-    canal?.postMessage({ tipo: 'limpar' } satisfies Mensagem);
-    notificar();
   }
   return resultado;
 }

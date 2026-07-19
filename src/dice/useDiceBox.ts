@@ -46,10 +46,10 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  * ordem dos termos na notação (1º termo primeiro, etc.), então a ordem de `termos` aqui precisa
  * bater com a ordem que o valor forçado pretende atingir.
  */
-export function montarNotacao(termos: RollTermo[]): string {
+export function montarNotacao(termos: RollTermo[], personagemId: string | null = null): string {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = consumirForcados(totalDados);
+  const forcados = consumirForcados(totalDados, personagemId);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -69,9 +69,9 @@ function paraGrupos(r: RollResults): GrupoResultado[] {
  * dos roladores e ainda respeita valores forçados da janela de controle, pela mesma ordem
  * (1º termo primeiro) que a rolagem física usaria — só sem o dado caindo na tela.
  */
-export function rolarFallback2D(termos: RollTermo[]): GrupoResultado[] {
+export function rolarFallback2D(termos: RollTermo[], personagemId: string | null = null): GrupoResultado[] {
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = consumirForcados(totalDados);
+  const forcados = consumirForcados(totalDados, personagemId);
   let cursor = 0;
   return termos.map((t) => {
     const rolls: { value: number }[] = [];
@@ -88,9 +88,10 @@ interface PedidoRolagem {
   termos: RollTermo[];
   onComplete: (grupos: GrupoResultado[]) => void;
   colorset: ColorsetId;
+  personagemId: string | null;
 }
 
-export function useDiceBox(containerId: string, enabled = true) {
+export function useDiceBox(containerId: string, enabled = true, baseScale = 100) {
   const boxRef = useRef<DiceBox | null>(null);
   const [ready, setReady] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -132,6 +133,7 @@ export function useDiceBox(containerId: string, enabled = true) {
       theme_surface: 'green-felt',
       theme_material: 'glass',
       theme_customColorset: COLORSETS.rede,
+      baseScale,
       sounds: false,
       shadows: true,
     });
@@ -160,7 +162,7 @@ export function useDiceBox(containerId: string, enabled = true) {
       container.replaceChildren();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerId, enabled]);
+  }, [containerId, enabled, baseScale]);
 
   // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima
   // reescreve notationVectors/diceList (estado único da instância) e derruba o resultado da
@@ -181,7 +183,7 @@ export function useDiceBox(containerId: string, enabled = true) {
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const r = await box.roll(montarNotacao(pedido.termos));
+      const r = await box.roll(montarNotacao(pedido.termos, pedido.personagemId));
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
       setErro(String(e));
@@ -200,15 +202,16 @@ export function useDiceBox(containerId: string, enabled = true) {
     notacao: string | RollTermo | RollTermo[],
     onComplete: (grupos: GrupoResultado[]) => void,
     colorset: ColorsetId = 'rede',
+    personagemId: string | null = null,
   ) => {
     const termos = normalizarTermos(notacao);
     if (modo2D) {
       // sem física rodando, então sem concorrência real pra proteger — resolve na hora.
-      onComplete(rolarFallback2D(termos));
+      onComplete(rolarFallback2D(termos, personagemId));
       return;
     }
     if (!boxRef.current) return;
-    const pedido: PedidoRolagem = { termos, onComplete, colorset };
+    const pedido: PedidoRolagem = { termos, onComplete, colorset, personagemId };
     if (rolandoRef.current) {
       filaRef.current.push(pedido);
       return;

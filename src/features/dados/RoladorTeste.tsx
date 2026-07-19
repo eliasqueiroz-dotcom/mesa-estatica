@@ -16,7 +16,12 @@ function descricaoResultado(r: ResultadoTeste): string {
 
 interface RoladorTesteProps {
   ready: boolean;
-  rolar: (notacao: string, onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
+  rolar: (
+    notacao: string,
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+  ) => void;
 }
 
 export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
@@ -62,7 +67,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         }${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
         ficha.id,
       );
-    }, 'rede');
+    }, 'rede', ficha.id);
   };
 
   return (
