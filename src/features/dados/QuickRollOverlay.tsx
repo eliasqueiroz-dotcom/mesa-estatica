@@ -18,7 +18,7 @@ interface QuickRollOverlayProps {
  */
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {
   const habilitado = abaAtual !== 'dados' && aberto;
-  const { ready, rolando, erro, rolar } = useDiceBox('dice-overlay-rapido', habilitado);
+  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado);
   const fichas = useStore((s) => s.fichas);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
   const registrarLog = useStore((s) => s.registrarLog);
@@ -60,13 +60,15 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           <h3 className="label" style={{ marginBottom: '0.5rem' }}>
             d20 rápido
           </h3>
-          <div
-            id="dice-overlay-rapido"
-            style={{ width: '100%', height: '140px', background: 'var(--concrete-0)', border: '1px solid var(--concrete-2)' }}
-          />
-          {erro && (
-            <p className="mono" style={{ color: 'var(--ruido)', fontSize: 12, marginTop: '0.4rem' }}>
-              erro: {erro}
+          {!modo2D && (
+            <div
+              id="dice-overlay-rapido"
+              style={{ width: '100%', height: '140px', background: 'var(--concrete-0)', border: '1px solid var(--concrete-2)' }}
+            />
+          )}
+          {modo2D && (
+            <p className="vazio" style={{ fontSize: 12 }}>
+              sem WebGL nesta máquina — rolando por número, sem o dado físico.
             </p>
           )}
           <p className="vazio" style={{ marginTop: '0.4rem' }}>

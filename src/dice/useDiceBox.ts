@@ -63,6 +63,27 @@ function paraGrupos(r: RollResults): GrupoResultado[] {
   }));
 }
 
+/**
+ * Rolagem por matemática pura (Math.random), sem física nem visual 3D — usada quando o WebGL
+ * não inicializa (GPU indisponível, driver bloqueado, etc.). Mantém o mesmo shape de resultado
+ * dos roladores e ainda respeita valores forçados da janela de controle, pela mesma ordem
+ * (1º termo primeiro) que a rolagem física usaria — só sem o dado caindo na tela.
+ */
+export function rolarFallback2D(termos: RollTermo[]): GrupoResultado[] {
+  const totalDados = termos.reduce((n, t) => n + t.qty, 0);
+  const forcados = consumirForcados(totalDados);
+  let cursor = 0;
+  return termos.map((t) => {
+    const rolls: { value: number }[] = [];
+    for (let i = 0; i < t.qty; i++) {
+      const valor = forcados?.[cursor] ?? Math.floor(Math.random() * t.sides) + 1;
+      rolls.push({ value: valor });
+      cursor++;
+    }
+    return { qty: t.qty, sides: t.sides, value: rolls.reduce((soma, r) => soma + r.value, 0), rolls };
+  });
+}
+
 interface PedidoRolagem {
   termos: RollTermo[];
   onComplete: (grupos: GrupoResultado[]) => void;
@@ -74,6 +95,9 @@ export function useDiceBox(containerId: string, enabled = true) {
   const [ready, setReady] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [rolando, setRolando] = useState(false);
+  /** true quando box.initialize() falhou (sem WebGL, GPU bloqueada, etc.) — rolar() passa a usar
+   *  rolarFallback2D em vez de tentar física. A ferramenta continua funcionando, só sem o visual. */
+  const [modo2D, setModo2D] = useState(false);
   /** espelho síncrono de `rolando` — a lib não enfileira roll() concorrente (ver rolar() abaixo),
    *  então o guard de "já tem uma rolagem em andamento" precisa ser lido antes do setState assentar. */
   const rolandoRef = useRef(false);
@@ -87,6 +111,7 @@ export function useDiceBox(containerId: string, enabled = true) {
     if (!enabled) {
       setReady(false);
       setErro(null);
+      setModo2D(false);
       boxRef.current?.clearDice();
       boxRef.current = null;
       filaRef.current = [];
@@ -120,7 +145,13 @@ export function useDiceBox(containerId: string, enabled = true) {
     };
 
     iniciar().catch((e: unknown) => {
-      if (vivo) setErro(String(e));
+      // WebGL indisponível ou falha de inicialização — cai pro modo 2D em vez de travar a
+      // ferramenta. `ready` fica true porque os roladores ficam usáveis mesmo sem física.
+      if (vivo) {
+        setErro(String(e));
+        setModo2D(true);
+        setReady(true);
+      }
     });
 
     return () => {
@@ -170,8 +201,14 @@ export function useDiceBox(containerId: string, enabled = true) {
     onComplete: (grupos: GrupoResultado[]) => void,
     colorset: ColorsetId = 'rede',
   ) => {
+    const termos = normalizarTermos(notacao);
+    if (modo2D) {
+      // sem física rodando, então sem concorrência real pra proteger — resolve na hora.
+      onComplete(rolarFallback2D(termos));
+      return;
+    }
     if (!boxRef.current) return;
-    const pedido: PedidoRolagem = { termos: normalizarTermos(notacao), onComplete, colorset };
+    const pedido: PedidoRolagem = { termos, onComplete, colorset };
     if (rolandoRef.current) {
       filaRef.current.push(pedido);
       return;
@@ -181,5 +218,5 @@ export function useDiceBox(containerId: string, enabled = true) {
     void executarRolagem(pedido);
   };
 
-  return { ready, erro, rolando, rolar };
+  return { ready, erro, rolando, modo2D, rolar };
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { montarNotacao } from './useDiceBox';
+import { montarNotacao, rolarFallback2D } from './useDiceBox';
 import { enviarForcados, limparForcados } from './forcarRolagem';
 import { extrairResultadosSanidade, parseDado } from '../features/dados/RoladorSanidade';
 
@@ -47,6 +47,40 @@ describe('montarNotacao', () => {
     enviarForcados([5, 1], true);
     montarNotacao([{ sides: 20, qty: 1 }, { sides: 8, qty: 1 }]);
     expect(montarNotacao([{ sides: 20, qty: 1 }, { sides: 8, qty: 1 }])).toBe('1d20+1d8');
+  });
+});
+
+describe('rolarFallback2D', () => {
+  afterEach(() => limparForcados());
+
+  it('honesta: valores caem dentro da faixa do dado', () => {
+    for (let i = 0; i < 50; i++) {
+      const [grupo] = rolarFallback2D([{ sides: 6, qty: 1 }]);
+      expect(grupo.rolls[0].value).toBeGreaterThanOrEqual(1);
+      expect(grupo.rolls[0].value).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('mantém o mesmo shape de GrupoResultado que a rolagem física (qty, sides, value, rolls)', () => {
+    const grupos = rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
+    expect(grupos).toHaveLength(2);
+    expect(grupos[0]).toMatchObject({ qty: 1, sides: 20 });
+    expect(grupos[1]).toMatchObject({ qty: 1, sides: 4 });
+    expect(grupos[0].value).toBe(grupos[0].rolls[0].value);
+  });
+
+  it('respeita valores forçados, na ordem dos termos — mesmo sem física', () => {
+    enviarForcados([5, 1], true);
+    const [d20, d4] = rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
+    expect(d20.rolls[0].value).toBe(5);
+    expect(d4.rolls[0].value).toBe(1);
+  });
+
+  it('soma corretamente múltiplos dados do mesmo termo (ex: surto 2d20)', () => {
+    enviarForcados([10, 20], true);
+    const [grupo] = rolarFallback2D([{ sides: 20, qty: 2 }]);
+    expect(grupo.rolls.map((r) => r.value)).toEqual([10, 20]);
+    expect(grupo.value).toBe(30);
   });
 });
 
