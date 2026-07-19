@@ -12,7 +12,7 @@ export default function FichasTab() {
   const fichaAtiva = fichas.find((f) => f.id === fichaAtivaId) ?? fichas[0] ?? null;
 
   const remover = (id: string, nome: string) => {
-    const ok = window.confirm(`Apagar a ficha "${nome || 'sem nome'}"? Isso não pode ser desfeito.`);
+    const ok = window.confirm(`apagar "${nome || 'sem nome'}" da rede? o papel não esquece.`);
     if (ok) removerFicha(id);
   };
 

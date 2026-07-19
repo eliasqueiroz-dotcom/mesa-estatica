@@ -35,3 +35,12 @@ export function cruzouLinhaDescendo(anterior: number, atual: number, linha: numb
 export function perdeuCincoOuMaisDeUmaVez(anterior: number, atual: number): boolean {
   return anterior - atual >= 5;
 }
+
+/** Tier do sistema de ruído (arte.md): 0 limpo · 1 interferência · 2 ruído · 3 colapso. */
+export function calcularTierRuido(atual: number, maximo: number): 0 | 1 | 2 | 3 {
+  const razao = maximo > 0 ? atual / maximo : 0;
+  if (razao > 0.75) return 0;
+  if (razao > 0.5) return 1;
+  if (razao > 0.25) return 2;
+  return 3;
+}

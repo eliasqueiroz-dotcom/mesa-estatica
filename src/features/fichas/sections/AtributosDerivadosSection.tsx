@@ -4,12 +4,21 @@ import {
   calcularDefesa,
   calcularPvMaximo,
   calcularSanidadeMaxima,
+  calcularTierRuido,
   estaFerido,
   metade,
 } from '../../../rules/derivados';
 import { ATRIBUTOS } from '../../../rules/data/pericias';
 import { useStore } from '../../../state/store';
+import BarraSegmentada from '../BarraSegmentada';
 import type { SecaoFichaProps } from '../tipos';
+
+const NOME_TIER_RUIDO: Record<0 | 1 | 2 | 3, string> = {
+  0: 'limpo',
+  1: 'interferência',
+  2: 'ruído',
+  3: 'colapso',
+};
 
 export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFichaProps) {
   const basePV = useStore((s) => s.config.basePV);
@@ -25,12 +34,13 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const ferido = estaFerido(ficha.pvAtual, pvMaximo);
   const linhaSanidade = metade(sanidadeMaxima);
   const traumasAtivos = ficha.traumas.filter((t) => !t.virouCicatriz).length;
+  const tierRuido = calcularTierRuido(ficha.sanidadeAtual, sanidadeMaxima);
 
   const handleSanidade = (valor: number) => {
     const resultado = ajustarSanidadeAtual(ficha.id, valor);
     const novosAlertas: string[] = [];
     // ambos podem disparar juntos: um Surto não dispensa marcar o Trauma da linha cruzada.
-    if (resultado.cruzouLinhaSanidade) novosAlertas.push('Sanidade cruzou a metade — marque um Trauma.');
+    if (resultado.cruzouLinhaSanidade) novosAlertas.push('a garoa chia — Sanidade cruzou a metade, marque um Trauma.');
     if (resultado.surtoDisparado) novosAlertas.push('SURTO — role duas vezes na tabela (aba Dados & Regras).');
     if (novosAlertas.length > 0) setAlertas(novosAlertas);
   };
@@ -73,6 +83,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
               onChange={(e) => ajustarPvAtual(ficha.id, Number(e.target.value) || 0)}
             />
           </div>
+          <BarraSegmentada atual={ficha.pvAtual} maximo={pvMaximo} variante="pv" />
           {ferido && <span className="badge" style={{ marginTop: '0.4rem' }}>ferido</span>}
         </div>
 
@@ -86,6 +97,10 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
               value={ficha.sanidadeAtual}
               onChange={(e) => handleSanidade(Number(e.target.value) || 0)}
             />
+          </div>
+          <BarraSegmentada atual={ficha.sanidadeAtual} maximo={sanidadeMaxima} variante="sanidade" tier={tierRuido} />
+          <div className="vazio" style={{ marginTop: '0.3rem' }}>
+            nível de ruído: {NOME_TIER_RUIDO[tierRuido]}
           </div>
         </div>
 

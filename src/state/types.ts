@@ -138,9 +138,20 @@ export interface EstadoConfig {
   basePV: BasePV;
 }
 
+export interface GradeMapa {
+  ativa: boolean;
+  x: number; // % de .mapa-area, canto superior esquerdo
+  y: number; // %
+  largura: number; // %
+  altura: number; // %
+  colunas: number; // nº de células na horizontal, >=1
+  linhas: number; // nº de células na vertical, >=1
+}
+
 export interface EstadoMapa {
   imagemDataUrl: string | null;
   tokens: TokenMapa[];
+  grade: GradeMapa;
 }
 
 export interface EstadoGlobal {

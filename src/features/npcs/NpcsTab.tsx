@@ -14,7 +14,7 @@ export default function NpcsTab() {
   const limparIniciativa = useStore((s) => s.limparIniciativa);
 
   const remover = (id: string, nome: string) => {
-    const ok = window.confirm(`Remover o NPC "${nome || 'sem nome'}"? Isso não pode ser desfeito.`);
+    const ok = window.confirm(`tirar "${nome || 'sem nome'}" do tabuleiro? não volta.`);
     if (ok) removerNpc(id);
   };
 

@@ -17,6 +17,7 @@ interface RoladorSurtoProps {
 export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
   const fichas = useStore((s) => s.fichas);
   const registrarLog = useStore((s) => s.registrarLog);
+  const dispararBurstRuido = useStore((s) => s.dispararBurstRuido);
 
   const [fichaId, setFichaId] = useState('');
   const [rolando, setRolando] = useState(false);
@@ -34,6 +35,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
       const r = resolverSurto(d20A, d20B);
       setResultado(r);
       setRolando(false);
+      dispararBurstRuido();
       if (r.mesmoNumero) {
         registrarLog(
           'surto',

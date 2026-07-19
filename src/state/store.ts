@@ -2,12 +2,29 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { ordenarIniciativa } from '../rules/teste';
-import { criarEstadoInicial, criarFichaVazia, criarNpcVazio, SCHEMA_VERSION } from './factories';
-import type { EntradaIniciativa, EntradaLog, EstadoGlobal, EstadoMapa, Ficha, Npc, TipoLog, TokenMapa } from './types';
+import { criarEstadoInicial, criarFichaVazia, criarGradeInicial, criarNpcVazio, SCHEMA_VERSION } from './factories';
+import type {
+  EntradaIniciativa,
+  EntradaLog,
+  EstadoGlobal,
+  EstadoMapa,
+  Ficha,
+  GradeMapa,
+  Npc,
+  TipoLog,
+  TokenMapa,
+} from './types';
 
 export interface AlertaSanidade {
   cruzouLinhaSanidade: boolean;
   surtoDisparado: boolean;
+}
+
+/** Estado efêmero de UI — não faz parte de `EstadoGlobal` (não entra no export/import). */
+interface EstadoEfemero {
+  /** timestamp do último burst do sistema de ruído — dispara em qualquer queda de Sanidade e ao
+   *  rolar na tabela de Surto; RuidoOverlay observa isso pro burst de 1,5s (arte.md). */
+  ultimoBurstRuidoEm: number | null;
 }
 
 interface Acoes {
@@ -33,6 +50,7 @@ interface Acoes {
   limparIniciativa: () => void;
 
   atualizarMapa: (patch: Partial<EstadoMapa>) => void;
+  atualizarGrade: (patch: Partial<GradeMapa>) => void;
   /** Ignora se o participante já tem token no mapa (evita duplicar ao clicar 2x). */
   adicionarTokenMapa: (participanteId: string, tipo: 'pc' | 'npc') => void;
   moverTokenMapa: (id: string, x: number, y: number) => void;
@@ -44,17 +62,21 @@ interface Acoes {
   atualizarSessao: (patch: Partial<EstadoGlobal['sessao']>) => void;
   atualizarConfig: (patch: Partial<EstadoGlobal['config']>) => void;
 
+  /** Dispara o burst de 1,5s do sistema de ruído (arte.md) — queda de Sanidade e rolagem de Surto. */
+  dispararBurstRuido: () => void;
+
   exportarJSON: () => string;
   importarJSON: (json: string) => void;
   resetarEstado: () => void;
 }
 
-type Store = EstadoGlobal & Acoes;
+type Store = EstadoGlobal & Acoes & EstadoEfemero;
 
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       ...criarEstadoInicial(),
+      ultimoBurstRuidoEm: null,
 
       adicionarFicha: () => {
         const ficha = criarFichaVazia(get().fichas.length);
@@ -106,6 +128,8 @@ export const useStore = create<Store>()(
           `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
           id,
         );
+        // qualquer queda de Sanidade acende o burst do ruído, não só o Surto — reação instantânea.
+        if (delta < 0) get().dispararBurstRuido();
         return alerta;
       },
 
@@ -182,6 +206,7 @@ export const useStore = create<Store>()(
       limparIniciativa: () => set({ iniciativa: [] }),
 
       atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
+      atualizarGrade: (patch) => set((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ...patch } } })),
       adicionarTokenMapa: (participanteId, tipo) =>
         set((s) => {
           if (s.mapa.tokens.some((t) => t.participanteId === participanteId)) return s;
@@ -215,6 +240,8 @@ export const useStore = create<Store>()(
       atualizarSessao: (patch) => set((s) => ({ sessao: { ...s.sessao, ...patch } })),
       atualizarConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 
+      dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
+
       exportarJSON: () => {
         const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config, sessao, schemaVersion } = get();
         return JSON.stringify(
@@ -232,7 +259,14 @@ export const useStore = create<Store>()(
     {
       name: 'estatica-mesa',
       version: SCHEMA_VERSION,
-      migrate: (persistedState) => persistedState as Store,
+      migrate: (persistedState, versaoAnterior) => {
+        const estado = persistedState as Store;
+        // v1 → v2: mapa não tinha `grade` (grid customizável da aba Mapa).
+        if (versaoAnterior < 2 && estado.mapa && !estado.mapa.grade) {
+          estado.mapa = { ...estado.mapa, grade: criarGradeInicial() };
+        }
+        return estado;
+      },
     },
   ),
 );

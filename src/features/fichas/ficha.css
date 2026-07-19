@@ -326,3 +326,57 @@
   font-size: 13px;
   font-family: var(--font-mono);
 }
+
+.barra-segmentada {
+  position: relative;
+  height: 12px;
+  background: var(--void);
+  border: 1px solid var(--concrete-2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+}
+
+.barra-segmentada__preenchimento {
+  position: absolute;
+  inset: 0;
+  right: auto;
+  height: 100%;
+  transition: width 0.2s ease;
+  background: var(--real);
+}
+
+.barra-segmentada[data-variante='sanidade'][data-tier='0'] .barra-segmentada__preenchimento {
+  background: var(--rede);
+}
+.barra-segmentada[data-variante='sanidade'][data-tier='1'] .barra-segmentada__preenchimento {
+  background: var(--rede-dim);
+}
+.barra-segmentada[data-variante='sanidade'][data-tier='2'] .barra-segmentada__preenchimento,
+.barra-segmentada[data-variante='sanidade'][data-tier='3'] .barra-segmentada__preenchimento {
+  background: var(--ruido);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(11, 13, 17, 0.35) 0 2px,
+    transparent 2px 4px
+  );
+}
+
+.barra-segmentada__tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--void);
+  opacity: 0.7;
+}
+
+.barra-segmentada__metade {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--ink);
+  opacity: 0.8;
+}

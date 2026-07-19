@@ -4,6 +4,7 @@ import QuickRollOverlay from '../features/dados/QuickRollOverlay';
 import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
 import NpcsTab from '../features/npcs/NpcsTab';
+import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import LogTab from './LogTab';
@@ -41,21 +42,28 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
       try {
         importarJSON(texto);
       } catch {
-        window.alert('arquivo inválido — não foi possível importar.');
+        window.alert('sinal corrompido — não foi possível ler esse arquivo.');
       }
     });
     e.target.value = '';
   };
 
   return (
-    <div style={{ display: 'flex', gap: '0.4rem' }}>
-      <button onClick={exportar}>imprimir tudo</button>
-      <button onClick={() => inputRef.current?.click()}>importar</button>
-      {/* botão de controle agora oculto; o controle é acessível clicando no título principal */}
-      <button onClick={abrirControle} title="janela secreta do mestre — não compartilhar" style={{ display: 'none' }}>
-        controle
-      </button>
-      <input ref={inputRef} type="file" accept="application/json" hidden onChange={importar} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <span className="mono" style={{ fontSize: '11px', color: 'var(--rede)' }} title="salva a cada alteração — localStorage deste navegador">
+        ● registrado
+      </span>
+      <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <button onClick={exportar} title="confie no papel, não na nuvem">
+          imprimir tudo
+        </button>
+        <button onClick={() => inputRef.current?.click()}>importar</button>
+        {/* botão de controle agora oculto; o controle é acessível clicando no título principal */}
+        <button onClick={abrirControle} title="janela secreta do mestre — não compartilhar" style={{ display: 'none' }}>
+          controle
+        </button>
+        <input ref={inputRef} type="file" accept="application/json" hidden onChange={importar} />
+      </div>
     </div>
   );
 }
@@ -103,6 +111,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <RuidoOverlay />
       <header
         style={{
           display: 'flex',

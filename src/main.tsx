@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/ruido.css';
 
 // #controle abre a janela de controle secreta do mestre (rolagem forçada), separada da
 // janela principal compartilhada no Discord. Mesma origin → BroadcastChannel conecta as duas.

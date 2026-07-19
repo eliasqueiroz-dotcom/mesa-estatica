@@ -4,6 +4,7 @@ import {
   calcularDefesa,
   calcularPvMaximo,
   calcularSanidadeMaxima,
+  calcularTierRuido,
   cruzouLinhaDescendo,
   estaFerido,
   metade,
@@ -78,5 +79,24 @@ describe('perdeuCincoOuMaisDeUmaVez', () => {
   });
   it('não dispara em ganho de Sanidade', () => {
     expect(perdeuCincoOuMaisDeUmaVez(10, 20)).toBe(false);
+  });
+});
+
+describe('calcularTierRuido', () => {
+  it('tier 0 — limpo, acima de 75%', () => {
+    expect(calcularTierRuido(20, 20)).toBe(0);
+    expect(calcularTierRuido(16, 20)).toBe(0);
+  });
+  it('tier 1 — interferência, 50–75%', () => {
+    expect(calcularTierRuido(15, 20)).toBe(1);
+    expect(calcularTierRuido(11, 20)).toBe(1);
+  });
+  it('tier 2 — ruído, 25–50%, inclui exatamente a linha da metade', () => {
+    expect(calcularTierRuido(10, 20)).toBe(2);
+    expect(calcularTierRuido(6, 20)).toBe(2);
+  });
+  it('tier 3 — colapso, ≤25%', () => {
+    expect(calcularTierRuido(5, 20)).toBe(3);
+    expect(calcularTierRuido(0, 20)).toBe(3);
   });
 });

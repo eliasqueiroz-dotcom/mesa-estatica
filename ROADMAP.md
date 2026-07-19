@@ -33,12 +33,7 @@
 
 **Dia 5 — Mapa, tokens, NPCs, sessão ✅**: upload de mapa comprimido a 1600px/JPEG (`comprimirImagem.ts`); tokens arrastáveis via pointer events em coordenadas normalizadas (sobrevive a resize); cristal 3D por token (`tokens3d/TokenScene.tsx`, câmera ortográfica sincronizada com o layout DOM, jitter em Sanidade ≤25%) — canvas criado via `document.createElement` e removido inteiro no cleanup (não um `<canvas>` fixo do JSX), porque um canvas só aceita um contexto WebGL por vida inteira e StrictMode/remount real quebrariam nisso; NPCs (PV/Defesa/Agilidade/notas) + Iniciativa (`ordenarIniciativa` de `rules/teste.ts`, já existia e já era testada) numa tabela ordenada, log dedicado; aba Sessão com campos ao vivo. Gate passou (fluxo completo — NPC, rolar iniciativa, tokens no mapa, drag — em poucos cliques). **Achado**: erro de console "Canvas has an existing context" no load em dev já existia antes deste dia (dice-box-threejs + StrictMode) — confirmado via stash, não é regressão daqui.
 
-## Dia 6 — Identidade visual total
-
-- [ ] Sistema de ruído por tiers ligado à Sanidade da ficha ativa (`arte.md`), incluindo burst de Surto.
-- [ ] Passada completa de UI: tipografia, cores rede/real/ruído por contexto, barras segmentadas com linha da metade, microcopy in-world em todos os estados (vazios, confirmações, toasts).
-- [ ] Performance: rAF pausado fora da aba, devicePixelRatio limitado, teste em screen share.
-- **Gate**: o teste do espelho de `arte.md` — mostrar um print a alguém e não ouvir "feito por IA". Checar os 3 clichês proibidos.
+**Dia 6 — Identidade visual total ✅**: sistema de ruído por tiers (`features/ruido/RuidoOverlay.tsx` + `styles/ruido.css`) — `data-ruido="0..3"` no `<html>` calculado por `calcularTierRuido` (novo, testado) a partir da Sanidade da ficha ativa; grain via SVG `feTurbulence` inline, scanlines, chroma aberration nos headers (tier 2+), glitch `steps()` + vinheta (tier 3), burst de 1,5s no Surto (`ultimoSurtoEm` no store, decai via CSS transition — zero rAF, só opacity/transform). Barras segmentadas com linha da metade (`BarraSegmentada.tsx`) pra PV e Sanidade, esta última também rotulada por tier ("nível de ruído: limpo/interferência/ruído/colapso"). Passada de microcopy: confirmações de apagar ficha/NPC e alerta de linha cruzada agora na voz do mundo (`arte.md`); indicador `● registrado` no header. Colorsets dos dados (rede/ruído) e devicePixelRatio (tokens3d) já vinham corretos de dias anteriores — conferido, não mexido. Gate: verificado visualmente nos 4 tiers via preview (bars, overlay e alerta reagem juntos); teste real de screen share fica pendente do usuário, como nos dias 4-5.
 
 ## Dia 7 — Playtest e folga
 

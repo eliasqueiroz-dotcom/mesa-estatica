@@ -1,5 +1,5 @@
 import type { Atributo } from '../rules/data/pericias';
-import type { EstadoGlobal, Ficha, Npc } from './types';
+import type { EstadoGlobal, Ficha, GradeMapa, Npc } from './types';
 
 const gerarId = () => crypto.randomUUID();
 
@@ -59,7 +59,11 @@ export function criarNpcVazio(): Npc {
   };
 }
 
-export const SCHEMA_VERSION = 1;
+export function criarGradeInicial(): GradeMapa {
+  return { ativa: false, x: 0, y: 0, largura: 100, altura: 100, colunas: 10, linhas: 10 };
+}
+
+export const SCHEMA_VERSION = 2;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -75,7 +79,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     fichaAtivaId: null,
     npcs: [],
     iniciativa: [],
-    mapa: { imagemDataUrl: null, tokens: [] },
+    mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() },
     log: [],
     config: { basePV: 20 },
   };
