@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
@@ -8,7 +9,7 @@ const DT_GATILHO = 12;
 
 interface RoladorTraumaProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void) => void;
+  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
 }
 
 export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
@@ -65,17 +66,21 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
           ficha.id,
         );
       }
-    });
+    }, 'ruido');
   };
 
   const perderSanidade = () => {
     if (!ficha || !trauma) return;
-    rolar([{ sides: 4, qty: 1 }], (grupos) => {
-      const perda = grupos[0].value;
-      registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id);
-      ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-      setResolvido(true);
-    });
+    rolar(
+      [{ sides: 4, qty: 1 }],
+      (grupos) => {
+        const perda = grupos[0].value;
+        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id);
+        ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
+        setResolvido(true);
+      },
+      'ruido',
+    );
   };
 
   const interpretar = () => {

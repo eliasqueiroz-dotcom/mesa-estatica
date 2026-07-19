@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -15,7 +16,7 @@ function descricaoResultado(r: ResultadoTeste): string {
 
 interface RoladorTesteProps {
   ready: boolean;
-  rolar: (notacao: string, onComplete: (r: RollGroupResult[]) => void) => void;
+  rolar: (notacao: string, onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
 }
 
 export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
@@ -61,7 +62,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         }${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
         ficha.id,
       );
-    });
+    }, 'rede');
   };
 
   return (

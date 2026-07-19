@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
+import { COLORSETS, type ColorsetId } from './colorsets';
 import { consumirForcados } from './forcarRolagem';
 
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
@@ -70,6 +71,8 @@ export function useDiceBox(containerId: string, enabled = true) {
   /** espelho síncrono de `rolando` — a lib não enfileira roll() concorrente (ver rolar() abaixo),
    *  então o guard de "já tem uma rolagem em andamento" precisa ser lido antes do setState assentar. */
   const rolandoRef = useRef(false);
+  /** evita chamar updateConfig (recarrega tema) toda rolagem — só quando o colorset pedido muda. */
+  const colorsetAtualRef = useRef<ColorsetId>('rede');
 
   useEffect(() => {
     if (!enabled) {
@@ -92,18 +95,12 @@ export function useDiceBox(containerId: string, enabled = true) {
       assetPath: '/assets/dice-box-threejs/',
       theme_surface: 'green-felt',
       theme_material: 'glass',
-      // números em âmbar vivo sobre corpo ciano frio (ver arte.md)
-      theme_customColorset: {
-        background: '#2a6d78',
-        foreground: '#ffc400',
-        outline: '#0b0d11',
-        texture: 'glass',
-        material: 'glass',
-      },
+      theme_customColorset: COLORSETS.rede,
       sounds: false,
       shadows: true,
     });
     boxRef.current = box;
+    colorsetAtualRef.current = 'rede';
 
     const iniciar = async () => {
       await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
@@ -126,6 +123,7 @@ export function useDiceBox(containerId: string, enabled = true) {
   const rolar = (
     notacao: string | RollTermo | RollTermo[],
     onComplete: (grupos: GrupoResultado[]) => void,
+    colorset: ColorsetId = 'rede',
   ) => {
     const box = boxRef.current;
     // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima
@@ -135,14 +133,24 @@ export function useDiceBox(containerId: string, enabled = true) {
     rolandoRef.current = true;
     setRolando(true);
     const termos = normalizarTermos(notacao);
-    box
-      .roll(montarNotacao(termos))
-      .then((r) => onComplete(paraGrupos(r)))
-      .catch((e: unknown) => setErro(String(e)))
-      .finally(() => {
+
+    (async () => {
+      try {
+        // só recarrega o tema se o colorset pedido for diferente do atual — updateConfig é async
+        // e refaz o loadTheme, então evitar isso em toda rolagem honesta (padrão 'rede').
+        if (colorset !== colorsetAtualRef.current) {
+          await box.updateConfig({ theme_customColorset: COLORSETS[colorset] });
+          colorsetAtualRef.current = colorset;
+        }
+        const r = await box.roll(montarNotacao(termos));
+        onComplete(paraGrupos(r));
+      } catch (e: unknown) {
+        setErro(String(e));
+      } finally {
         rolandoRef.current = false;
         setRolando(false);
-      });
+      }
+    })();
   };
 
   return { ready, erro, rolando, rolar };

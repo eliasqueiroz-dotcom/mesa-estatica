@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { calcularPerdaSanidade } from '../../rules/sanidade';
@@ -26,7 +27,7 @@ export function extrairResultadosSanidade(grupos: RollGroupResult[], perdaTermo:
 
 interface RoladorSanidadeProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void) => void;
+  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
 }
 
 export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) {
@@ -79,7 +80,7 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
         ficha.id,
       );
       ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-    });
+    }, 'ruido');
   };
 
   return (

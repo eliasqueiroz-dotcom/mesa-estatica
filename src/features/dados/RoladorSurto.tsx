@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 
 interface RoladorSurtoProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void) => void;
+  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void, colorset?: ColorsetId) => void;
 }
 
 export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
@@ -35,7 +36,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
           ficha.id,
         );
       }
-    });
+    }, 'ruido');
   };
 
   const escolher = (lado: 'A' | 'B') => {
