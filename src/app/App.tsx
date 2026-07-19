@@ -112,21 +112,76 @@ export default function App() {
         </div>
         <ExportarImportar abrirControle={abrirControle} />
       </header>
-      <main style={{ flex: 1, overflow: 'hidden' }}>
-        {aba === 'sessao' && <Placeholder nome="Sessão" />}
-        {aba === 'personagens' && (
-          <div style={{ padding: '1.5rem', height: '100%' }}>
-            <FichasTab />
-          </div>
-        )}
-        {aba === 'dados' && (
-          <div style={{ padding: '1.5rem', height: '100%', overflowY: 'auto' }}>
-            <DadosTab />
-          </div>
-        )}
-        {aba === 'mapa' && <Placeholder nome="Mapa" />}
-        {aba === 'npcs' && <Placeholder nome="NPCs & Iniciativa" />}
-        {aba === 'log' && <LogTab />}
+      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'sessao' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'sessao' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <Placeholder nome="Sessão" />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'personagens' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'personagens' ? 'auto' : 'none',
+            padding: '1.5rem',
+            height: '100%',
+          }}
+        >
+          <FichasTab />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'dados' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'dados' ? 'auto' : 'none',
+            padding: '1.5rem',
+            height: '100%',
+            overflowY: 'auto',
+          }}
+        >
+          <DadosTab active={aba === 'dados'} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'mapa' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'mapa' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <Placeholder nome="Mapa" />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'npcs' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'npcs' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <Placeholder nome="NPCs & Iniciativa" />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'log' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'log' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <LogTab />
+        </div>
       </main>
     </div>
   );

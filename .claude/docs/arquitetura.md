@@ -7,27 +7,45 @@
 | Build | **Vite** | dev server local rápido, `npm run build` gera pasta estática servível offline |
 | UI | **React 18 + TypeScript** | ficha é CRUD reativo denso; derivados (`PV = base + 5×Vigor`) caem de graça; caminho de menor risco para construir rápido e certo |
 | Estado | **Zustand + middleware `persist`** | localStorage automático, sem boilerplate, selectors evitam re-render da ficha inteira a cada tecla |
-| Dados 3D | **`@3d-dice/dice-box`** (Babylon.js + Ammo.js) | ver "Correção — biblioteca de dados" abaixo: a lib do plano original está abandonada |
-| Tokens 3D | **cena Three.js própria, leve** (ver abaixo) | a dice-box roda a própria stack (Babylon) isolada num worker — não dá pra "reaproveitar a mesma cena" nem no sentido do plano original (Three) nem tecnicamente (motores diferentes). Tokens usam Three.js numa cena separada |
+| Dados 3D | **`@3d-dice/dice-box-threejs`** (Three.js + cannon-es) | ver "Rolagem forçada" abaixo: escolhido por suportar resultado forçado nativo (`1d20@X`), necessário pro modo determinístico do mestre. É a lib menos mantida (2022), mas Three vem bundlada nela (sem conflito com nosso Three 0.169) |
+| Tokens 3D | **cena Three.js própria, leve** (ver abaixo) | cena separada da dos dados. A dice-box-threejs bundla seu próprio Three; os tokens usam o Three 0.169 do projeto — duas instâncias, sem conflito (só um warning no console) |
 | Fontes | **@fontsource** (Barlow, Barlow Condensed, IBM Plex Mono) | self-host, zero dependência de internet na sessão |
 | Backend | **nenhum** | mestre único, screen share; `npm run dev` local ou `npx serve dist` |
 
-## Correção importante: rolagem honesta vs. determinística
+## Rolagem: honesta por padrão + modo forçado do mestre (decisão revertida)
 
-O plano original se contradizia — a seção dos dados pedia física 100% honesta e a seção do motor de regras pedia "resultado calculado passado como valor determinístico pro dado 3D". **Decisão: rolagem honesta.**
+O plano original (e as primeiras versões deste doc) diziam "rolagem sempre honesta, nunca `1d20@X`". **O usuário reverteu isso**: quer poder forçar um resultado quando precisar, controlando de **fora** da janela compartilhada no Discord. Decisão atual:
 
-Fluxo: UI monta o contexto do teste (atributo, perícia, DT, Ferido) → dispara `roll('1d20')` **sem** notação de resultado forçado → `onRollComplete` devolve o valor bruto da física (agrupado por `getRollResults()`) → o motor soma modificadores, classifica (sucesso/falha/margem 10+/20 nat/1 nat) → grava no log. Física decide o dado; matemática decide o teste.
+- **Padrão: honesto.** UI monta o contexto do teste → `roll('1d20')` (física) → o motor soma modificadores, classifica → log. Física decide o dado; matemática decide o teste.
+- **Exceção: forçado.** Se o mestre enfileirar valores pela **janela de controle** (`#controle`, janela separada), a próxima rolagem usa a notação `1d20@X` — a lib faz *swap da face* do dado depois que a física assenta, então o dado **cai fisicamente no valor** escolhido, indistinguível de uma rolagem honesta na tela.
 
-## Correção — biblioteca de dados: dice-box, não dice-box-threejs (achado do spike Dia 1)
+Por que `dice-box-threejs` e não o `@3d-dice/dice-box` (Babylon) que usávamos até aqui: **só a versão threejs suporta `@` forçado nativo.** No Babylon, o valor vem de um raycast na face que a física assentou (`Dice.js` → `getRollResult`), e os dados rodam num web-worker offscreen com a cena encapsulada em campos privados — forçar exigiria forkar a lib. A versão threejs entrega isso de fábrica. Trade-off aceito pelo usuário: lib menos mantida (v0.0.12, 2022).
 
-O plano original recomendava `@3d-dice/dice-box-threejs` (Three.js + Cannon-es). Checagem no npm registry no Dia 1 mostrou que essa lib está em **v0.0.12, com último publish em outubro/2022** — abandonada. A lib irmã do mesmo time, **`@3d-dice/dice-box`**, está em **v1.1.4 (última: agosto/2024, 52 releases)** e é a mantida ativamente — mas usa **Babylon.js + Ammo.js**, não Three.js/Cannon. Trocamos para ela. Consequências:
+### Como o forçado flui (arquivos)
 
-- Os tokens (seção 4.2) continuam em Three.js — engines diferentes, mas isso já não muda nada porque os tokens sempre iam precisar de cena própria (ver linha acima).
-- **A lib não publica tipos TypeScript.** Declaração ambiente mínima escrita à mão em [`src/dice/dice-box.d.ts`](../../src/dice/dice-box.d.ts), derivada de ler o bundle `dist/dice-box.es.js` diretamente (não confiar cegamente no README do GitHub — ver próximo ponto).
-- **Construtor é 1 argumento só**: `new DiceBox({ container: '#id', assetPath: '/assets/dice-box/', ... })`. O README do GitHub mostra `new DiceBox('#id', {...})` (2 argumentos) — **isso não bate com o código-fonte instalado da v1.1.4**. Confiar no código, não no README.
-- **`roll(notation)` resolve com um array plano de dados individuais**, não agrupado. Para ler o resultado somado/agrupado (o que a UI precisa: valor total do teste), usar o callback `box.onRollComplete = (results) => ...`, que recebe `getRollResults()` já agrupado por dado/grupo com `{ qty, value, sides, rolls: [...] }`. Isso importa especialmente pro Surto (seção 7 de `regras.md`), que rola 2×d20 em paralelo — `onRollComplete` dispara uma vez com os dois grupos prontos.
-- **Assets não são copiados automaticamente.** O `postinstall` da lib (`copyAssets.js`) é interativo (pede o caminho num prompt de terminal) e ficou bloqueado pelo `npm allow-scripts` neste ambiente. Copiar manualmente uma vez: `node_modules/@3d-dice/dice-box/dist/assets/*` → `public/assets/dice-box/`. Documentado no README do projeto (Dia 7).
-- Validado no spike: **10 rolagens consecutivas** cobrindo d4, d6, d8, d10, d12, d20 (×3), d100 e 2d8 — todas com física honesta (valores variados, sem repetição suspeita), zero erros de console, todos os assets em 200 OK. Renderiza via OffscreenCanvas + web worker (bom para performance em screen share).
+- [`src/dice/forcarRolagem.ts`](../../src/dice/forcarRolagem.ts) — canal via **BroadcastChannel** (`estatica-forcar-dados`). A janela de controle chama `enviarForcados(valores, umaVez)`; a principal chama `consumirForcados(totalDados)` no momento da rolagem. `umaVez` (padrão) força só a próxima e volta ao honesto; sync é bidirecional (as duas janelas mostram o mesmo estado).
+- [`src/dice/useDiceBox.ts`](../../src/dice/useDiceBox.ts) — adapter: converte `RollTermo[]`/string → notação da lib, anexa `@v1,v2,...` se há força enfileirada, e **traduz o resultado da lib de volta pro shape `RollGroupResult[]`** que os quatro roladores já consumiam (evitou reescrever a UI). Valores forçados são o **valor bruto do dado**, um por dado na ordem da rolagem (a ficha soma os modificadores depois).
+- [`src/features/controle/ControlPanel.tsx`](../../src/features/controle/ControlPanel.tsx) — a janela secreta (rota por hash `#controle`, aberta via `window.open` pelo botão "controle" no header). Mesma origin → BroadcastChannel conecta sem backend, funciona offline.
+
+Validado ponta a ponta com duas janelas reais: força de 1 dado (teste → 1 natural), de 2 dados (surto 2d20 → 10/20), reversão automática após consumir, sem erros de console.
+
+### API da lib (não publica tipos — decl. à mão em `src/dice/dice-box-threejs.d.ts`)
+
+- Construtor **2 argumentos**: `new DiceBox('#seletor', { assetPath, theme_customColorset, ... })`.
+- `initialize()` async **precisa ser chamado e aguardado** antes de rolar.
+- `roll(notation)` → Promise com `{ notation, sets: [{ num, sides, rolls: [{value}], total }], modifier, total }`. Notação combinada suportada: `1d8+1d20`, forçada `1d8+1d20@5,15`.
+- **Cor dos números**: `theme_customColorset.foreground` (aqui: âmbar `#ffc400`); `background` = corpo do dado (ciano `#2a6d78`). Sem precisar recolorir textura (era o problema do Babylon). Definido inline no `useDiceBox`.
+- Assets (texturas envmap/superfícies + sons) em `node_modules/@3d-dice/dice-box-threejs/public/` → copiados p/ `public/assets/dice-box-threejs/` pelo [`scripts/copy-dice-assets.mjs`](../../scripts/copy-dice-assets.mjs) no `postinstall`. `assetPath: '/assets/dice-box-threejs/'`.
+- Three vem **bundlada** na lib (não importa `three` externo) → sem conflito com nosso `three@0.169` dos tokens.
+
+**Pendente do Dia 4** (herdado): a bandeja visual (`<div>`) ainda é maior que a área real de arremesso da física — reduzir a caixa ou ajustar escala quando desenhar a bandeja definitiva.
+
+## Shell de abas e preservação de estado (sessão 18/07/2026)
+
+- O bug de regressão identificado na navegação entre abas veio de renderização condicional de `App.tsx`: ao trocar de "Dados & Regras" para outra aba, o componente de dados era desmontado.
+- Em React, isso faz o `useState` interno dos roladores (Surto, Trauma, Sanidade, rolagem livre) voltar ao valor inicial e também ativa o cleanup do hook de dados (`useDiceBox`), que `replaceChildren()` no container da bandeja — por isso o dado desaparecia.
+- Correção aplicada: não remover o componente de uma aba do arbore; manter o painel montado e controlar apenas `display`/visibilidade no shell principal. Isso preserva o estado local da seleção e da mesa de dados sem mudar a lógica do motor.
+- Efeito esperado e validado: ao voltar à aba de dados, as opções escolhidas e a bandeja continuam presentes. A correção foi confirmada com `npm run build` concluindo com êxito.
 
 ## Estrutura de pastas
 

@@ -24,6 +24,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     motivo: '',
     perguntaQueTeDefine: '',
     respostaPergunta: '',
+    gancho: '',
     vinculos: [],
     atributos: { ...ATRIBUTOS_ZERO },
     pvAtual: 20,

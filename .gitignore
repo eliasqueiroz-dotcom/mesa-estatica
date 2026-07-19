@@ -8,3 +8,5 @@ public/assets/
 vite.config.js
 vite.config.d.ts
 .claude/settings.local.json
+# config local de dev (contém caminho absoluto da máquina atual — regenerável)
+.claude/launch.json

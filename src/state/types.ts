@@ -45,6 +45,7 @@ export interface Ficha {
   motivo: string;
   perguntaQueTeDefine: string;
   respostaPergunta: string;
+  gancho: string;
 
   vinculos: Vinculo[]; // máx 3
 
@@ -112,7 +113,8 @@ export type TipoLog =
   | 'cura'
   | 'dinheiro'
   | 'determinacao'
-  | 'anotacao';
+  | 'anotacao'
+  | 'rolagem-livre';
 
 export interface EntradaLog {
   id: string;

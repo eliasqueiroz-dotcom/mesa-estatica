@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/copy-dice-assets.mjs",
+    "setup": "node scripts/copy-dice-assets.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
@@ -11,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@3d-dice/dice-box": "^1.1.4",
+    "@3d-dice/dice-box-threejs": "^0.0.12",
     "@fontsource/barlow": "^5.1.0",
     "@fontsource/barlow-condensed": "^5.1.0",
     "@fontsource/ibm-plex-mono": "^5.1.0",

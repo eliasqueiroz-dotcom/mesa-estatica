@@ -96,6 +96,6 @@ Tom: frases curtas, minúsculas no log (estética terminal), sem exclamações, 
 - **Cantos**: raio pequeno (2–4px) ou zero. Nada de rounded-2xl amigável.
 - **Sombras**: quase nenhuma; elevação por borda `--concrete-2` e diferença de fundo. Glow só em `--rede-glow` para foco/ação primária.
 - **Barras de PV/Sanidade**: retas, segmentadas (ticks a cada 5), com a **linha da metade marcada** — Sanidade rotulada como `NÍVEL DE RUÍDO` invertido visualmente (quanto menos sanidade, mais a barra "chia" com textura).
-- **Dados 3D**: bandeja com dois colorsets — `rede` (vidro frio ciano, testes normais) e `ruído` (âmbar sujo/vermelho, Sanidade e Surto).
+- **Dados 3D**: números em âmbar vivo (`#ffc400`) sobre corpo ciano frio, via `theme_customColorset` da dice-box-threejs (`foreground`/`background` — sem recolorir textura; definido inline em `useDiceBox.ts`). Validado no navegador. **Dia 4**: quando os dois colorsets do plano forem implementados (`rede` ciano para testes, `ruído` âmbar/vermelho para Sanidade/Surto), cuidar do contraste — número âmbar sobre corpo âmbar some; usar `foreground` claro nesse caso. Trocar de colorset por rolagem é `updateConfig({ theme_customColorset })` antes do `roll`.
 - **Tokens de personagem**: cristal/chip facetado low-poly, cor do personagem + inicial, rotação lenta; com Sanidade tier 3 o cristal ganha jitter. Fallback de rosto: placa com foto + shader scanline = crachá holográfico (estética de vigilância — não é plano B pobre).
 - **Ícones**: traço fino, geométricos, consistentes (Lucide serve, stroke 1.5) — nunca emoji na UI.
