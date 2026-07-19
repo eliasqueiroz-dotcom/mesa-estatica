@@ -93,6 +93,8 @@ export default function App() {
         setPedidosRolagemRapida((n) => n + 1);
       } else if (tecla === 's') {
         setOverlayAberto(true);
+      } else if (tecla === 'x') {
+        setOverlayAberto(false);
       }
     };
     window.addEventListener('keydown', handler);
