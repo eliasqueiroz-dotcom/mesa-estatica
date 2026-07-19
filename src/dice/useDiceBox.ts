@@ -66,6 +66,10 @@ export function useDiceBox(containerId: string, enabled = true) {
   const boxRef = useRef<DiceBox | null>(null);
   const [ready, setReady] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [rolando, setRolando] = useState(false);
+  /** espelho síncrono de `rolando` — a lib não enfileira roll() concorrente (ver rolar() abaixo),
+   *  então o guard de "já tem uma rolagem em andamento" precisa ser lido antes do setState assentar. */
+  const rolandoRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -124,13 +128,22 @@ export function useDiceBox(containerId: string, enabled = true) {
     onComplete: (grupos: GrupoResultado[]) => void,
   ) => {
     const box = boxRef.current;
-    if (!box) return;
+    // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima
+    // reescreve notationVectors/diceList (estado único da instância) e derruba o resultado da
+    // primeira — por isso o cadeado é aqui, no único ponto que os 5 roladores compartilham.
+    if (!box || rolandoRef.current) return;
+    rolandoRef.current = true;
+    setRolando(true);
     const termos = normalizarTermos(notacao);
     box
       .roll(montarNotacao(termos))
       .then((r) => onComplete(paraGrupos(r)))
-      .catch((e: unknown) => setErro(String(e)));
+      .catch((e: unknown) => setErro(String(e)))
+      .finally(() => {
+        rolandoRef.current = false;
+        setRolando(false);
+      });
   };
 
-  return { ready, erro, rolar };
+  return { ready, erro, rolando, rolar };
 }
