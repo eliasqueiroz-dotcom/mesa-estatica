@@ -5,6 +5,7 @@ import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
 import NpcsTab from '../features/npcs/NpcsTab';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
+import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import LogTab from './LogTab';
@@ -147,6 +148,7 @@ export default function App() {
         </div>
         <ExportarImportar abrirControle={abrirControle} />
       </header>
+      <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <div
           style={{

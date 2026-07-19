@@ -25,6 +25,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
   const ajustarDeterminacao = useStore((s) => s.ajustarDeterminacao);
+  const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const [alertas, setAlertas] = useState<string[]>([]);
 
   const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
@@ -35,6 +36,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const linhaSanidade = metade(sanidadeMaxima);
   const traumasAtivos = ficha.traumas.filter((t) => !t.virouCicatriz).length;
   const tierRuido = calcularTierRuido(ficha.sanidadeAtual, sanidadeMaxima);
+  const surtoAtivoAgora = ficha.surtoAtivo === contadorCena;
 
   const handleSanidade = (valor: number) => {
     const resultado = ajustarSanidadeAtual(ficha.id, valor);
@@ -132,9 +134,14 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
         </div>
       ))}
 
-      {traumasAtivos >= 3 && (
+      {(traumasAtivos >= 3 || surtoAtivoAgora) && (
         <div className="badges-linha">
-          <span className="badge">à beira de se perder — 3+ traumas</span>
+          {surtoAtivoAgora && (
+            <span className="badge" style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}>
+              surto ativo nesta cena
+            </span>
+          )}
+          {traumasAtivos >= 3 && <span className="badge">à beira de se perder — 3+ traumas</span>}
         </div>
       )}
 

@@ -10,7 +10,7 @@ const NOMES_TIPO: Record<TipoRegulador, string> = {
 };
 
 export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps) {
-  const sessaoAtual = useStore((s) => s.sessao.numeroSessao);
+  const sessaoAtual = useStore((s) => s.sessaoPublica.numeroSessao);
 
   const ajustarAcessos = (delta: number) => {
     onChange({ acessos: Math.max(0, ficha.acessos + delta) });

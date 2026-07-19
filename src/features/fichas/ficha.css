@@ -362,6 +362,10 @@
   );
 }
 
+.barra-segmentada[data-variante='gauge'] .barra-segmentada__preenchimento {
+  background: var(--rede-dim);
+}
+
 .barra-segmentada__tick {
   position: absolute;
   top: 0;

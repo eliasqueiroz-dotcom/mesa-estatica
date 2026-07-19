@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
+import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
 import { comprimirImagem } from './comprimirImagem';
 import './mapa.css';
+import TokenOverlay from './TokenOverlay';
 
-const COR_NPC = '#7d8594';
 const LARGURA_ALTURA_MINIMA = 2; // % — evita a caixa do grid colapsar a zero arrastando uma alça
+const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup em um token conta como clique, não arrasto
 
 // arredonda pro campo numérico ficar digitável (arrastar produz float; digitar quer inteiro).
 const clamp = (valor: number, min: number, max: number) => Math.round(Math.max(min, Math.min(max, valor)));
@@ -40,14 +42,20 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
   const removerTokenMapa = useStore((s) => s.removerTokenMapa);
 
+  const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [tokenOverlay, setTokenOverlay] = useState<{ tipo: 'pc' | 'npc'; id: string } | null>(null);
   const arrastoRef = useRef<EstadoArrasto | null>(null);
   /** posição do ponteiro (% de .mapa-area) e grade no instante em que o arrasto começou — os
    *  handlers de alça calculam por delta a partir daqui, não por posição absoluta como o token. */
   const inicioArrastoRef = useRef<{ px: number; py: number; grade: GradeMapa } | null>(null);
+  /** posição do ponteiro em px de tela no pointerdown de um token — distingue clique (abre
+   *  overlay) de arrasto (move token), comparando com o pointerup. */
+  const inicioCliqueRef = useRef<{ x: number; y: number } | null>(null);
 
   // mede o container pra dimensionar a câmera ortográfica da cena 3D (tokens3d/TokenScene) e pra
   // converter posição de ponteiro em coordenada normalizada durante o drag.
@@ -66,8 +74,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const ficha = fichas.find((f) => f.id === id);
     if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, ficha };
     const npc = npcs.find((n) => n.id === id);
-    if (npc) return { nome: npc.nome || 'sem nome', cor: COR_NPC, ficha: null as null };
-    return { nome: '?', cor: COR_NPC, ficha: null as null };
+    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, ficha: null as null };
+    return { nome: '?', cor: COR_NPC_PADRAO, ficha: null as null };
   };
 
   const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,6 +104,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     e.preventDefault();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     arrastoRef.current = { tipo: 'token', id };
+    inicioCliqueRef.current = { x: e.clientX, y: e.clientY };
   };
 
   const iniciarMoverGrade = (e: React.PointerEvent) => {
@@ -164,9 +173,19 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     atualizarGrade(patch);
   };
 
-  const soltarArrasto = () => {
+  const soltarArrasto = (e: React.PointerEvent) => {
+    const estado = arrastoRef.current;
+    const inicioClique = inicioCliqueRef.current;
+    if (estado?.tipo === 'token' && inicioClique) {
+      const dist = Math.hypot(e.clientX - inicioClique.x, e.clientY - inicioClique.y);
+      if (dist < LIMIAR_CLIQUE) {
+        const token = mapa.tokens.find((t) => t.id === estado.id);
+        if (token) setTokenOverlay({ tipo: token.tipo, id: token.participanteId });
+      }
+    }
     arrastoRef.current = null;
     inicioArrastoRef.current = null;
+    inicioCliqueRef.current = null;
   };
 
   const tokensVisuais = mapa.tokens.map((t) => {
@@ -174,7 +193,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const sanidadeCritica = p.ficha
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
       : false;
-    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, nome: p.nome };
+    const surtoAtivo = p.ficha ? p.ficha.surtoAtivo === contadorCena : false;
+    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, nome: p.nome };
   });
 
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
@@ -216,77 +236,6 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         )}
       </div>
 
-      {mapa.grade.ativa && (
-        <div className="campos-grid mapa-grade-config">
-          <div>
-            <label htmlFor="grade-colunas">colunas</label>
-            <input
-              id="grade-colunas"
-              type="number"
-              min={1}
-              max={100}
-              value={mapa.grade.colunas}
-              onChange={(e) => atualizarGrade({ colunas: clamp(Number(e.target.value) || 1, 1, 100) })}
-            />
-          </div>
-          <div>
-            <label htmlFor="grade-linhas">linhas</label>
-            <input
-              id="grade-linhas"
-              type="number"
-              min={1}
-              max={100}
-              value={mapa.grade.linhas}
-              onChange={(e) => atualizarGrade({ linhas: clamp(Number(e.target.value) || 1, 1, 100) })}
-            />
-          </div>
-          <div>
-            <label htmlFor="grade-x">x (%)</label>
-            <input
-              id="grade-x"
-              type="number"
-              min={0}
-              max={100}
-              value={mapa.grade.x}
-              onChange={(e) => atualizarGrade({ x: clamp(Number(e.target.value) || 0, 0, 100) })}
-            />
-          </div>
-          <div>
-            <label htmlFor="grade-y">y (%)</label>
-            <input
-              id="grade-y"
-              type="number"
-              min={0}
-              max={100}
-              value={mapa.grade.y}
-              onChange={(e) => atualizarGrade({ y: clamp(Number(e.target.value) || 0, 0, 100) })}
-            />
-          </div>
-          <div>
-            <label htmlFor="grade-largura">largura (%)</label>
-            <input
-              id="grade-largura"
-              type="number"
-              min={0}
-              max={100}
-              value={mapa.grade.largura}
-              onChange={(e) => atualizarGrade({ largura: clamp(Number(e.target.value) || 0, 0, 100) })}
-            />
-          </div>
-          <div>
-            <label htmlFor="grade-altura">altura (%)</label>
-            <input
-              id="grade-altura"
-              type="number"
-              min={0}
-              max={100}
-              value={mapa.grade.altura}
-              onChange={(e) => atualizarGrade({ altura: clamp(Number(e.target.value) || 0, 0, 100) })}
-            />
-          </div>
-        </div>
-      )}
-
       <div
         ref={containerRef}
         className="mapa-area"
@@ -298,6 +247,79 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           <img src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false} />
         ) : (
           <p className="vazio mapa-vazio">nenhum mapa carregado — clique em &quot;carregar mapa&quot;.</p>
+        )}
+
+        {/* painel flutuante, não sibling no flex — não pode alterar o tamanho de .mapa-area
+            (bug de layout corrigido, mesa-estatica-multiplayer-completo.md Parte II §5). */}
+        {mapa.grade.ativa && (
+          <div className="campos-grid mapa-grade-config">
+            <div>
+              <label htmlFor="grade-colunas">colunas</label>
+              <input
+                id="grade-colunas"
+                type="number"
+                min={1}
+                max={100}
+                value={mapa.grade.colunas}
+                onChange={(e) => atualizarGrade({ colunas: clamp(Number(e.target.value) || 1, 1, 100) })}
+              />
+            </div>
+            <div>
+              <label htmlFor="grade-linhas">linhas</label>
+              <input
+                id="grade-linhas"
+                type="number"
+                min={1}
+                max={100}
+                value={mapa.grade.linhas}
+                onChange={(e) => atualizarGrade({ linhas: clamp(Number(e.target.value) || 1, 1, 100) })}
+              />
+            </div>
+            <div>
+              <label htmlFor="grade-x">x (%)</label>
+              <input
+                id="grade-x"
+                type="number"
+                min={0}
+                max={100}
+                value={mapa.grade.x}
+                onChange={(e) => atualizarGrade({ x: clamp(Number(e.target.value) || 0, 0, 100) })}
+              />
+            </div>
+            <div>
+              <label htmlFor="grade-y">y (%)</label>
+              <input
+                id="grade-y"
+                type="number"
+                min={0}
+                max={100}
+                value={mapa.grade.y}
+                onChange={(e) => atualizarGrade({ y: clamp(Number(e.target.value) || 0, 0, 100) })}
+              />
+            </div>
+            <div>
+              <label htmlFor="grade-largura">largura (%)</label>
+              <input
+                id="grade-largura"
+                type="number"
+                min={0}
+                max={100}
+                value={mapa.grade.largura}
+                onChange={(e) => atualizarGrade({ largura: clamp(Number(e.target.value) || 0, 0, 100) })}
+              />
+            </div>
+            <div>
+              <label htmlFor="grade-altura">altura (%)</label>
+              <input
+                id="grade-altura"
+                type="number"
+                min={0}
+                max={100}
+                value={mapa.grade.altura}
+                onChange={(e) => atualizarGrade({ altura: clamp(Number(e.target.value) || 0, 0, 100) })}
+              />
+            </div>
+          </div>
         )}
 
         {mapa.grade.ativa && (
@@ -352,6 +374,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           <div
             key={t.id}
             className="mapa-token"
+            data-surto={t.surtoAtivo}
             style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, borderColor: t.cor }}
             onPointerDown={iniciarArrastoToken(t.id)}
             title={t.nome}
@@ -369,6 +392,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           </div>
         ))}
       </div>
+
+      {tokenOverlay && <TokenOverlay tipo={tokenOverlay.tipo} id={tokenOverlay.id} onFechar={() => setTokenOverlay(null)} />}
     </div>
   );
 }

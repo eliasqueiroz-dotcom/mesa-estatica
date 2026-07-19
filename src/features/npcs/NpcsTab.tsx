@@ -1,3 +1,4 @@
+import SeletorCor from '../fichas/SeletorCor';
 import { useStore } from '../../state/store';
 import './npcs.css';
 
@@ -12,6 +13,13 @@ export default function NpcsTab() {
   const rolarIniciativaTodos = useStore((s) => s.rolarIniciativaTodos);
   const removerDaIniciativa = useStore((s) => s.removerDaIniciativa);
   const limparIniciativa = useStore((s) => s.limparIniciativa);
+
+  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
+  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const iniciarModoCombate = useStore((s) => s.iniciarModoCombate);
+  const avancarTurno = useStore((s) => s.avancarTurno);
+  const encerrarModoCombate = useStore((s) => s.encerrarModoCombate);
 
   const remover = (id: string, nome: string) => {
     const ok = window.confirm(`tirar "${nome || 'sem nome'}" do tabuleiro? não volta.`);
@@ -42,6 +50,7 @@ export default function NpcsTab() {
                     onChange={(e) => atualizarNpc(n.id, { nome: e.target.value })}
                     style={{ flex: 1 }}
                   />
+                  <SeletorCor valor={n.corVisual} onEscolher={(cor) => atualizarNpc(n.id, { corVisual: cor })} />
                   <span
                     className="icone-botao"
                     role="button"
@@ -117,6 +126,37 @@ export default function NpcsTab() {
           </div>
         </div>
 
+        {iniciativa.length > 0 && (
+          <div
+            className="alerta-banner"
+            style={{
+              marginBottom: '0.75rem',
+              borderColor: modoCombate ? 'var(--rede)' : undefined,
+              color: modoCombate ? 'var(--rede)' : undefined,
+            }}
+          >
+            <span className="mono">
+              {modoCombate ? `combate — rodada ${rodada} · vez de ${iniciativa[indiceAtualTurno]?.nome ?? '?'}` : 'fora de combate'}
+            </span>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              {modoCombate ? (
+                <>
+                  <button className="icone-botao acento" onClick={avancarTurno}>
+                    próximo turno
+                  </button>
+                  <button className="icone-botao" onClick={encerrarModoCombate}>
+                    encerrar combate
+                  </button>
+                </>
+              ) : (
+                <button className="icone-botao acento" onClick={iniciarModoCombate}>
+                  iniciar combate
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {iniciativa.length === 0 ? (
           <p className="vazio">sem ordem de combate. role a iniciativa quando o encontro começar.</p>
         ) : (
@@ -132,8 +172,15 @@ export default function NpcsTab() {
             </thead>
             <tbody>
               {iniciativa.map((e, i) => (
-                <tr key={e.id}>
-                  <td className="mono">{i + 1}</td>
+                <tr
+                  key={e.id}
+                  style={
+                    modoCombate && i === indiceAtualTurno
+                      ? { background: 'color-mix(in srgb, var(--rede) 15%, transparent)' }
+                      : undefined
+                  }
+                >
+                  <td className="mono">{modoCombate && i === indiceAtualTurno ? '▶' : i + 1}</td>
                   <td>{e.nome}</td>
                   <td className="mono">{e.tipo === 'pc' ? 'pc' : 'npc'}</td>
                   <td className="mono">{e.valor}</td>

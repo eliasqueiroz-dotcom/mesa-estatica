@@ -77,11 +77,17 @@ export interface Ficha {
   dinheiroPonto: number;
 
   anotacoes: string;
+
+  /** nº da cena (sessaoPublica.contadorCena) em que o Surto disparou; null = sem Surto ativo.
+   *  Marcador válido enquanto === sessaoPublica.contadorCena — avançar cena invalida sozinho,
+   *  sem precisar limpar ficha por ficha (mesa-estatica-multiplayer-completo.md Parte II §2). */
+  surtoAtivo: number | null;
 }
 
 export interface Npc {
   id: string;
   nome: string;
+  corVisual: string;
   pvAtual: number;
   pvMaximo: number;
   defesa: number;
@@ -126,12 +132,62 @@ export interface EntradaLog {
   texto: string;
 }
 
-export interface EstadoSessao {
+export interface Progresso {
+  atual: number;
+  total: number;
+}
+
+export interface SessaoPublica {
   nomeDaMesa: string;
   numeroSessao: number;
-  cenaAtual: string;
   clima: string;
   hora: string;
+  /** "o que os jogadores veem" (mesa-estatica-multiplayer-completo.md Parte III §2) — já existia. */
+  cenaAtual: string;
+  caso: string;
+  localAtual: string;
+  objetivo: string;
+  progresso: Progresso;
+  atmosfera: string;
+  /** contador de cena pro Surto (mesa-estatica-multiplayer-completo.md Parte II §2) — não é `cenaAtual`. */
+  contadorCena: number;
+
+  /** Modo combate por turnos (Parte II §4). A ordem em si continua em `EstadoGlobal.iniciativa`
+   *  (já existia) — aqui só o estado de "de quem é a vez". */
+  modoCombate: boolean;
+  indiceAtualTurno: number;
+  rodada: number;
+}
+
+export interface EventoSessao {
+  id: string;
+  texto: string;
+  feito: boolean;
+}
+
+export interface Lembrete {
+  id: string;
+  texto: string;
+}
+
+export interface EstatisticasSessao {
+  rolagens: number;
+  surtos: number;
+  /** sem gatilho automático (não há regra de morte em regras.md) — ajustado manualmente. */
+  mortes: number;
+  /** ISO; null = timer da sessão parado. */
+  iniciadaEm: string | null;
+}
+
+export interface SessaoPrivada {
+  oQueRealmenteAcontece: string;
+  proximoEvento: string;
+  lembretes: Lembrete[];
+  eventos: EventoSessao[];
+  tensao: number; // 0-100
+  ruidoNarrativo: number; // 0-100
+  ameaca: number; // 0-100
+  estatisticas: EstatisticasSessao;
 }
 
 export interface EstadoConfig {
@@ -156,7 +212,8 @@ export interface EstadoMapa {
 
 export interface EstadoGlobal {
   schemaVersion: number;
-  sessao: EstadoSessao;
+  sessaoPublica: SessaoPublica;
+  sessaoPrivada: SessaoPrivada;
   fichas: Ficha[];
   fichaAtivaId: string | null;
   npcs: Npc[];

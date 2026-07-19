@@ -1,4 +1,5 @@
 import { ANTECEDENTES } from '../../../rules/data/antecedentes';
+import SeletorCor from '../SeletorCor';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) {
@@ -69,6 +70,10 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label>Cor do token</label>
+          <SeletorCor valor={ficha.corVisual} onEscolher={(cor) => onChange({ corVisual: cor })} />
         </div>
       </div>
       <div className="campos-grid" style={{ marginTop: '0.6rem' }}>

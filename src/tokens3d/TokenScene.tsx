@@ -7,6 +7,8 @@ export interface TokenVisual {
   y: number; // normalizado 0-1
   cor: string;
   sanidadeCritica: boolean;
+  /** Surto ativo nesta cena (Parte II §2) — pulso de escala, distinto do jitter de Sanidade crítica. */
+  surtoAtivo: boolean;
 }
 
 interface Props {
@@ -118,6 +120,7 @@ export default function TokenScene({ tokens, width, height, active }: Props) {
           mesh.position.set(px, py, 0);
           mesh.rotation.y += dt * 0.6;
           mesh.rotation.x += dt * 0.15;
+          mesh.scale.setScalar(t.surtoAtivo ? 1 + Math.sin(agora / 150) * 0.18 : 1);
         }
         renderer.render(scene, camera);
       }

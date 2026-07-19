@@ -2,7 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { ordenarIniciativa } from '../rules/teste';
-import { criarEstadoInicial, criarFichaVazia, criarGradeInicial, criarNpcVazio, SCHEMA_VERSION } from './factories';
+import {
+  COR_NPC_PADRAO,
+  criarEstadoInicial,
+  criarFichaVazia,
+  criarGradeInicial,
+  criarNpcVazio,
+  criarSessaoPrivada,
+  criarSessaoPublica,
+  SCHEMA_VERSION,
+} from './factories';
 import type {
   EntradaIniciativa,
   EntradaLog,
@@ -11,9 +20,14 @@ import type {
   Ficha,
   GradeMapa,
   Npc,
+  SessaoPrivada,
+  SessaoPublica,
   TipoLog,
   TokenMapa,
 } from './types';
+
+/** tipos de log que representam uma rolagem de dado — conta pra `estatisticas.rolagens`. */
+const TIPOS_ROLAGEM: TipoLog[] = ['teste', 'rolagem-livre', 'surto', 'iniciativa'];
 
 export interface AlertaSanidade {
   cruzouLinhaSanidade: boolean;
@@ -49,6 +63,13 @@ interface Acoes {
   removerDaIniciativa: (id: string) => void;
   limparIniciativa: () => void;
 
+  /** Rola iniciativa se ainda não houver, e liga o modo combate na 1ª entrada da ordem. */
+  iniciarModoCombate: () => void;
+  /** Passa pro próximo em `iniciativa`; dá a volta soma 1 em `rodada`. */
+  avancarTurno: () => void;
+  /** Só para de checar a trava — não zera `iniciativa`/`rodada` (mesa-estatica-multiplayer-completo.md Parte I §6.3). */
+  encerrarModoCombate: () => void;
+
   atualizarMapa: (patch: Partial<EstadoMapa>) => void;
   atualizarGrade: (patch: Partial<GradeMapa>) => void;
   /** Ignora se o participante já tem token no mapa (evita duplicar ao clicar 2x). */
@@ -59,7 +80,23 @@ interface Acoes {
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
   limparLog: () => void;
 
-  atualizarSessao: (patch: Partial<EstadoGlobal['sessao']>) => void;
+  atualizarSessaoPublica: (patch: Partial<SessaoPublica>) => void;
+  atualizarSessaoPrivada: (patch: Partial<SessaoPrivada>) => void;
+  /** incrementa o contador de cena (usado pelo Surto — ver mesa-estatica-multiplayer-completo.md Parte II §2). */
+  avancarCena: () => void;
+
+  adicionarEvento: (texto: string) => void;
+  alternarEvento: (id: string) => void;
+  removerEvento: (id: string) => void;
+
+  adicionarLembrete: (texto: string) => void;
+  removerLembrete: (id: string) => void;
+
+  /** Clampa em >= 0. Sem gatilho automático — não há regra de morte em regras.md. */
+  ajustarMortes: (delta: number) => void;
+  iniciarSessaoTimer: () => void;
+  encerrarSessaoTimer: () => void;
+
   atualizarConfig: (patch: Partial<EstadoGlobal['config']>) => void;
 
   /** Dispara o burst de 1,5s do sistema de ruído (arte.md) — queda de Sanidade e rolagem de Surto. */
@@ -122,7 +159,19 @@ export const useStore = create<Store>()(
           cruzouLinhaSanidade: cruzouLinhaDescendo(anterior, valor, linha),
           surtoDisparado: perdeuCincoOuMaisDeUmaVez(anterior, valor),
         };
-        set((s) => ({ fichas: s.fichas.map((f) => (f.id === id ? { ...f, sanidadeAtual: valor } : f)) }));
+        set((s) => ({
+          fichas: s.fichas.map((f) =>
+            f.id === id
+              ? {
+                  ...f,
+                  sanidadeAtual: valor,
+                  // marca o Surto até o fim da cena atual — avançar cena invalida sozinho
+                  // (comparação por número, não precisa limpar ficha por ficha depois).
+                  surtoAtivo: alerta.surtoDisparado ? get().sessaoPublica.contadorCena : f.surtoAtivo,
+                }
+              : f,
+          ),
+        }));
         get().registrarLog(
           'sanidade',
           `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
@@ -130,6 +179,14 @@ export const useStore = create<Store>()(
         );
         // qualquer queda de Sanidade acende o burst do ruído, não só o Surto — reação instantânea.
         if (delta < 0) get().dispararBurstRuido();
+        if (alerta.surtoDisparado) {
+          set((s) => ({
+            sessaoPrivada: {
+              ...s.sessaoPrivada,
+              estatisticas: { ...s.sessaoPrivada.estatisticas, surtos: s.sessaoPrivada.estatisticas.surtos + 1 },
+            },
+          }));
+        }
         return alerta;
       },
 
@@ -205,6 +262,23 @@ export const useStore = create<Store>()(
       removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
       limparIniciativa: () => set({ iniciativa: [] }),
 
+      iniciarModoCombate: () => {
+        if (get().iniciativa.length === 0) get().rolarIniciativaTodos();
+        if (get().iniciativa.length === 0) return; // ninguém pra lutar — não liga o modo.
+        set((s) => ({
+          sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno: 0, rodada: 1 },
+        }));
+      },
+      avancarTurno: () =>
+        set((s) => {
+          const total = s.iniciativa.length;
+          if (total === 0) return s;
+          const proximo = (s.sessaoPublica.indiceAtualTurno + 1) % total;
+          const rodada = proximo === 0 ? s.sessaoPublica.rodada + 1 : s.sessaoPublica.rodada;
+          return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada } };
+        }),
+      encerrarModoCombate: () => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false } })),
+
       atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
       atualizarGrade: (patch) => set((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ...patch } } })),
       adicionarTokenMapa: (participanteId, tipo) =>
@@ -234,18 +308,88 @@ export const useStore = create<Store>()(
           texto,
         };
         set((s) => ({ log: [entrada, ...s.log] }));
+        if (TIPOS_ROLAGEM.includes(tipo)) {
+          set((s) => ({
+            sessaoPrivada: {
+              ...s.sessaoPrivada,
+              estatisticas: { ...s.sessaoPrivada.estatisticas, rolagens: s.sessaoPrivada.estatisticas.rolagens + 1 },
+            },
+          }));
+        }
       },
       limparLog: () => set({ log: [] }),
 
-      atualizarSessao: (patch) => set((s) => ({ sessao: { ...s.sessao, ...patch } })),
+      atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
+      atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),
+      avancarCena: () =>
+        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, contadorCena: s.sessaoPublica.contadorCena + 1 } })),
+
+      adicionarEvento: (texto) =>
+        set((s) => ({
+          sessaoPrivada: {
+            ...s.sessaoPrivada,
+            eventos: [...s.sessaoPrivada.eventos, { id: crypto.randomUUID(), texto, feito: false }],
+          },
+        })),
+      alternarEvento: (id) =>
+        set((s) => ({
+          sessaoPrivada: {
+            ...s.sessaoPrivada,
+            eventos: s.sessaoPrivada.eventos.map((e) => (e.id === id ? { ...e, feito: !e.feito } : e)),
+          },
+        })),
+      removerEvento: (id) =>
+        set((s) => ({
+          sessaoPrivada: { ...s.sessaoPrivada, eventos: s.sessaoPrivada.eventos.filter((e) => e.id !== id) },
+        })),
+
+      adicionarLembrete: (texto) =>
+        set((s) => ({
+          sessaoPrivada: {
+            ...s.sessaoPrivada,
+            lembretes: [...s.sessaoPrivada.lembretes, { id: crypto.randomUUID(), texto }],
+          },
+        })),
+      removerLembrete: (id) =>
+        set((s) => ({
+          sessaoPrivada: { ...s.sessaoPrivada, lembretes: s.sessaoPrivada.lembretes.filter((l) => l.id !== id) },
+        })),
+
+      ajustarMortes: (delta) =>
+        set((s) => ({
+          sessaoPrivada: {
+            ...s.sessaoPrivada,
+            estatisticas: {
+              ...s.sessaoPrivada.estatisticas,
+              mortes: Math.max(0, s.sessaoPrivada.estatisticas.mortes + delta),
+            },
+          },
+        })),
+      iniciarSessaoTimer: () =>
+        set((s) =>
+          s.sessaoPrivada.estatisticas.iniciadaEm
+            ? s
+            : {
+                sessaoPrivada: {
+                  ...s.sessaoPrivada,
+                  estatisticas: { ...s.sessaoPrivada.estatisticas, iniciadaEm: new Date().toISOString() },
+                },
+              },
+        ),
+      encerrarSessaoTimer: () =>
+        set((s) => ({
+          sessaoPrivada: { ...s.sessaoPrivada, estatisticas: { ...s.sessaoPrivada.estatisticas, iniciadaEm: null } },
+        })),
+
       atualizarConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config, sessao, schemaVersion } = get();
+        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+          get();
         return JSON.stringify(
-          { schemaVersion, sessao, fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config },
           null,
           2,
         );
@@ -260,12 +404,48 @@ export const useStore = create<Store>()(
       name: 'estatica-mesa',
       version: SCHEMA_VERSION,
       migrate: (persistedState, versaoAnterior) => {
-        const estado = persistedState as Store;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const estado = persistedState as any;
         // v1 → v2: mapa não tinha `grade` (grid customizável da aba Mapa).
         if (versaoAnterior < 2 && estado.mapa && !estado.mapa.grade) {
           estado.mapa = { ...estado.mapa, grade: criarGradeInicial() };
         }
-        return estado;
+        // v2 → v3: `sessao` (único objeto) vira `sessaoPublica`/`sessaoPrivada` separados
+        // (mesa-estatica-multiplayer-completo.md Parte III §0 — prepara pro Supabase futuro).
+        if (versaoAnterior < 3 && estado.sessao) {
+          const antiga = estado.sessao;
+          estado.sessaoPublica = {
+            ...criarSessaoPublica(),
+            nomeDaMesa: antiga.nomeDaMesa,
+            numeroSessao: antiga.numeroSessao,
+            clima: antiga.clima,
+            hora: antiga.hora,
+            cenaAtual: antiga.cenaAtual,
+          };
+          estado.sessaoPrivada = criarSessaoPrivada();
+          delete estado.sessao;
+        }
+        // v3 → v4: cor de NPC editável, marcador de Surto até fim de cena, modo combate por
+        // turnos (mesa-estatica-multiplayer-completo.md Parte II §1-4).
+        if (versaoAnterior < 4) {
+          if (estado.npcs) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            estado.npcs = estado.npcs.map((n: any) => ({ corVisual: COR_NPC_PADRAO, ...n }));
+          }
+          if (estado.fichas) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            estado.fichas = estado.fichas.map((f: any) => ({ surtoAtivo: null, ...f }));
+          }
+          if (estado.sessaoPublica) {
+            estado.sessaoPublica = {
+              modoCombate: false,
+              indiceAtualTurno: 0,
+              rodada: 1,
+              ...estado.sessaoPublica,
+            };
+          }
+        }
+        return estado as Store;
       },
     },
   ),
