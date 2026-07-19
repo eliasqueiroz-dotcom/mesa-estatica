@@ -59,9 +59,14 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           className="secao"
           style={{ width: 260, marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}
         >
-          <h3 className="label" style={{ marginBottom: '0.5rem' }}>
-            d20 rápido
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h3 className="label" style={{ margin: 0 }}>
+              d20 rápido
+            </h3>
+            <button className="icone-botao" onClick={() => onAbertoChange(false)} title="fechar (atalho: X)">
+              ×
+            </button>
+          </div>
           {!modo2D && (
             <div
               id="dice-overlay-rapido"

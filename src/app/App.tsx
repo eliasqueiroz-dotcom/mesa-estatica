@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import DadosTab from '../features/dados/DadosTab';
 import QuickRollOverlay from '../features/dados/QuickRollOverlay';
 import FichasTab from '../features/fichas/FichasTab';
+import MapaTab from '../features/mapa/MapaTab';
+import NpcsTab from '../features/npcs/NpcsTab';
+import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import LogTab from './LogTab';
 
@@ -15,14 +18,6 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'npcs', label: 'NPCs & Iniciativa' },
   { id: 'log', label: 'Log' },
 ];
-
-function Placeholder({ nome }: { nome: string }) {
-  return (
-    <div style={{ padding: '1.5rem' }}>
-      <p className="vazio">{nome} — ainda não construído neste dia do roadmap.</p>
-    </div>
-  );
-}
 
 function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   const exportarJSON = useStore((s) => s.exportarJSON);
@@ -148,10 +143,12 @@ export default function App() {
             inset: 0,
             visibility: aba === 'sessao' ? 'visible' : 'hidden',
             pointerEvents: aba === 'sessao' ? 'auto' : 'none',
+            padding: '1.5rem',
             height: '100%',
+            overflowY: 'auto',
           }}
         >
-          <Placeholder nome="Sessão" />
+          <SessaoTab />
         </div>
         <div
           style={{
@@ -187,7 +184,7 @@ export default function App() {
             height: '100%',
           }}
         >
-          <Placeholder nome="Mapa" />
+          <MapaTab active={aba === 'mapa'} />
         </div>
         <div
           style={{
@@ -195,10 +192,12 @@ export default function App() {
             inset: 0,
             visibility: aba === 'npcs' ? 'visible' : 'hidden',
             pointerEvents: aba === 'npcs' ? 'auto' : 'none',
+            padding: '1.5rem',
             height: '100%',
+            overflowY: 'auto',
           }}
         >
-          <Placeholder nome="NPCs & Iniciativa" />
+          <NpcsTab />
         </div>
         <div
           style={{

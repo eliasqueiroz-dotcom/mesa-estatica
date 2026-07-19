@@ -1,0 +1,17 @@
+.npc-card {
+  background: var(--concrete-0);
+  border: 1px solid var(--concrete-2);
+  border-radius: 2px;
+  padding: 0.6rem;
+}
+
+.npc-card__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.iniciativa-tabela td,
+.iniciativa-tabela th {
+  text-align: left;
+}

@@ -85,6 +85,7 @@ export interface Npc {
   pvAtual: number;
   pvMaximo: number;
   defesa: number;
+  agilidade: number; // pra Iniciativa (d20 + Agilidade, regras.md Parte V)
   notas: string;
 }
 
@@ -114,7 +115,8 @@ export type TipoLog =
   | 'dinheiro'
   | 'determinacao'
   | 'anotacao'
-  | 'rolagem-livre';
+  | 'rolagem-livre'
+  | 'iniciativa';
 
 export interface EntradaLog {
   id: string;

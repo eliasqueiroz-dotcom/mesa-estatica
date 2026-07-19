@@ -14,6 +14,7 @@ const LABELS_TIPO: Record<TipoLog | 'todos', string> = {
   determinacao: 'determinação',
   anotacao: 'anotação',
   'rolagem-livre': 'rolagem livre',
+  iniciativa: 'iniciativa',
 };
 
 export default function LogTab() {

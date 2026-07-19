@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
+import { ordenarIniciativa } from '../rules/teste';
 import { criarEstadoInicial, criarFichaVazia, criarNpcVazio, SCHEMA_VERSION } from './factories';
-import type { EntradaLog, EstadoGlobal, Ficha, Npc, TipoLog } from './types';
+import type { EntradaIniciativa, EntradaLog, EstadoGlobal, EstadoMapa, Ficha, Npc, TipoLog, TokenMapa } from './types';
 
 export interface AlertaSanidade {
   cruzouLinhaSanidade: boolean;
@@ -25,6 +26,17 @@ interface Acoes {
   adicionarNpc: () => string;
   atualizarNpc: (id: string, patch: Partial<Npc>) => void;
   removerNpc: (id: string) => void;
+
+  /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
+  rolarIniciativaTodos: () => void;
+  removerDaIniciativa: (id: string) => void;
+  limparIniciativa: () => void;
+
+  atualizarMapa: (patch: Partial<EstadoMapa>) => void;
+  /** Ignora se o participante já tem token no mapa (evita duplicar ao clicar 2x). */
+  adicionarTokenMapa: (participanteId: string, tipo: 'pc' | 'npc') => void;
+  moverTokenMapa: (id: string, x: number, y: number) => void;
+  removerTokenMapa: (id: string) => void;
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
   limparLog: () => void;
@@ -131,6 +143,62 @@ export const useStore = create<Store>()(
       atualizarNpc: (id, patch) =>
         set((s) => ({ npcs: s.npcs.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
       removerNpc: (id) => set((s) => ({ npcs: s.npcs.filter((n) => n.id !== id) })),
+
+      rolarIniciativaTodos: () => {
+        const { fichas, npcs } = get();
+        const d20 = () => Math.floor(Math.random() * 20) + 1;
+        const participantes = [
+          ...fichas.map((f) => ({
+            id: f.id,
+            tipo: 'pc' as const,
+            nome: f.nome || 'sem nome',
+            d20: d20(),
+            agilidade: f.atributos.agilidade,
+          })),
+          ...npcs.map((n) => ({
+            id: n.id,
+            tipo: 'npc' as const,
+            nome: n.nome || 'sem nome',
+            d20: d20(),
+            agilidade: n.agilidade,
+          })),
+        ];
+        if (participantes.length === 0) return;
+        const ordenados = ordenarIniciativa(participantes);
+        const entradas: EntradaIniciativa[] = ordenados.map((p) => ({
+          id: crypto.randomUUID(),
+          participanteId: p.id,
+          tipo: p.tipo,
+          nome: p.nome,
+          valor: p.d20 + p.agilidade,
+        }));
+        set({ iniciativa: entradas });
+        get().registrarLog(
+          'iniciativa',
+          `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`,
+        );
+      },
+      removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
+      limparIniciativa: () => set({ iniciativa: [] }),
+
+      atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
+      adicionarTokenMapa: (participanteId, tipo) =>
+        set((s) => {
+          if (s.mapa.tokens.some((t) => t.participanteId === participanteId)) return s;
+          const token: TokenMapa = { id: crypto.randomUUID(), participanteId, tipo, x: 0.5, y: 0.5 };
+          return { mapa: { ...s.mapa, tokens: [...s.mapa.tokens, token] } };
+        }),
+      moverTokenMapa: (id, x, y) =>
+        set((s) => ({
+          mapa: {
+            ...s.mapa,
+            tokens: s.mapa.tokens.map((t) =>
+              t.id === id ? { ...t, x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) } : t,
+            ),
+          },
+        })),
+      removerTokenMapa: (id) =>
+        set((s) => ({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== id) } })),
 
       registrarLog: (tipo, texto, personagemId = null) => {
         const entrada: EntradaLog = {

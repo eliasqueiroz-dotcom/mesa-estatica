@@ -54,6 +54,7 @@ export function criarNpcVazio(): Npc {
     pvAtual: 10,
     pvMaximo: 10,
     defesa: 10,
+    agilidade: 1,
     notas: '',
   };
 }

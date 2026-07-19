@@ -31,13 +31,7 @@
 
 **Dia 4 — Dados 3D integrados ✅**: colorsets `rede`/`ruído` por rolagem (`colorsets.ts`; `updateConfig` só quando muda); fila de rolagens (roll() concorrente corrompe a lib — cadeado + fila, nenhum clique se perde); overlay d20 rápido em qualquer aba (`QuickRollOverlay`); atalhos `1–6`/`R`/`S` (ignorados ao digitar); fallback 2D automático sem WebGL (`rolarFallback2D`, respeita forçados); bandeja escala com o container (achado do Dia 3 morreu com a troca de lib). Gate: 21 rolagens seguidas, zero erros, log 1:1 com a tela. **Pendente do usuário: teste de screen share real no Discord.**
 
-## Dia 5 — Mapa, tokens, NPCs, sessão
-
-- [ ] Mapa: upload de imagem (comprimida p/ localStorage), tokens arrastáveis em coordenadas normalizadas.
-- [ ] Tokens 3D: cristal low-poly com cor+inicial; suporte a `.glb` de `assets/faces/` com fallback placa+scanline; jitter em Sanidade crítica.
-- [ ] NPCs & Iniciativa: lista com PV/Defesa/notas, tabela de iniciativa ordenável misturando PCs e NPCs.
-- [ ] Aba Sessão: nome da mesa, nº da sessão, cena atual editável ao vivo, garoa/hora.
-- **Gate**: montar uma cena de combate completa (mapa + 4 tokens + 3 NPCs + iniciativa) em menos de 3 minutos.
+**Dia 5 — Mapa, tokens, NPCs, sessão ✅**: upload de mapa comprimido a 1600px/JPEG (`comprimirImagem.ts`); tokens arrastáveis via pointer events em coordenadas normalizadas (sobrevive a resize); cristal 3D por token (`tokens3d/TokenScene.tsx`, câmera ortográfica sincronizada com o layout DOM, jitter em Sanidade ≤25%) — canvas criado via `document.createElement` e removido inteiro no cleanup (não um `<canvas>` fixo do JSX), porque um canvas só aceita um contexto WebGL por vida inteira e StrictMode/remount real quebrariam nisso; NPCs (PV/Defesa/Agilidade/notas) + Iniciativa (`ordenarIniciativa` de `rules/teste.ts`, já existia e já era testada) numa tabela ordenada, log dedicado; aba Sessão com campos ao vivo. Gate passou (fluxo completo — NPC, rolar iniciativa, tokens no mapa, drag — em poucos cliques). **Achado**: erro de console "Canvas has an existing context" no load em dev já existia antes deste dia (dice-box-threejs + StrictMode) — confirmado via stash, não é regressão daqui.
 
 ## Dia 6 — Identidade visual total
 
