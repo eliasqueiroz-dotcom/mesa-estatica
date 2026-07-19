@@ -23,9 +23,10 @@ Vite 8 + React 18 + TypeScript + Zustand(persist) · `@3d-dice/dice-box-threejs`
 - **Portabilidade é requisito**: esta máquina de dev NÃO é a máquina da sessão. Tudo deve funcionar num clone limpo com `npm install` + `npm run dev` (o postinstall recria os assets 3D). Nunca versionar caminhos absolutos desta máquina; estado da mesa migra via export/import JSON (localStorage não viaja). Setup da máquina nova documentado no [README.md](README.md).
 - Antes de marcar um dia do roadmap como concluído, passar no **gate** daquele dia — incluindo a pergunta: "isso funcionaria num clone limpo?"
 
-## Estado atual da sessão (18/07/2026)
+## Economia de tokens (pedido do usuário — sessões devem ser baratas)
 
-- Correção aplicada na shell de abas: a tela de dados deixou de ser desmontada ao trocar para outras abas, evitando o reset dos estados locais dos roladores e do container da mesa de dados.
-- Causa raiz confirmada: renderização condicional que removia `DadosTab` do árbol de React; ao voltar, `useState` e a instância da cabine `useDiceBox` eram recriados e o dado desaparecia.
-- Ajuste adotado: manter a aba montada e alternar apenas a visibilidade com `display` no componente principal (`App.tsx`).
-- Verificação: `npm run build` passou após o ajuste.
+- **Docs sob demanda e por trecho**: nunca ler `regras.md`/`arquitetura.md` inteiros — Grep pela seção. ROADMAP: `grep "^## "` + ler só a seção do dia atual (o histórico concluído está comprimido de propósito; detalhe fica no `git log`).
+- **Vitest antes de navegador**: lógica valida-se com `npm test` (barato). Navegador só para o que é visual/interativo, **uma rodada por feature** — não por edit.
+- **No navegador**: `read_console_messages(onlyErrors)` e `get_page_text`/`find` antes de `read_page` (as árvores repetem as 15 perícias em cada select — caras). Screenshot no máximo 1–2 por feature, só quando a confirmação precisa ser visual.
+- **Artefato conhecido de HMR**: erros "Invalid hook call"/"change in the order of Hooks" numa aba antiga depois de editar hooks NÃO são bug — abrir UMA aba nova e seguir; não investigar. Reiniciar o dev server (via preview_start) a cada dia de roadmap; não acumular abas.
+- **Escrita enxuta**: commits e entradas de ROADMAP curtos (o quê + por quê em 1–3 frases); o detalhe fica no diff.

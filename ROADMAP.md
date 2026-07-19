@@ -6,89 +6,30 @@
 ## O que mudou em relação ao plano original (e por quê)
 
 1. **Erudição existe.** O plano listava 14 perícias; a ficha oficial tem **15** (Erudição, Intelecto). Corrigido em `ficha.md`.
-2. **Contradição dados 3D resolvida.** O plano pedia física honesta na seção 4 e resultado determinístico na seção 7. Decisão: **física honesta** — o motor soma modificadores sobre o valor bruto. Detalhe em `arquitetura.md`.
+2. **Contradição dados 3D resolvida.** Decisão final (revertida a pedido do usuário): **honesta por padrão + modo forçado do mestre** via janela `#controle`. Detalhe em `arquitetura.md`.
 3. **Spike dos dados 3D antecipado para o Dia 1.** Era o maior risco técnico agendado para o Dia 4 — se a lib falhasse, sobrava 1 dia de folga. Agora falha cedo e barato.
 4. **Regras que o plano ignorou e a mesa vai usar**: Ferido dá **-2 mecânico** (não é só badge), Surto dispara com **perda ≥5 de uma vez**, Trauma tem teste Vontade DT 12 com escolha na falha, e a ficha oficial rastreia **neuro-reguladores** (doses, Dependência, contador de Acessos — ferramenta de mestre valiosíssima: "gasta na pior hora possível").
 5. **Tokens 3D não compartilham a cena dos dados.** A dice-box encapsula o próprio renderer; os tokens ganham uma cena Three.js leve e separada (mesma stack, cena própria). O plano prometia reaproveitamento que não existe.
 6. **Export/Import JSON obrigatório.** localStorage é frágil demais para ser o único guardião da sessão. Backup entra no checklist do dia.
 7. **Fallback 2D dos dados.** Se WebGL falhar no meio da sessão, rolagem via `crypto.getRandomValues` com animação CSS. O jogo nunca trava por causa do 3D.
 8. **Microcopy in-world como requisito, não enfeite** — é a arma principal contra a cara de "gerado por IA". Vocabulário canônico em `arte.md`.
-9. **A lib de dados recomendada estava abandonada.** Achado no spike do Dia 1: `@3d-dice/dice-box-threejs` não recebe release desde 2022. Trocado para `@3d-dice/dice-box` (Babylon.js + Ammo.js, mesmo time, mantida até 2024). Sem tipos TS publicados — declaração escrita à mão em `src/dice/dice-box.d.ts`. Detalhes completos em `arquitetura.md`.
+9. **A lib de dados mudou duas vezes.** Dia 1 trocou a abandonada `dice-box-threejs` pela Babylon `dice-box`; depois voltamos à `dice-box-threejs` porque só ela tem rolagem forçada nativa (`1d20@X`). Tipos escritos à mão. Detalhes em `arquitetura.md`.
 
 ---
 
-## Dia 1 — Fundação + spike de risco ✅ concluído
+## Concluído — Dias 1 a 4 + extras (detalhe completo no `git log`; decisões técnicas em `arquitetura.md`)
 
-- [x] Scaffold: Vite 8 + React 18 + TS + Zustand(persist); `git init`; tokens de design (`tokens.css`) e fontes self-host (@fontsource).
-- [x] Modelo de dados completo (`src/state/types.ts`, `factories.ts`, `store.ts`) com `schemaVersion`, CRUD de fichas/NPCs/log, e export/import JSON.
-- [x] Tabelas do jogo tipadas em `src/rules/data/`: 15 perícias, Surto×20, Traumas×20, armas×9+proteções, antecedentes×8, DTs/dificuldades.
-- [x] **Spike de dados 3D**: `@3d-dice/dice-box-threejs` estava abandonada (última release 2022) — trocado por `@3d-dice/dice-box` (Babylon.js, mantida). Instalada, assets copiados manualmente (`public/assets/dice-box/`), tipos declarados à mão (`src/dice/dice-box.d.ts`), componente de teste em `src/dice/DiceSpike.tsx`.
-- [x] **Gate passou**: 10 rolagens consecutivas no navegador real (d4, d6, d8, d10, d12, d20×3, d100, 2d8) via `onRollComplete`, valores honestos e variados, zero erros de console, todos os assets 200 OK.
+**Dia 1 — Fundação + spike ✅**: scaffold Vite/React/TS/Zustand, modelo de dados com export/import JSON, tabelas do jogo tipadas em `src/rules/data/`, spike de dados 3D validado (10 rolagens honestas). Node LTS via winget; Vite 8.1.5/Vitest 4.1.10 (0 vulns); git local sem remote.
 
-**Nota de ambiente**: Node.js não estava instalado na máquina — instalado via `winget install OpenJS.NodeJS.LTS` (v24.18.0) com autorização do usuário. `npm audit` inicial acusou 5 vulnerabilidades (todas do dev-server, Vite/Vitest/esbuild) — corrigido subindo para Vite 8.1.5 + Vitest 4.1.10 (0 vulnerabilidades). Repositório git local inicializado (`git init`), commit inicial feito sob pedido explícito do usuário — sem remote configurado.
+**Dia 2 — Ficha completa ✅**: todos os campos de `ficha.md`; indicadores mecânicos (Ferido, linha da Sanidade só na transição descendo, Surto com perda ≥5, 3+ traumas — Surto e Trauma exibem os dois banners quando disparam juntos); multi-ficha; export/import na shell. Gate passou (ficha real só pela UI, sobreviveu a fechar/reabrir). **Lição: reiniciar o dev server a cada dia** — HMR longo corrompe o React ("Invalid hook call" sem bug de código).
 
-## Dia 2 — Ficha completa ✅ concluído
+**Dia 3 — Motor de regras + log ✅**: `rules/teste|sanidade|surto.ts` puros e testados; roladores Teste/Sanidade/Surto/Trauma + Rolagem Livre numa bandeja física única, com log automático. Gate passou (cena completa só por botões, log coerente).
 
-- [x] Todos os campos de `ficha.md`: identidade (com preset de antecedente — confirma antes de sobrescrever kit/perícias), vínculos (máx. 3), atributos, derivados auto (PV/Sanidade/Defesa/Alerta com dial de letalidade via `config.basePV`), 15 perícias com toggles —/T/V agrupadas por atributo, traumas/cicatrizes (manual ou sorteio d20 na tabela oficial), equipamento, armas (livre ou preset do arsenal com dano/alcance/nota auto-preenchidos), reguladores (doses, Acessos por telemetria, Dependência auto-detectada, flag de anestesia), dinheiro R$/P$ com botões rápidos (±1/10/100), anotações.
-- [x] Indicadores mecânicos, todos testados manualmente no navegador com valores reais: **Ferido** (badge ao cruzar metade do PV), **linha da Sanidade** (alerta "marque um Trauma" só na transição descendo, não reausa em toda edição), **Surto** (perda ≥5 numa única alteração — descoberto e corrigido um bug onde Surto escondia o alerta de Trauma quando os dois disparavam juntos; agora mostram os dois banners), **3+ Traumas ativos** ("à beira de se perder").
-- [x] Multi-ficha (lista lateral com cor + nome, adicionar/remover com confirmação, ficha ativa persistida).
-- [x] Export/Import JSON funcionando no shell de abas (botões "imprimir tudo" / "importar").
-- [x] Regras novas cobertas por teste (`derivados.test.ts`, `reguladores.test.ts` — 18 testes).
-- **Gate passou**: ficha real criada e preenchida (identidade, antecedente, atributos, perícias, trauma, arma, dose de regulador, dinheiro) só pela UI: fechado e reaberto o navegador — tudo sobreviveu no localStorage.
+**Fora de ordem — Rolagem forçada + troca de lib ✅** (decisão revertida a pedido do usuário): honesta por padrão + modo forçado via janela `#controle` (BroadcastChannel em `forcarRolagem.ts`; abre clicando no título "Estática — Mesa"). Lib Babylon → `dice-box-threejs` (única com `1d20@X` nativo — swap de face, indistinguível na tela). Regras duras: **um único `@` no fim da notação combinada** (o parser da lib quebra com mais de um); `consumirForcados` é exclusivo do `useDiceBox` (sorteio de trauma na ficha usa Math.random puro — já foi bug).
 
-**Achado**: uma sessão de dev server muito longa (rodando desde o Dia 1, muitos ciclos de HMR) acumulou estado inconsistente e quebrou com "Invalid hook call". Não era bug de código — reiniciar o servidor com `node_modules/.vite` limpo resolveu. Lição para os próximos dias: reiniciar o dev server a cada dia do roadmap, não deixar rodando indefinidamente.
+**Extras 18/07 ✅**: abas trocam por `display` sem desmontar (preserva bandeja/estados locais); log com filtros (personagem/tipo/busca); rolagem livre logada; ajuste manual de Acessos na ficha.
 
-## Dia 3 — Motor de regras + log (sem 3D de produção ainda) ✅ concluído
-
-- [x] `rules/teste.ts`: teste padrão (d20+atrib+perícia vs DT, margem 10+, 20/1 natural sempre sucede/falha, Ferido -2 só em Vigor/Agilidade), iniciativa (d20+Agilidade, empate por maior Agilidade), dano de ataque (corpo a corpo soma Vigor, margem 10+ = dano máximo do dado).
-- [x] `rules/sanidade.ts`: `calcularPerdaSanidade(valorRolado, sucesso)` — metade arredondada pra baixo no sucesso.
-- [x] `rules/surto.ts`: `resolverSurto(d20A, d20B)` — mapeia os dois d20 pra tabela, detecta "o destino insiste" no empate.
-- [x] **Quatro roladores integrados de ponta a ponta na aba "Dados & Regras"**, todos compartilhando uma única bandeja física (`DadosTab.tsx` + `useDiceBox` hook do Dia 3.5):
-  - `RoladorTeste.tsx` — teste padrão (d20+atributo+perícia vs DT)
-  - `RoladorSanidade.tsx` — rola Vontade+dado de perda combinados numa só jogada física (`[{sides:20},{sides:dado}]`), aplica sucesso=metade/falha=tudo, chama `ajustarSanidadeAtual` (que já detecta cruzamento de linha e Surto, do Dia 2)
-  - `RoladorSurto.tsx` — 2d20 físicos, mostra as duas entradas da tabela lado a lado com botão de escolha; trava a escolha após clicar; detecta empate automaticamente
-  - `RoladorTrauma.tsx` — lista só os traumas ativos (exclui os que já viraram Cicatriz) da ficha selecionada, rola Vontade vs DT12 fixo; na falha, oferece as duas respostas da regra (perder 1d4 Sanidade — rolado sob demanda — ou interpretar por +1 Determinação)
-- [x] Log da sessão cobrindo os quatro caminhos, testado com uma sequência real: teste padrão → Sanidade (falha, perde tudo) → Surto (escolhido) → Trauma (falha → interpretou, +1 Determinação) — todas as linhas batendo matematicamente no log.
-- [x] 36 testes automatizados no total (`teste.test.ts`, `sanidade.test.ts`, `surto.test.ts` + os de dias anteriores).
-- **Gate passou**: simulei uma cena completa só clicando botões na aba de Dados — teste, dano por Sanidade com Surto/linha detectados, escolha de Surto, gatilho de Trauma com as duas respostas possíveis — tudo com dados físicos reais e log coerente.
-
-## Fora de ordem — Rolagem forçada + troca de biblioteca de dados ✅ (a pedido do usuário)
-
-Decisão **revertida** a pedido do usuário: rolagem deixa de ser "sempre honesta" e passa a **honesta por padrão + modo forçado** controlado por uma janela secreta, fora da tela compartilhada.
-
-- **Troca de lib**: `@3d-dice/dice-box` (Babylon) → `@3d-dice/dice-box-threejs`. Motivo: só a versão threejs suporta resultado forçado nativo (`1d20@X`, faz swap da face — indistinguível na tela). O Babylon não expõe isso sem forkar (física em worker offscreen + cena privada). Trade-off aceito: lib menos mantida. Three vem bundlada nela → sem conflito com o Three 0.169 dos tokens.
-- **Adapter** (`useDiceBox.ts`) traduz o resultado da nova lib de volta pro shape que os 4 roladores já usavam → **zero reescrita da UI dos roladores**. Colorset âmbar/ciano agora é `theme_customColorset` inline (o problema de recolorir textura do Babylon sumiu; `assets-src/dice-theme-estatica/` removido).
-- **Janela de controle** (`#controle`, `ControlPanel.tsx`) + **BroadcastChannel** (`forcarRolagem.ts`): o mestre abre uma 2ª janela (botão "controle"), enfileira o valor bruto; a próxima rolagem cai nele (ou persiste, se marcar). Sync bidirecional, `umaVez` por padrão.
-- **Validado com 2 janelas reais**: força de 1 dado (teste → 1 natural/complicação), de 2 dados (surto 2d20 → 10 Fúria / 20 Sintonia), reversão ao honesto após consumir, zero erros. Detalhes em `arquitetura.md`.
-
-**Achado do Dia 3 (bandeja de dados) — resolvido de graça pela troca de lib**: o problema original era que o tamanho visual da bandeja não batia com a área real de física, diagnosticado contra o `@3d-dice/dice-box` (Babylon). A `dice-box-threejs` calcula as paredes da física a partir de `this.display.containerWidth/containerHeight` (`makeWorldBox()`, lido no código-fonte) — ou seja, a área de jogo já escala com o tamanho real do container. Confirmado visualmente no Dia 4: rolagens de Surto (2d20) e Teste (1d20) usam boa parte da largura da bandeja, dados caindo em pontos variados, não presos num canto pequeno. Nenhum ajuste de CSS/escala foi necessário.
-
-## Ajuste de regressão de sessão — preservação de estado entre abas (18/07/2026)
-
-- [x] Reproduzido o bug de regressão: trocar de "Dados & Regras" para "Personagens" e voltar fazia o componente desmontar, zerando `useState` dos roladores e o container da mesa física.
-- [x] Correção aplicada na shell principal: o conteúdo de cada aba continua montado e só muda a visibilidade com `display`, em vez de remover o componente do JSX.
-- [x] Efeito esperado: a seleção de Surto/Trauma, o estado de rolagem e a bandeja de dados permanecem quando o mestre navega entre abas.
-- [x] Verificação: `npm run build` finalizou com sucesso após o ajuste.
-
-## Refinamento de log e telemetria — sessão de 18/07/2026
-
-- [x] A aba de log agora possui filtros por personagem, tipo de evento e busca por texto, permitindo uma leitura limpa em sessões longas.
-- [x] A rolagem livre passou a ser registrada no log da sessão, com resultado completo e rastreável.
-- [x] O contador de acessos por personagem foi tornado mais explícito na ficha de reguladores, com ajuste manual direto para o mestre.
-- [x] Verificação: `npm run build` continuou passando após os ajustes de registro e filtro.
-
-## Dia 4 — Dados 3D integrados ✅ concluído
-
-- [x] **Bandeja/área de física**: achado do Dia 3 (caixa visual maior que a área real de jogo) confirmado como já resolvido pela troca de lib no "Fora de ordem" — `dice-box-threejs` escala a área de física pelo tamanho real do container (`makeWorldBox()`). Validado rolando Surto (2d20) e Teste em telas de tamanhos diferentes: dados usam a largura real da bandeja, não ficam presos num canto.
-- [x] **Colorsets `rede`/`ruído`**: `src/dice/colorsets.ts` — `rede` (corpo ciano, números âmbar) para Teste; `ruído` (corpo vermelho-enferrujado, números ciano) para Sanidade/Surto/Trauma. `useDiceBox.rolar()` recebe o colorset por chamada e só recarrega o tema (`updateConfig`, é async) quando ele muda. Validado trocando de colorset nos dois sentidos ao vivo, cores realmente mudando na bandeja física.
-- [x] **Fila de rolagens**: antes, um segundo clique num rolador diferente enquanto a bandeja já rolava era descartado silenciosamente (só o cadeado contra corrupção, sem preservar o pedido). Agora `filaRef` guarda pedidos concorrentes e os dispara sozinhos, em ordem, assim que a rolagem atual assenta — nenhum clique se perde. Validado com stagger controlado de 1s entre dois roladores diferentes.
-- [x] **Overlay de rolagem acessível de qualquer aba**: `QuickRollOverlay.tsx` — botão flutuante em qualquer aba (exceto a própria "Dados & Regras", pra não duplicar instância de física), abre um painel compacto com d20 físico honesto. Usa o personagem ativo pro log. Validado rolando um d20 de verdade a partir da aba Personagens, sem nunca navegar até Dados.
-- [x] **Atalhos de teclado**: `1`–`6` trocam de aba, `R` abre o overlay e já rola (ou só abre, se a física ainda não tiver inicializado — evita `roll()` perdido), `S` abre o overlay sem rolar (Sanidade não reduz bem a uma tecla só, precisa de gatilho/DT). Todos ignorados com o foco num campo de texto — testado digitando "123rs" no Nome de uma ficha, nada disparou.
-- [x] **Fallback 2D automático**: se `box.initialize()` falhar (sem WebGL), `modo2D` liga sozinho e `rolar()` usa `rolarFallback2D` (Math.random puro, mesmo shape de resultado, respeita valores forçados) — a ferramenta continua funcionando, só sem o visual físico. Não dá pra forçar uma falha real de WebGL neste ambiente de teste (suporta normalmente), então validado com 4 testes automatizados da função pura + confirmação de que o caminho normal não regrediu.
-- [x] Motor plugado: rolagem física → valor bruto → soma → classificação → log (já validado nos dias anteriores, reconfirmado nas 21 rolagens do gate).
-- **Gate**: 21 rolagens sequenciais reais (uma a mais que o mínimo — tempo de resposta das próprias chamadas de automação), zero erros de console em todos os checkpoints, log com 21 entradas sincronizadas exatamente com o que apareceu na tela em cada uma. **Pendente do usuário**: o teste de screen share real numa janela compartilhada no Discord — isso só dá pra validar ao vivo, fora deste ambiente.
-
-**Achado de teste**: cliques em rajada muito rápida (múltiplos roladores clicados quase simultaneamente via automação) às vezes não registram todos — é uma limitação da ferramenta de automação usada para testar (não do app: confirmado que cliques isolados sempre funcionam, mesmo logo depois de outra rolagem ter passado pela fila). Rolagens reais de mestre, feitas por clique humano, não replicam esse padrão de rajada.
+**Dia 4 — Dados 3D integrados ✅**: colorsets `rede`/`ruído` por rolagem (`colorsets.ts`; `updateConfig` só quando muda); fila de rolagens (roll() concorrente corrompe a lib — cadeado + fila, nenhum clique se perde); overlay d20 rápido em qualquer aba (`QuickRollOverlay`); atalhos `1–6`/`R`/`S` (ignorados ao digitar); fallback 2D automático sem WebGL (`rolarFallback2D`, respeita forçados); bandeja escala com o container (achado do Dia 3 morreu com a troca de lib). Gate: 21 rolagens seguidas, zero erros, log 1:1 com a tela. **Pendente do usuário: teste de screen share real no Discord.**
 
 ## Dia 5 — Mapa, tokens, NPCs, sessão
 
@@ -124,7 +65,7 @@ Decisão **revertida** a pedido do usuário: rolagem deixa de ser "sempre honest
 
 | Risco | Mitigação |
 |---|---|
-| lib de dados 3D incompatível/abandonada | ~~mitigado no Dia 1~~: `dice-box-threejs` estava abandonada, trocada por `@3d-dice/dice-box` — validada e funcionando. Fallback 2D permanente continua no plano por segurança |
+| lib de dados 3D incompatível/abandonada | mitigado: `dice-box-threejs` validada em produção + fallback 2D automático implementado no Dia 4 |
 | localStorage apagado antes da sessão | export JSON no checklist; autosave testado no Dia 2 |
 | Screen share derrete performance | teste real no Discord nos gates dos Dias 4 e 6 |
 | Ruído visual atrapalha leitura | tiers discretos; regra de legibilidade em `arte.md` |
