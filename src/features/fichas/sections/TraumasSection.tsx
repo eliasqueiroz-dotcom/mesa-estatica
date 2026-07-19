@@ -1,4 +1,3 @@
-import { consumirForcados } from '../../../dice/forcarRolagem';
 import { TABELA_TRAUMAS } from '../../../rules/data/traumas';
 import type { TraumaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
@@ -28,8 +27,12 @@ export default function TraumasSection({ ficha, onChange }: SecaoFichaProps) {
   };
 
   const sortear = () => {
-    const forçados = consumirForcados(1);
-    const d20 = Math.min(20, Math.max(1, forçados?.[0] ?? Math.floor(Math.random() * 20) + 1));
+    // Math.random() puro, deliberado: este sorteio não é uma rolagem física na bandeja de dados,
+    // então não deve consumir a fila de valores forçados de forcarRolagem.ts — essa fila é
+    // exclusiva de rolagens reais que o mestre vê na tela (ver useDiceBox.montarNotacao).
+    // Conectar os dois já causou um bug real: um valor forçado pra um teste na aba Dados sumia
+    // silenciosamente se alguém sorteasse um trauma antes de rolar.
+    const d20 = Math.floor(Math.random() * 20) + 1;
     const entrada = TABELA_TRAUMAS.find((t) => t.d20 === d20)!;
     adicionar(entrada);
   };
