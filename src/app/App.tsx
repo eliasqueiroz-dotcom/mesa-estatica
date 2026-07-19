@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import DadosTab from '../features/dados/DadosTab';
+import QuickRollOverlay from '../features/dados/QuickRollOverlay';
 import FichasTab from '../features/fichas/FichasTab';
 import { useStore } from '../state/store';
 import LogTab from './LogTab';
@@ -66,6 +67,8 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
 
 export default function App() {
   const [aba, setAba] = useState<AbaId>('personagens');
+  const [overlayAberto, setOverlayAberto] = useState(false);
+  const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
 
   const abrirControle = () => {
     window.open(
@@ -74,6 +77,32 @@ export default function App() {
       'width=620,height=760',
     );
   };
+
+  // atalhos: 1–6 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel.
+  // ignorados enquanto o foco está num campo de texto (senão digitar "1" numa ficha trocaria de aba).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      const digitando =
+        alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
+      if (digitando || e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const indiceAba = '123456'.indexOf(e.key);
+      if (indiceAba !== -1) {
+        setAba(ABAS[indiceAba].id);
+        return;
+      }
+      const tecla = e.key.toLowerCase();
+      if (tecla === 'r') {
+        setOverlayAberto(true);
+        setPedidosRolagemRapida((n) => n + 1);
+      } else if (tecla === 's') {
+        setOverlayAberto(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -183,6 +212,12 @@ export default function App() {
           <LogTab />
         </div>
       </main>
+      <QuickRollOverlay
+        abaAtual={aba}
+        aberto={overlayAberto}
+        onAbertoChange={setOverlayAberto}
+        pedidoRolagem={pedidosRolagemRapida}
+      />
     </div>
   );
 }
