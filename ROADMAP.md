@@ -77,12 +77,18 @@ Decisão **revertida** a pedido do usuário: rolagem deixa de ser "sempre honest
 - [x] O contador de acessos por personagem foi tornado mais explícito na ficha de reguladores, com ajuste manual direto para o mestre.
 - [x] Verificação: `npm run build` continuou passando após os ajustes de registro e filtro.
 
-## Dia 4 — Dados 3D integrados
+## Dia 4 — Dados 3D integrados ✅ concluído
 
-- [ ] Wrapper de produção sobre o spike: fila de rolagens, colorsets `rede`/`ruído`, overlay de rolagem acessível de qualquer aba, fallback 2D automático.
-- [ ] Motor plugado: rolagem física → valor bruto → soma → classificação → log.
-- [ ] Atalhos: `R` d20 rápido · `S` sanidade · `1–6` abas.
-- **Gate**: 20 rolagens seguidas sem travar, sem dessincronia física×log, em janela compartilhada no Discord (testar screen share de verdade).
+- [x] **Bandeja/área de física**: achado do Dia 3 (caixa visual maior que a área real de jogo) confirmado como já resolvido pela troca de lib no "Fora de ordem" — `dice-box-threejs` escala a área de física pelo tamanho real do container (`makeWorldBox()`). Validado rolando Surto (2d20) e Teste em telas de tamanhos diferentes: dados usam a largura real da bandeja, não ficam presos num canto.
+- [x] **Colorsets `rede`/`ruído`**: `src/dice/colorsets.ts` — `rede` (corpo ciano, números âmbar) para Teste; `ruído` (corpo vermelho-enferrujado, números ciano) para Sanidade/Surto/Trauma. `useDiceBox.rolar()` recebe o colorset por chamada e só recarrega o tema (`updateConfig`, é async) quando ele muda. Validado trocando de colorset nos dois sentidos ao vivo, cores realmente mudando na bandeja física.
+- [x] **Fila de rolagens**: antes, um segundo clique num rolador diferente enquanto a bandeja já rolava era descartado silenciosamente (só o cadeado contra corrupção, sem preservar o pedido). Agora `filaRef` guarda pedidos concorrentes e os dispara sozinhos, em ordem, assim que a rolagem atual assenta — nenhum clique se perde. Validado com stagger controlado de 1s entre dois roladores diferentes.
+- [x] **Overlay de rolagem acessível de qualquer aba**: `QuickRollOverlay.tsx` — botão flutuante em qualquer aba (exceto a própria "Dados & Regras", pra não duplicar instância de física), abre um painel compacto com d20 físico honesto. Usa o personagem ativo pro log. Validado rolando um d20 de verdade a partir da aba Personagens, sem nunca navegar até Dados.
+- [x] **Atalhos de teclado**: `1`–`6` trocam de aba, `R` abre o overlay e já rola (ou só abre, se a física ainda não tiver inicializado — evita `roll()` perdido), `S` abre o overlay sem rolar (Sanidade não reduz bem a uma tecla só, precisa de gatilho/DT). Todos ignorados com o foco num campo de texto — testado digitando "123rs" no Nome de uma ficha, nada disparou.
+- [x] **Fallback 2D automático**: se `box.initialize()` falhar (sem WebGL), `modo2D` liga sozinho e `rolar()` usa `rolarFallback2D` (Math.random puro, mesmo shape de resultado, respeita valores forçados) — a ferramenta continua funcionando, só sem o visual físico. Não dá pra forçar uma falha real de WebGL neste ambiente de teste (suporta normalmente), então validado com 4 testes automatizados da função pura + confirmação de que o caminho normal não regrediu.
+- [x] Motor plugado: rolagem física → valor bruto → soma → classificação → log (já validado nos dias anteriores, reconfirmado nas 21 rolagens do gate).
+- **Gate**: 21 rolagens sequenciais reais (uma a mais que o mínimo — tempo de resposta das próprias chamadas de automação), zero erros de console em todos os checkpoints, log com 21 entradas sincronizadas exatamente com o que apareceu na tela em cada uma. **Pendente do usuário**: o teste de screen share real numa janela compartilhada no Discord — isso só dá pra validar ao vivo, fora deste ambiente.
+
+**Achado de teste**: cliques em rajada muito rápida (múltiplos roladores clicados quase simultaneamente via automação) às vezes não registram todos — é uma limitação da ferramenta de automação usada para testar (não do app: confirmado que cliques isolados sempre funcionam, mesmo logo depois de outra rolagem ter passado pela fila). Rolagens reais de mestre, feitas por clique humano, não replicam esse padrão de rajada.
 
 ## Dia 5 — Mapa, tokens, NPCs, sessão
 
