@@ -7,6 +7,8 @@ import { useStore } from '../../state/store';
 export function useDtDaCena(): number {
   const dificuldadeCena = useStore((s) => s.sessaoPrivada.dificuldadeCena);
   const dificuldadeCenaCustom = useStore((s) => s.sessaoPrivada.dificuldadeCenaCustom);
-  const dificuldade = DIFICULDADES.find((d) => d.id === dificuldadeCena)!;
-  return dificuldade.dt ?? dificuldadeCenaCustom;
+  // fallback pra "média" (DT15): estado persistido de uma versão anterior à migração v6 pode
+  // não ter esse campo ainda — nunca deixar o app inteiro quebrar por causa da DT.
+  const dificuldade = DIFICULDADES.find((d) => d.id === dificuldadeCena) ?? DIFICULDADES.find((d) => d.id === 'media')!;
+  return dificuldade.dt ?? dificuldadeCenaCustom ?? 15;
 }
