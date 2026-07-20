@@ -3,20 +3,12 @@ import { calcularPvMaximo } from '../../rules/derivados';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { useStore } from '../../state/store';
 
-/** Estado de PV de um combatente, resolvido de ficha (PC) ou NPC. `aplicar` já sabe qual ação
- *  do store chamar, então a linha da lista não precisa saber o tipo. */
 interface PvCombatente {
   atual: number;
   maximo: number;
   aplicar: (delta: number) => void;
 }
 
-/**
- * Rastreador de combate minimizado — mesmo padrão de GradeOverlay/QuickRollOverlay, no canto
- * inferior central (grid fica no esquerdo, rolagem no direito). Espelha os controles da aba
- * NPCs & Iniciativa, lendo/escrevendo o MESMO estado do store — não duplica lógica. Fica só na
- * aba Mapa (dentro de MapaTab, que vira visibility:hidden nas outras abas, escondendo este fixed).
- */
 export default function CombatOverlay() {
   const iniciativa = useStore((s) => s.iniciativa);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
@@ -26,8 +18,13 @@ export default function CombatOverlay() {
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
   const basePV = useStore((s) => s.config.basePV);
+  const selecionadosIniciativa = useStore((s) => s.sessaoPrivada.selecionadosIniciativa);
+  const atualizarSessaoPrivada = useStore((s) => s.atualizarSessaoPrivada);
 
   const rolarIniciativaTodos = useStore((s) => s.rolarIniciativaTodos);
+  const rolarIniciativa = useStore((s) => s.rolarIniciativa);
+  const limparIniciativa = useStore((s) => s.limparIniciativa);
+  const removerDaIniciativa = useStore((s) => s.removerDaIniciativa);
   const iniciarModoCombate = useStore((s) => s.iniciarModoCombate);
   const avancarTurno = useStore((s) => s.avancarTurno);
   const encerrarModoCombate = useStore((s) => s.encerrarModoCombate);
@@ -36,6 +33,51 @@ export default function CombatOverlay() {
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
 
   const [aberto, setAberto] = useState(false);
+
+  const participantesDisponiveis = [
+    ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome' })),
+    ...npcs.map((n) => ({ id: n.id, tipo: 'npc' as const, nome: n.nome || 'sem nome' })),
+  ];
+
+  const jaNaIniciativa = new Set(iniciativa.map((e) => e.participanteId));
+  const disponiveis = participantesDisponiveis.filter((p) => !jaNaIniciativa.has(p.id));
+  const todosSelecionados = disponiveis.length > 0 && disponiveis.every((p) => selecionadosIniciativa.includes(p.id));
+  const nenhumSelecionado = disponiveis.length > 0 && disponiveis.every((p) => !selecionadosIniciativa.includes(p.id));
+
+  const toggleSelecionado = (id: string) => {
+    const novo = selecionadosIniciativa.includes(id)
+      ? selecionadosIniciativa.filter((s) => s !== id)
+      : [...selecionadosIniciativa, id];
+    atualizarSessaoPrivada({ selecionadosIniciativa: novo });
+  };
+
+  const toggleTodos = () => {
+    if (todosSelecionados) {
+      const ids = new Set(disponiveis.map((p) => p.id));
+      atualizarSessaoPrivada({ selecionadosIniciativa: selecionadosIniciativa.filter((s) => !ids.has(s)) });
+    } else {
+      const ids = disponiveis.map((p) => p.id);
+      const existentes = new Set(selecionadosIniciativa);
+      const novos = ids.filter((id) => !existentes.has(id));
+      atualizarSessaoPrivada({ selecionadosIniciativa: [...selecionadosIniciativa, ...novos] });
+    }
+  };
+
+  const rolarSelecionados = () => {
+    const ids = [...new Set(selecionadosIniciativa)];
+    if (ids.length === 0) { rolarIniciativaTodos(); return; }
+    rolarIniciativa(ids);
+    const idsDisponiveis = new Set(disponiveis.map((p) => p.id));
+    atualizarSessaoPrivada({ selecionadosIniciativa: selecionadosIniciativa.filter((s) => !idsDisponiveis.has(s)) });
+  };
+
+  const resetar = () => {
+    atualizarSessaoPrivada({ selecionadosIniciativa: [] });
+    if (modoCombate) encerrarModoCombate();
+    if (iniciativa.length > 0) limparIniciativa();
+  };
+
+  const adicionarDisponiveis = disponiveis.filter((p) => selecionadosIniciativa.includes(p.id));
 
   const pvDoCombatente = (participanteId: string, tipo: 'pc' | 'npc'): PvCombatente | null => {
     if (tipo === 'pc') {
@@ -59,14 +101,13 @@ export default function CombatOverlay() {
   return (
     <div
       style={{
-        position: 'fixed',
-        left: '50%',
-        bottom: '1.25rem',
-        transform: 'translateX(-50%)',
+        position: 'absolute',
+        left: '0.5rem',
+        top: '0.5rem',
         zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'flex-end',
       }}
     >
       {aberto && (
@@ -108,27 +149,61 @@ export default function CombatOverlay() {
                 </>
               ) : (
                 <>
-                  <button className="icone-botao" onClick={rolarIniciativaTodos} disabled={fichas.length === 0 && npcs.length === 0}>
+                  <button
+                    className="icone-botao"
+                    onClick={rolarSelecionados}
+                    disabled={nenhumSelecionado && disponiveis.length > 0}
+                  >
                     rolar inic.
                   </button>
                   <button className="icone-botao acento" onClick={iniciarModoCombate} disabled={iniciativa.length === 0}>
                     iniciar
                   </button>
+                  {(iniciativa.length > 0 || selecionadosIniciativa.length > 0) && (
+                    <button className="icone-botao" onClick={resetar} title="limpar tudo" style={{ borderColor: 'var(--ruido-dim)', color: 'var(--ruido)' }}>
+                      resetar
+                    </button>
+                  )}
                 </>
               )}
             </div>
           </div>
 
           {iniciativa.length === 0 ? (
-            <p className="vazio" style={{ fontSize: 12 }}>
-              sem ordem de combate — role a iniciativa quando o encontro começar.
-            </p>
+            <>
+              {disponiveis.length === 0 ? (
+                <p className="vazio" style={{ fontSize: 12 }}>nenhum combatente disponível.</p>
+              ) : (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.4rem', color: 'var(--ink-dim)' }}>
+                    <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
+                    selecionar todos
+                  </label>
+                  {disponiveis.map((p) => {
+                    const marcado = selecionadosIniciativa.includes(p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 12,
+                          marginBottom: '0.25rem', opacity: marcado ? 1 : 0.5,
+                        }}
+                      >
+                        <input type="checkbox" checked={marcado} onChange={() => toggleSelecionado(p.id)} />
+                        <span className="mono">{p.nome}</span>
+                        <span className="vazio" style={{ fontSize: 10 }}>({p.tipo === 'pc' ? 'PC' : 'NPC'})</span>
+                      </label>
+                    );
+                  })}
+                </>
+              )}
+            </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {iniciativa.map((e, i) => {
                 const naVez = modoCombate && i === indiceAtualTurno;
                 const pv = pvDoCombatente(e.participanteId, e.tipo);
-                const ativas = condicoesCombate[e.participanteId] ?? [];
+                const ativas = (condicoesCombate ?? {})[e.participanteId] ?? [];
                 return (
                   <div
                     key={e.id}
@@ -139,17 +214,21 @@ export default function CombatOverlay() {
                       <span style={{ fontSize: 13, color: naVez ? 'var(--rede)' : undefined }}>
                         <span className="mono">{naVez ? '▶' : i + 1}</span> {e.nome}
                       </span>
+                      <span
+                        className="icone-botao"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => removerDaIniciativa(e.id)}
+                        title="remover"
+                        style={{ color: 'var(--ruido)', fontSize: 10, padding: '0.15em 0.4em', lineHeight: 1 }}
+                      >
+                        ×
+                      </span>
                       {pv && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                          <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="dano">
-                            −
-                          </button>
-                          <span className="mono" style={{ fontSize: 12, minWidth: 44, textAlign: 'center' }}>
-                            {pv.atual}/{pv.maximo}
-                          </span>
-                          <button className="icone-botao" onClick={() => pv.aplicar(1)} title="cura">
-                            +
-                          </button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="dano">−</button>
+                          <span className="mono" style={{ fontSize: 12, minWidth: 44, textAlign: 'center' }}>{pv.atual}/{pv.maximo}</span>
+                          <button className="icone-botao" onClick={() => pv.aplicar(1)} title="cura">+</button>
                         </div>
                       )}
                     </div>
@@ -171,6 +250,23 @@ export default function CombatOverlay() {
                   </div>
                 );
               })}
+              {!modoCombate && disponiveis.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--concrete-2)', paddingTop: '0.35rem' }}>
+                  <p className="vazio" style={{ fontSize: 10, marginBottom: '0.25rem' }}>adicionar mais:</p>
+                  {disponiveis.map((p) => {
+                    const marcado = selecionadosIniciativa.includes(p.id);
+                    return (
+                      <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.15rem', opacity: marcado ? 1 : 0.5 }}>
+                        <input type="checkbox" checked={marcado} onChange={() => toggleSelecionado(p.id)} />
+                        <span className="mono">{p.nome}</span>
+                      </label>
+                    );
+                  })}
+                  {adicionarDisponiveis.length > 0 && (
+                    <button className="icone-botao acento" onClick={rolarSelecionados} style={{ marginTop: '0.25rem', fontSize: 10 }}>+ adicionar</button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -184,7 +280,7 @@ export default function CombatOverlay() {
             : { borderRadius: '50%', width: 48, height: 48, padding: 0 }
         }
       >
-        {modoCombate ? `R${rodada}` : 'IN'}
+        {modoCombate ? `R${rodada}` : 'X1'}
       </button>
     </div>
   );

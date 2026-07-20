@@ -105,10 +105,11 @@ export function criarSessaoPrivada(): SessaoPrivada {
     estatisticas: { rolagens: 0, surtos: 0, mortes: 0, iniciadaEm: null },
     dificuldadeCena: 'media',
     dificuldadeCenaCustom: 15,
+    selecionadosIniciativa: [],
   };
 }
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

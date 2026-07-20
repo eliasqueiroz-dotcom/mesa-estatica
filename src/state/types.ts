@@ -197,6 +197,8 @@ export interface SessaoPrivada {
   /** DT da cena atual — só o mestre define/vê (nunca aparece nos roladores nem no log). */
   dificuldadeCena: NivelDificuldade;
   dificuldadeCenaCustom: number;
+  /** IDs de participante selecionados pra iniciativa (persiste entre sessões). */
+  selecionadosIniciativa: string[];
 }
 
 export interface EstadoConfig {

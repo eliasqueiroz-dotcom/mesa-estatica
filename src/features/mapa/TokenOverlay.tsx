@@ -7,6 +7,9 @@ import { descricaoSurto } from '../../rules/data/surto';
 import { useStore } from '../../state/store';
 import type { ArmaFicha, Ficha } from '../../state/types';
 import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
+import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+
+const EMPTY_CONDICOES: string[] = [];
 
 interface Props {
   tipo: 'pc' | 'npc';
@@ -110,6 +113,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
 
   const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
   const emSurto = ficha ? personagemEstaEmSurto(ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
+  const turnoAtivo = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === id;
 
   return (
     <div
@@ -252,6 +256,32 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
               onChange={(e) => atualizarNpc(npc.id, { notas: e.target.value })}
               style={{ marginTop: '0.4rem', minHeight: '3em' }}
             />
+          </>
+        )}
+
+        {modoCombate && (
+          <>
+            <Separador />
+            {turnoAtivo && (
+              <span className="badge" style={{ borderColor: 'var(--rede)', color: 'var(--rede)', alignSelf: 'flex-start', marginBottom: '0.35rem' }}>
+                ▶ vez dele
+              </span>
+            )}
+            <div className="combate-condicoes">
+              {CONDICOES_COMBATE.map((c) => {
+                const ligada = condicoesAtivas.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                    title={c.efeito}
+                    onClick={() => alternarCondicaoCombate(id, c.id)}
+                  >
+                    {c.nome}
+                  </button>
+                );
+              })}
+            </div>
           </>
         )}
       </div>

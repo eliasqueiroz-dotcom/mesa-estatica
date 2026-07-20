@@ -72,6 +72,8 @@ interface Acoes {
 
   /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
   rolarIniciativaTodos: () => void;
+  /** Rola iniciativa apenas para os IDs de participante selecionados (PC ou NPC). */
+  rolarIniciativa: (participanteIds: string[]) => void;
   removerDaIniciativa: (id: string) => void;
   limparIniciativa: () => void;
 
@@ -347,6 +349,26 @@ export const useStore = create<Store>()(
           `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`,
         );
       },
+      rolarIniciativa: (participanteIds) => {
+        const { fichas, npcs } = get();
+        const d20 = () => Math.floor(Math.random() * 20) + 1;
+        const todos = [
+          ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome', d20: d20(), agilidade: f.atributos.agilidade })),
+          ...npcs.map((n) => ({ id: n.id, tipo: 'npc' as const, nome: n.nome || 'sem nome', d20: d20(), agilidade: n.agilidade })),
+        ];
+        const filtrados = todos.filter((p) => participanteIds.includes(p.id));
+        if (filtrados.length === 0) return;
+        const ordenados = ordenarIniciativa(filtrados);
+        const entradas: EntradaIniciativa[] = ordenados.map((p) => ({
+          id: crypto.randomUUID(),
+          participanteId: p.id,
+          tipo: p.tipo,
+          nome: p.nome,
+          valor: p.d20 + p.agilidade,
+        }));
+        set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
+        get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
+      },
       removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
       limparIniciativa: () => set({ iniciativa: [] }),
 
@@ -369,14 +391,14 @@ export const useStore = create<Store>()(
         set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {} } })),
       alternarCondicaoCombate: (participanteId, condicaoId) =>
         set((s) => {
-          const atuais = s.sessaoPublica.condicoesCombate[participanteId] ?? [];
+          const condicoesMap = { ...(s.sessaoPublica.condicoesCombate ?? {}) };
+          const atuais = condicoesMap[participanteId] ?? [];
           const proximas = atuais.includes(condicaoId)
             ? atuais.filter((c) => c !== condicaoId)
             : [...atuais, condicaoId];
-          const condicoesCombate = { ...s.sessaoPublica.condicoesCombate };
-          if (proximas.length === 0) delete condicoesCombate[participanteId];
-          else condicoesCombate[participanteId] = proximas;
-          return { sessaoPublica: { ...s.sessaoPublica, condicoesCombate } };
+          if (proximas.length === 0) delete condicoesMap[participanteId];
+          else condicoesMap[participanteId] = proximas;
+          return { sessaoPublica: { ...s.sessaoPublica, condicoesCombate: condicoesMap } };
         }),
 
       atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
@@ -503,7 +525,14 @@ export const useStore = create<Store>()(
       },
       importarJSON: (json) => {
         const dados = JSON.parse(json) as EstadoGlobal;
-        set({ ...dados });
+        const base = criarEstadoInicial();
+        set({
+          ...base,
+          ...dados,
+          sessaoPublica: { ...base.sessaoPublica, ...dados.sessaoPublica },
+          sessaoPrivada: { ...base.sessaoPrivada, ...dados.sessaoPrivada },
+          schemaVersion: SCHEMA_VERSION,
+        });
       },
       resetarEstado: () => set(criarEstadoInicial()),
     }),
@@ -559,12 +588,17 @@ export const useStore = create<Store>()(
         }
         // v5 → v6: DT da cena sai dos roladores (visíveis na tela compartilhada) e vira campo
         // privado em "cena atual" — só o mestre define/vê.
-        if (versaoAnterior < 6 && estado.sessaoPrivada) {
-          estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...estado.sessaoPrivada };
+        if (versaoAnterior < 6) {
+          estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...(estado.sessaoPrivada ?? {}) };
         }
         // v6 → v7: condições de combate por combatente (Parte II §4).
-        if (versaoAnterior < 7 && estado.sessaoPublica) {
-          estado.sessaoPublica = { condicoesCombate: {}, ...estado.sessaoPublica };
+        if (versaoAnterior < 7) {
+          estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
+        }
+        // v7 → v8: selecionadosIniciativa na sessaoPrivada; reforça condicoesCombate.
+        if (versaoAnterior < 8) {
+          estado.sessaoPrivada = { selecionadosIniciativa: [], ...(estado.sessaoPrivada ?? {}) };
+          estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
         }
         return estado as Store;
       },

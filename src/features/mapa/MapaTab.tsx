@@ -217,7 +217,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const surtoAtivo = p.ficha ? personagemEstaEmSurto(p.ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
     const surtoEscolha = surtoAtivo ? p.ficha?.surtoEscolha ?? null : null;
     const turnoAtivo = participanteNaVez === t.participanteId;
-    const condicoes = condicoesCombate[t.participanteId] ?? [];
+    const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome };
   });
 
@@ -341,10 +341,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
             </div>
           );
         })}
+        <CombatOverlay />
       </div>
 
       <GradeOverlay />
-      <CombatOverlay />
       {tokenOverlay && <TokenOverlay tipo={tokenOverlay.tipo} id={tokenOverlay.id} onFechar={() => setTokenOverlay(null)} />}
     </div>
   );
