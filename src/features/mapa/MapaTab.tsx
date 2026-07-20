@@ -208,7 +208,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
       : false;
     const surtoAtivo = p.ficha ? personagemEstaEmSurto(p.ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
-    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, nome: p.nome };
+    const surtoEscolha = surtoAtivo ? p.ficha?.surtoEscolha ?? null : null;
+    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, nome: p.nome };
   });
 
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
@@ -310,7 +311,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
             data-surto={t.surtoAtivo}
             style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, borderColor: t.cor }}
             onPointerDown={iniciarArrastoToken(t.id)}
-            title={t.nome}
+            title={t.surtoAtivo ? `${t.nome} — surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}` : t.nome}
           >
             <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
             <span

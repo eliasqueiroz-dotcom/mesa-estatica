@@ -3,9 +3,9 @@ import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { DIFICULDADES } from '../../rules/data/dificuldades';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
+import { useDtDaCena } from './useDtDaCena';
 
 function descricaoResultado(r: ResultadoTeste): string {
   if (r.natural1) return '1 natural — complicação';
@@ -31,16 +31,13 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
 
   const [fichaId, setFichaId] = useState('');
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
-  const [dtId, setDtId] = useState('media');
-  const [dtCustom, setDtCustom] = useState(15);
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null);
   const [rolando, setRolando] = useState(false);
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
-  const dificuldade = DIFICULDADES.find((d) => d.id === dtId)!;
-  const dt = dificuldade.dt ?? dtCustom;
+  const dt = useDtDaCena();
 
   const rolarTeste = () => {
     if (!ficha) return;
@@ -62,7 +59,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
       setRolando(false);
       registrarLog(
         'teste',
-        `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} vs DT${dt} → ${d20}${
+        `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} → ${d20}${
           r.modificador >= 0 ? '+' : ''
         }${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
         ficha.id,
@@ -96,28 +93,6 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
             ))}
           </select>
         </div>
-        <div>
-          <label htmlFor="rt-dt">Dificuldade</label>
-          <select id="rt-dt" value={dtId} onChange={(e) => setDtId(e.target.value)}>
-            {DIFICULDADES.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nome}
-                {d.dt ? ` (${d.dt})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        {dtId === 'custom' && (
-          <div>
-            <label htmlFor="rt-dt-custom">DT customizada</label>
-            <input
-              id="rt-dt-custom"
-              type="number"
-              value={dtCustom}
-              onChange={(e) => setDtCustom(Number(e.target.value) || 0)}
-            />
-          </div>
-        )}
       </div>
 
       <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || !ficha || rolando} onClick={rolarTeste}>
@@ -135,7 +110,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         >
           <span>
             d20={resultado.d20} {resultado.modificador >= 0 ? '+' : ''}
-            {resultado.modificador} = {resultado.total} vs DT{resultado.dt} — {descricaoResultado(resultado)}
+            {resultado.modificador} = {resultado.total} — {descricaoResultado(resultado)}
           </span>
         </div>
       )}

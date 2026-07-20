@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
-import { calcularExpiraSurto } from '../rules/surto';
+import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
+import type { EntradaSurto } from '../rules/data/surto';
 import { ordenarIniciativa } from '../rules/teste';
 import {
   COR_NPC_PADRAO,
@@ -40,6 +41,10 @@ interface EstadoEfemero {
   /** timestamp do último burst do sistema de ruído — dispara em qualquer queda de Sanidade e ao
    *  rolar na tabela de Surto; RuidoOverlay observa isso pro burst de 1,5s (arte.md). */
   ultimoBurstRuidoEm: number | null;
+  /** quando um Surto dispara com os dois d20 diferentes, fica pendente até o mestre escolher
+   *  qual entrada vigora (regras.md: "o jogador escolhe qual acontece") — SurtoEscolhaModal
+   *  observa isso. null = nenhuma escolha pendente. */
+  escolhaSurtoPendente: { fichaId: string; nomeFicha: string; entradaA: EntradaSurto; entradaB: EntradaSurto } | null;
 }
 
 interface Acoes {
@@ -52,8 +57,14 @@ interface Acoes {
   ajustarPvAtual: (id: string, novoValor: number) => void;
   /** Igual ao PV, mas também detecta cruzamento da linha (→ Trauma) e perda ≥5 de uma vez (→ Surto). */
   ajustarSanidadeAtual: (id: string, novoValor: number) => AlertaSanidade;
+  /** Resolve `escolhaSurtoPendente` (dois d20 diferentes) com o lado que o mestre escolheu. */
+  resolverEscolhaSurtoPendente: (lado: 'A' | 'B') => void;
   ajustarDeterminacao: (id: string, novoValor: number) => void;
   ajustarDinheiro: (id: string, tipo: 'real' | 'ponto', novoValor: number) => void;
+  /** Câmbio entre R$/P$ (regras.md "grana e equipamento") — P$→R$ com cambista desconta 30%;
+   *  R$→P$ é 1:1 mas exige justificar origem (mestre decide, a UI só avisa). Debita no máximo o
+   *  saldo disponível na moeda de origem. Loga uma única entrada 'dinheiro' com as duas pernas. */
+  converterDinheiro: (id: string, direcao: 'realParaPonto' | 'pontoParaReal', valor: number) => void;
 
   adicionarNpc: () => string;
   atualizarNpc: (id: string, patch: Partial<Npc>) => void;
@@ -115,6 +126,7 @@ export const useStore = create<Store>()(
     (set, get) => ({
       ...criarEstadoInicial(),
       ultimoBurstRuidoEm: null,
+      escolhaSurtoPendente: null,
 
       adicionarFicha: () => {
         const ficha = criarFichaVazia(get().fichas.length);
@@ -160,6 +172,26 @@ export const useStore = create<Store>()(
           cruzouLinhaSanidade: cruzouLinhaDescendo(anterior, valor, linha),
           surtoDisparado: perdeuCincoOuMaisDeUmaVez(anterior, valor),
         };
+
+        // Surto: rola a tabela na hora (2d20, comportamento igual ao Rolador de Surto manual —
+        // não é uma rolagem física na bandeja, é resolução automática de bastidor, como a
+        // iniciativa e a duração em combate; ver correcoes-parte2.md item 2). Empate resolve
+        // sozinho ("o destino insiste"); senão fica pendente até o mestre escolher.
+        let surtoEscolhaImediata: string | null = null;
+        let logSurtoImediato: string | null = null;
+        let pendente: EstadoEfemero['escolhaSurtoPendente'] = null;
+        if (alerta.surtoDisparado) {
+          const d20A = Math.floor(Math.random() * 20) + 1;
+          const d20B = Math.floor(Math.random() * 20) + 1;
+          const resultado = resolverSurto(d20A, d20B);
+          if (resultado.mesmoNumero) {
+            surtoEscolhaImediata = resultado.entradaA.nome;
+            logSurtoImediato = `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${resultado.entradaA.nome} — ${resultado.entradaA.descricao}`;
+          } else {
+            pendente = { fichaId: id, nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB };
+          }
+        }
+
         set((s) => ({
           fichas: s.fichas.map((f) =>
             f.id === id
@@ -169,15 +201,18 @@ export const useStore = create<Store>()(
                   // marca o Surto até o fim da cena atual — avançar cena invalida sozinho
                   // (comparação por número, não precisa limpar ficha por ficha depois).
                   surtoAtivo: alerta.surtoDisparado ? calcularExpiraSurto(s.sessaoPublica) : f.surtoAtivo,
+                  surtoEscolha: alerta.surtoDisparado ? surtoEscolhaImediata : f.surtoEscolha,
                 }
               : f,
           ),
+          escolhaSurtoPendente: pendente ?? s.escolhaSurtoPendente,
         }));
         get().registrarLog(
           'sanidade',
           `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
           id,
         );
+        if (logSurtoImediato) get().registrarLog('surto', logSurtoImediato, id);
         // qualquer queda de Sanidade acende o burst do ruído, não só o Surto — reação instantânea.
         if (delta < 0) get().dispararBurstRuido();
         if (alerta.surtoDisparado) {
@@ -189,6 +224,21 @@ export const useStore = create<Store>()(
           }));
         }
         return alerta;
+      },
+
+      resolverEscolhaSurtoPendente: (lado) => {
+        const pendente = get().escolhaSurtoPendente;
+        if (!pendente) return;
+        const entrada = lado === 'A' ? pendente.entradaA : pendente.entradaB;
+        set((s) => ({
+          fichas: s.fichas.map((f) => (f.id === pendente.fichaId ? { ...f, surtoEscolha: entrada.nome } : f)),
+          escolhaSurtoPendente: null,
+        }));
+        get().registrarLog(
+          'surto',
+          `${pendente.nomeFicha} · Surto · escolhido: ${entrada.nome} — ${entrada.descricao}`,
+          pendente.fichaId,
+        );
       },
 
       ajustarDeterminacao: (id, novoValor) => {
@@ -215,6 +265,41 @@ export const useStore = create<Store>()(
           `${ficha.nome || 'Personagem'}: ${simbolo} ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
           id,
         );
+      },
+
+      converterDinheiro: (id, direcao, valorBruto) => {
+        const ficha = get().fichas.find((f) => f.id === id);
+        if (!ficha) return;
+        const nome = ficha.nome || 'Personagem';
+
+        if (direcao === 'pontoParaReal') {
+          const debitado = Math.min(Math.max(0, Math.floor(valorBruto)), ficha.dinheiroPonto);
+          if (debitado === 0) return;
+          const creditado = Math.floor(debitado * 0.7);
+          const novoPonto = ficha.dinheiroPonto - debitado;
+          const novoReal = ficha.dinheiroReal + creditado;
+          set((s) => ({
+            fichas: s.fichas.map((f) => (f.id === id ? { ...f, dinheiroPonto: novoPonto, dinheiroReal: novoReal } : f)),
+          }));
+          get().registrarLog(
+            'dinheiro',
+            `${nome}: câmbio P$→R$ ${debitado} (P$ ${ficha.dinheiroPonto} → ${novoPonto}, R$ ${ficha.dinheiroReal} → ${novoReal}) — taxa do sigilo, 30%`,
+            id,
+          );
+        } else {
+          const debitado = Math.min(Math.max(0, Math.floor(valorBruto)), ficha.dinheiroReal);
+          if (debitado === 0) return;
+          const novoReal = ficha.dinheiroReal - debitado;
+          const novoPonto = ficha.dinheiroPonto + debitado;
+          set((s) => ({
+            fichas: s.fichas.map((f) => (f.id === id ? { ...f, dinheiroReal: novoReal, dinheiroPonto: novoPonto } : f)),
+          }));
+          get().registrarLog(
+            'dinheiro',
+            `${nome}: câmbio R$→P$ ${debitado} (R$ ${ficha.dinheiroReal} → ${novoReal}, P$ ${ficha.dinheiroPonto} → ${novoPonto}) — origem a justificar`,
+            id,
+          );
+        }
       },
 
       adicionarNpc: () => {
@@ -452,6 +537,16 @@ export const useStore = create<Store>()(
               ...estado.sessaoPublica,
             };
           }
+        }
+        // v4 → v5: qual entrada da Tabela de Surto está em vigor (correcoes-parte2.md item 11).
+        if (versaoAnterior < 5 && estado.fichas) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          estado.fichas = estado.fichas.map((f: any) => ({ surtoEscolha: null, ...f }));
+        }
+        // v5 → v6: DT da cena sai dos roladores (visíveis na tela compartilhada) e vira campo
+        // privado em "cena atual" — só o mestre define/vê.
+        if (versaoAnterior < 6 && estado.sessaoPrivada) {
+          estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...estado.sessaoPrivada };
         }
         return estado as Store;
       },

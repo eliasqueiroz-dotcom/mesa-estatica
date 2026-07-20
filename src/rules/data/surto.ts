@@ -27,3 +27,9 @@ export const TABELA_SURTO: EntradaSurto[] = [
   { d20: 19, nome: 'Eco', descricao: 'Sussurra tudo o que ouve com dois segundos de atraso — inclusive frases que ninguém disse. Ouvi-lo de perto por uma cena inteira custa 1 de Sanidade.' },
   { d20: 20, nome: 'Sintonia', descricao: 'Para e escuta, imóvel, sussurrando. Ao fim do Surto, quem mestra entrega uma informação verdadeira sobre o mistério — e a personagem perde 1d4 de Sanidade.' },
 ];
+
+/** Descrição da entrada de Surto pelo nome já escolhido (`ficha.surtoEscolha`) — usada nos
+ *  badges "surto ativo" (TokenOverlay, AtributosDerivadosSection) como tooltip. */
+export function descricaoSurto(nome: string): string | undefined {
+  return TABELA_SURTO.find((e) => e.nome === nome)?.descricao;
+}

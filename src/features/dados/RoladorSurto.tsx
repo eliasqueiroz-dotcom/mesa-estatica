@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
-import { resolverSurto, type ResultadoSurto } from '../../rules/surto';
+import { calcularExpiraSurto, resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 
 interface RoladorSurtoProps {
@@ -18,6 +18,8 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
   const fichas = useStore((s) => s.fichas);
   const registrarLog = useStore((s) => s.registrarLog);
   const dispararBurstRuido = useStore((s) => s.dispararBurstRuido);
+  const atualizarFicha = useStore((s) => s.atualizarFicha);
+  const sessaoPublica = useStore((s) => s.sessaoPublica);
 
   const [fichaId, setFichaId] = useState('');
   const [rolando, setRolando] = useState(false);
@@ -37,6 +39,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
       setRolando(false);
       dispararBurstRuido();
       if (r.mesmoNumero) {
+        atualizarFicha(ficha.id, { surtoEscolha: r.entradaA.nome, surtoAtivo: calcularExpiraSurto(sessaoPublica) });
         registrarLog(
           'surto',
           `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
@@ -50,6 +53,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
     if (!ficha || !resultado) return;
     const entrada = lado === 'A' ? resultado.entradaA : resultado.entradaB;
     setEscolhido(lado);
+    atualizarFicha(ficha.id, { surtoEscolha: entrada.nome, surtoAtivo: calcularExpiraSurto(sessaoPublica) });
     registrarLog(
       'surto',
       `${ficha.nome || 'Personagem'} · Surto · d20=${resultado.d20A}/${resultado.d20B} · escolhido: ${entrada.nome} — ${entrada.descricao}`,

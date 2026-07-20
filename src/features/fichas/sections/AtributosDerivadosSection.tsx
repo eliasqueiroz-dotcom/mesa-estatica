@@ -9,17 +9,12 @@ import {
   metade,
 } from '../../../rules/derivados';
 import { personagemEstaEmSurto } from '../../../rules/surto';
+import { descricaoSurto } from '../../../rules/data/surto';
 import { ATRIBUTOS } from '../../../rules/data/pericias';
+import { NOME_TIER_RUIDO } from '../../ruido/RuidoOverlay';
 import { useStore } from '../../../state/store';
 import BarraSegmentada from '../BarraSegmentada';
 import type { SecaoFichaProps } from '../tipos';
-
-const NOME_TIER_RUIDO: Record<0 | 1 | 2 | 3, string> = {
-  0: 'limpo',
-  1: 'interferência',
-  2: 'ruído sanidade',
-  3: 'colapso',
-};
 
 export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFichaProps) {
   const basePV = useStore((s) => s.config.basePV);
@@ -29,6 +24,10 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const escolhaSurtoPendente = useStore((s) =>
+    s.escolhaSurtoPendente?.fichaId === ficha.id ? s.escolhaSurtoPendente : null,
+  );
+  const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
   const [alertas, setAlertas] = useState<string[]>([]);
 
   const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
@@ -46,7 +45,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
     const novosAlertas: string[] = [];
     // ambos podem disparar juntos: um Surto não dispensa marcar o Trauma da linha cruzada.
     if (resultado.cruzouLinhaSanidade) novosAlertas.push('a garoa chia — Sanidade cruzou a metade, marque um Trauma.');
-    if (resultado.surtoDisparado) novosAlertas.push('SURTO — role na tabela (aba Dados & Regras).');
+    if (resultado.surtoDisparado) novosAlertas.push('SURTO — role duas vezes; escolha o efeito abaixo.');
     if (novosAlertas.length > 0) setAlertas(novosAlertas);
   };
 
@@ -105,7 +104,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
           </div>
           <BarraSegmentada atual={ficha.sanidadeAtual} maximo={sanidadeMaxima} variante="sanidade" tier={tierRuido} />
           <div className="vazio" style={{ marginTop: '0.3rem' }}>
-            ruído sanidade: {NOME_TIER_RUIDO[tierRuido]}
+            sanidade: {NOME_TIER_RUIDO[tierRuido]}
           </div>
         </div>
 
@@ -137,11 +136,43 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
         </div>
       ))}
 
-      {(traumasAtivos >= 3 || surtoAtivoAgora) && (
+      {escolhaSurtoPendente && (
+        <div style={{ marginTop: '0.6rem' }}>
+          <span className="label" style={{ fontSize: '12px' }}>
+            Surto — role duas vezes; escolha qual acontece
+          </span>
+          <div className="campos-grid" style={{ marginTop: '0.4rem' }}>
+            {(['A', 'B'] as const).map((lado) => {
+              const entrada = lado === 'A' ? escolhaSurtoPendente.entradaA : escolhaSurtoPendente.entradaB;
+              return (
+                <div
+                  key={lado}
+                  className="alerta-banner mono"
+                  style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.4rem' }}
+                >
+                  <span>
+                    d20={entrada.d20} — <strong>{entrada.nome}</strong>
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-body)' }}>{entrada.descricao}</span>
+                  <button className="acento" onClick={() => resolverEscolhaSurtoPendente(lado)}>
+                    escolher este
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(traumasAtivos >= 3 || (surtoAtivoAgora && !escolhaSurtoPendente)) && (
         <div className="badges-linha">
-          {surtoAtivoAgora && (
-            <span className="badge" style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}>
-              surto ativo nesta cena
+          {surtoAtivoAgora && !escolhaSurtoPendente && (
+            <span
+              className="badge"
+              style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}
+              title={ficha.surtoEscolha ? descricaoSurto(ficha.surtoEscolha) : undefined}
+            >
+              surto{ficha.surtoEscolha ? `: ${ficha.surtoEscolha}` : ' ativo'}
             </span>
           )}
           {traumasAtivos >= 3 && <span className="badge">à beira de se perder — 3+ traumas</span>}

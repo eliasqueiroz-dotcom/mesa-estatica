@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
+import { PROTECOES } from '../../rules/data/armas';
+import { PERICIAS } from '../../rules/data/pericias';
+import { personagemEstaEmSurto } from '../../rules/surto';
+import { descricaoSurto } from '../../rules/data/surto';
 import { useStore } from '../../state/store';
+import type { ArmaFicha, Ficha } from '../../state/types';
+import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
 
 interface Props {
   tipo: 'pc' | 'npc';
@@ -34,9 +40,47 @@ function StepperLinha({ label, atual, maximo, onAjustar }: StepperProps) {
   );
 }
 
+const Separador = () => <div style={{ borderTop: '1px solid var(--concrete-2)', margin: '0.6rem 0' }} />;
+
+function truncar(texto: string, max: number): string {
+  return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto;
+}
+
+function resumoArmas(armas: ArmaFicha[]): string {
+  if (armas.length === 0) return 'nenhuma';
+  const nomes = armas.slice(0, 3).map((a) => (a.dano ? `${a.nome || 'sem nome'} (${a.dano})` : a.nome || 'sem nome'));
+  const resto = armas.length - 3;
+  return resto > 0 ? `${nomes.join(', ')}, +${resto}` : nomes.join(', ');
+}
+
+function resumoProtecao(bonusDefesa: number): string {
+  if (bonusDefesa === 0) return 'nenhuma';
+  const def = PROTECOES.find((p) => p.defesa === bonusDefesa);
+  return def ? `${def.nome} (+${bonusDefesa} defesa)` : `+${bonusDefesa} defesa`;
+}
+
+function resumoRegulador(ficha: Ficha): string {
+  if (ficha.anestesiaAte !== null) return 'anestesia ativa';
+  if (ficha.reguladores.length === 0) return 'nenhum';
+  const ultima = ficha.reguladores[0];
+  return `ativo — ${NOMES_TIPO_REGULADOR[ultima.tipo]} (sessão ${ultima.sessao})`;
+}
+
+/** Perícias treinadas (grau 3) e veteranas (grau 6) — pra decidir um teste rápido sem abrir a
+ *  ficha inteira. */
+function resumoPericias(pericias: Ficha['pericias']): { treinadas: string; veteranas: string } {
+  const nomesPorGrau = (grau: 3 | 6) =>
+    PERICIAS.filter((p) => pericias[p.id] === grau)
+      .map((p) => p.nome)
+      .join(', ');
+  return { treinadas: nomesPorGrau(3), veteranas: nomesPorGrau(6) };
+}
+
 /** Overlay de detalhes/ajuste rápido — abre ao CLICAR num token (não arrastar, ver MapaTab),
  *  fecha por X, clique fora, ou Esc. Escreve direto no Zustand — reflete na aba Personagens/NPCs
- *  e vice-versa (mesa-estatica-multiplayer-completo.md Parte II §1). */
+ *  e vice-versa (mesa-estatica-multiplayer-completo.md Parte II §1). PC ganha um resumo compacto
+ *  (surto/trauma ativos, acessos, neuro-regulador, itens, armas, proteção) pra não precisar abrir
+ *  a ficha inteira no meio da cena (correcoes-parte2.md item 12). */
 export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const ficha = useStore((s) => (tipo === 'pc' ? s.fichas.find((f) => f.id === id) : undefined));
   const npc = useStore((s) => (tipo === 'npc' ? s.npcs.find((n) => n.id === id) : undefined));
@@ -45,6 +89,9 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
   const ajustarDeterminacao = useStore((s) => s.ajustarDeterminacao);
   const atualizarNpc = useStore((s) => s.atualizarNpc);
+  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
+  const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
+  const rodada = useStore((s) => s.sessaoPublica.rodada);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -56,6 +103,9 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
 
   if (tipo === 'pc' && !ficha) return null;
   if (tipo === 'npc' && !npc) return null;
+
+  const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
+  const emSurto = ficha ? personagemEstaEmSurto(ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
 
   return (
     <div
@@ -105,6 +155,49 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                   />
                 </label>
               ))}
+            </div>
+
+            {(emSurto || traumasAtivos.length > 0) && (
+              <>
+                <Separador />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {emSurto && (
+                    <span
+                      className="badge"
+                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start' }}
+                      title={ficha.surtoEscolha ? descricaoSurto(ficha.surtoEscolha) : undefined}
+                    >
+                      surto{ficha.surtoEscolha ? `: ${ficha.surtoEscolha}` : ' ativo — aguardando escolha'}
+                    </span>
+                  )}
+                  {traumasAtivos.map((t) => (
+                    <span key={t.id} className="badge" style={{ alignSelf: 'flex-start' }}>
+                      trauma: {t.nome || 'sem nome'}
+                      {t.gatilho ? ` — ${t.gatilho}` : ''}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <Separador />
+            <div className="vazio mono" style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              {(() => {
+                const { treinadas, veteranas } = resumoPericias(ficha.pericias);
+                if (!treinadas && !veteranas) return <span>perícias: nenhuma treinada</span>;
+                return (
+                  <>
+                    {treinadas && <span>treinado: {treinadas}</span>}
+                    {veteranas && <span>veterano: {veteranas}</span>}
+                  </>
+                );
+              })()}
+              <span>
+                acessos: {ficha.acessos} · neuro-regulador: {resumoRegulador(ficha)}
+              </span>
+              <span>itens: {ficha.outrosItens ? truncar(ficha.outrosItens, 60) : 'nenhum'}</span>
+              <span>armas: {resumoArmas(ficha.armas)}</span>
+              <span>proteção: {resumoProtecao(ficha.equipamentoModificadorDefesa)}</span>
             </div>
           </>
         )}

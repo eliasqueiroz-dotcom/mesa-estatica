@@ -52,6 +52,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     dinheiroPonto: 800,
     anotacoes: '',
     surtoAtivo: null,
+    surtoEscolha: null,
   };
 }
 
@@ -101,10 +102,12 @@ export function criarSessaoPrivada(): SessaoPrivada {
     ruidoNarrativo: 0,
     ameaca: 0,
     estatisticas: { rolagens: 0, surtos: 0, mortes: 0, iniciadaEm: null },
+    dificuldadeCena: 'media',
+    dificuldadeCenaCustom: 15,
   };
 }
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 6;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

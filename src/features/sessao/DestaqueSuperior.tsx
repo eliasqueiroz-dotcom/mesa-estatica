@@ -1,10 +1,23 @@
+import { NOME_TIER_RUIDO, useTierRuidoFichaAtiva } from '../ruido/RuidoOverlay';
 import { useStore } from '../../state/store';
+
+const COR_TIER_RUIDO: Record<0 | 1 | 2 | 3, string> = {
+  0: 'var(--ink)',
+  1: 'var(--ink)',
+  2: 'var(--real)',
+  3: 'var(--ruido)',
+};
 
 /** §8 — Destaque superior [Público]: resumo da situação da sessão (§1), sempre visível —
  *  deriva de sessaoPublica, não é estado novo. Montado em App.tsx (fora da aba Sessão)
- *  porque "sempre visível" quer dizer em qualquer aba, não só na de Sessão. */
+ *  porque "sempre visível" quer dizer em qualquer aba, não só na de Sessão.
+ *
+ *  Também carrega o indicador compacto "ruído sanidade" (correcoes-parte2.md item 4) — o mestre
+ *  precisa de uma leitura confiável do tier mesmo sem depender do efeito visual em tela cheia. */
 export default function DestaqueSuperior() {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
+  const fichaAtivaId = useStore((s) => s.fichaAtivaId);
+  const tierRuido = useTierRuidoFichaAtiva();
   const { numeroSessao, localAtual, objetivo, progresso } = sessaoPublica;
 
   return (
@@ -40,6 +53,12 @@ export default function DestaqueSuperior() {
           <span style={{ color: 'var(--ink)' }}>
             {progresso.atual}/{progresso.total}
           </span>
+        </span>
+      )}
+      {fichaAtivaId && (
+        <span>
+          SANIDADE:{' '}
+          <span style={{ color: COR_TIER_RUIDO[tierRuido] }}>{NOME_TIER_RUIDO[tierRuido].toUpperCase()}</span>
         </span>
       )}
     </div>

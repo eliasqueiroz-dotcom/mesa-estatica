@@ -3,9 +3,10 @@ import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { calcularPerdaSanidade } from '../../rules/sanidade';
-import { DIFICULDADES, PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
+import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
 import { resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
+import { useDtDaCena } from './useDtDaCena';
 
 export function parseDado(dado: string): RollTermo {
   const [qty, sides] = dado.split('d').map(Number);
@@ -43,8 +44,6 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
 
   const [fichaId, setFichaId] = useState('');
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
-  const [dtId, setDtId] = useState('media');
-  const [dtCustom, setDtCustom] = useState(15);
   const [rolando, setRolando] = useState(false);
   const [resultado, setResultado] = useState<{ sucesso: boolean; d20: number; perdaRolada: number; perda: number } | null>(
     null,
@@ -52,8 +51,7 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const gatilho = PERDA_SANIDADE.find((g) => g.id === gatilhoId)!;
-  const dificuldade = DIFICULDADES.find((d) => d.id === dtId)!;
-  const dt = dificuldade.dt ?? dtCustom;
+  const dt = useDtDaCena();
 
   const rolarSanidade = () => {
     if (!ficha) return;
@@ -79,7 +77,7 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
 
       registrarLog(
         'teste',
-        `${ficha.nome || 'Personagem'} · Sanidade (${gatilho.nome}) · Vontade vs DT${dt} → d20=${d20}${
+        `${ficha.nome || 'Personagem'} · Sanidade (${gatilho.nome}) · Vontade → d20=${d20}${
           teste.modificador >= 0 ? '+' : ''
         }${teste.modificador} = ${teste.total} · ${teste.sucesso ? 'sucesso, perde metade' : 'falha, perde tudo'}`,
         ficha.id,
@@ -114,28 +112,6 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
             ))}
           </select>
         </div>
-        <div>
-          <label htmlFor="rs-dt">Dificuldade da cena</label>
-          <select id="rs-dt" value={dtId} onChange={(e) => setDtId(e.target.value)}>
-            {DIFICULDADES.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nome}
-                {d.dt ? ` (${d.dt})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        {dtId === 'custom' && (
-          <div>
-            <label htmlFor="rs-dt-custom">DT customizada</label>
-            <input
-              id="rs-dt-custom"
-              type="number"
-              value={dtCustom}
-              onChange={(e) => setDtCustom(Number(e.target.value) || 0)}
-            />
-          </div>
-        )}
       </div>
 
       <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || !ficha || rolando} onClick={rolarSanidade}>
@@ -152,8 +128,8 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
           }}
         >
           <span>
-            d20={resultado.d20} vs DT{dt} — {resultado.sucesso ? 'sucesso' : 'falha'} · rolou {resultado.perdaRolada} de
-            Sanidade, perdeu {resultado.perda}
+            d20={resultado.d20} — {resultado.sucesso ? 'sucesso' : 'falha'} · rolou {resultado.perdaRolada} de Sanidade,
+            perdeu {resultado.perda}
           </span>
         </div>
       )}

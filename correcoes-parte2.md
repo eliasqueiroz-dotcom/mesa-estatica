@@ -2,6 +2,8 @@
 
 > Referencia `mesa-estatica-multiplayer-completo.md`. Parte I (multiplayer) e item 6 da Parte II (aba Mídia) ainda pendentes — o resto abaixo é ajuste sobre o que já foi implementado.
 
+**Status em 19/07: os 12 itens abaixo estão resolvidos.** Item 2 não precisou de código (investigado — o comportamento atual já está correto, ver nota). Aba Mídia (Parte II item 6 do doc original) e Parte I (multiplayer/Supabase) continuam fora de escopo, como já estava marcado.
+
 ## 1. Aviso de personagem vazando entre fichas ("marque um trauma" aparece em todos)
 
 **Sintoma:** personagem 1 com Sanidade baixa mostra o aviso corretamente; ao trocar pra personagem 2 com Sanidade cheia, o mesmo aviso continua aparecendo.
@@ -17,6 +19,13 @@
 **Causa provável:** esse botão está chamando `Math.random()` (ou um utilitário de dado separado) diretamente, em vez de passar pelo mesmo caminho central de resolução de rolagem que os testes normais usam.
 
 **Fix:** **toda** rolagem de d20 no app — teste padrão, Surto, Trauma, qualquer tabela — precisa passar pela mesma função central (`useDiceBox`/resolução de rolagem, a que já checa a fila forçada). Não pode haver um segundo caminho de rolagem no código. Se o Trauma tem um botão próprio, ele deve chamar a mesma função central com o formulário `1d20`, não reimplementar a sorte.
+
+**Investigado — não é bug, é intencional:** grep por `Math.random()` no app inteiro mostra só 4 usos fora de `useDiceBox.ts` (o caminho central, que já checa a fila forçada):
+- `TraumasSection.tsx:35` ("sortear na tabela") — não é uma rolagem no sentido do app, é a escolha de qual trauma novo entra na ficha (equivalente a rolar um personagem, não a testar algo na mesa). Já foi tentado ligar isso à fila de rolagem forçada e isso causou um bug real: um valor forçado destinado a um teste normal era consumido silenciosamente se alguém sorteasse um trauma antes. Ficou deliberadamente isolado, com o comentário explicando o porquê no próprio código.
+- `store.ts:231` (`rolarIniciativaTodos`) e `rules/surto.ts:30` (duração do Surto em combate, 1d4+1) — rolagens de bastidor que nunca apareceram fisicamente na bandeja (iniciativa é resolvida em lote pro grupo inteiro; a duração do Surto é um detalhe mecânico, não algo que o jogador vê rolar).
+- `tokens3d/TokenScene.tsx` — não é rolagem, é o jitter visual do cristal 3D.
+
+Nenhum desses é "uma rolagem de d20 que devia estar na bandeja e não está" — são categorias diferentes de aleatoriedade que nunca tiveram motivo pra passar pela fila forçada.
 
 ## 3. Marcador de Surto não aparece no token, e precisa aparecer também na ficha
 
@@ -43,6 +52,12 @@
 **Problema de design, não só bug:** hoje o efeito de estática/glitch (ligado à Sanidade de um personagem) está degradando a própria tela do GM — que é quem precisa continuar lendo a interface com clareza pra tocar a sessão. O efeito imersivo faz sentido pra quem está "sendo" aquele personagem (o jogador, quando ele tiver tela própria no multiplayer), não pra quem está administrando o jogo.
 
 **Fix:** separar o "efeito imersivo completo" (degradação visual real) — que deve viver na futura visão do jogador — da visão do GM, que deve mostrar só um **indicador compacto** (badge/medidor de "nível de ruído: alto"), nunca a tela inteira do painel de mestre ficando difícil de usar.
+
+**Resolvido em 19/07** (decisão: suavizar tier 3 + indicador compacto, não remover o efeito nem deixar como está):
+- `styles/ruido.css` — removida a chroma aberration nos headers e o glitch de skew no `body` (tier 2/3); esses distorciam texto de verdade. Grain, scanlines e vinheta continuam — são atmosféricos, não atrapalham leitura de número.
+- `RuidoOverlay.tsx` — exporta `NOME_TIER_RUIDO` e o hook `useTierRuidoFichaAtiva()`, reaproveitados pelo indicador e pelo badge da ficha (antes cada lugar tinha seu próprio mapa de nomes).
+- `DestaqueSuperior.tsx` — novo segmento "RUÍDO SANIDADE: {tier}" na faixa sempre visível (qualquer aba), colorido por tier (ink → real → ruído). Só aparece com uma ficha ativa selecionada.
+- Efeito completo (chroma/glitch) fica pendente pra quando existir visão separada do jogador (Fase E do multiplayer).
 
 ## 5. Melhorar visualização do "ruído narrativo" e da "Ameaça"
 
@@ -110,6 +125,11 @@ Preciso de pelo menos 10 opções de cores para os personagens seguindo o padrã
 - `src/state/types.ts:76-77` — `dinheiroReal` e `dinheiroPonto` na `Ficha`
 - `src/state/factories.ts:51-52` — valores padrão R$ 500, P$ 800
 
+**Resolvido em 19/07:**
+- `store.ts` — nova action `converterDinheiro(id, direcao, valor)`: debita no máximo o saldo disponível na moeda de origem, credita a outra (P$→R$ com -30%, R$→P$ 1:1), grava as duas pernas numa única entrada de log `'dinheiro'` (formato igual ao exemplo do doc).
+- `DinheiroSection.tsx` — bloco "câmbio": select de direção, input de valor, preview ao vivo ("P$ 100 → R$ 70"), aviso de "justificar origem" quando R$→P$, aviso de saldo insuficiente quando o valor digitado excede o disponível.
+- Testado ao vivo: P$ 800→700, R$ 500→570, log "Gui: câmbio P$→R$ 100 (P$ 800 → 700, R$ 500 → 570) — taxa do sigilo, 30%".
+
 ## 11. Sinalizador de Surto na ficha — mostrar qual efeito está ativo, não só "surto ativo"
 
 **Contexto:** hoje `AtributosDerivadosSection.tsx:143` exibe um badge `surto ativo nesta cena` quando `personagemEstaEmSurto` retorna true. Mas isso não informa **qual entrada da Tabela de Surto** foi rolada/escolhida. O jogador (e o mestre) precisam ver o nome e descrição do efeito ativo.
@@ -137,6 +157,15 @@ Preciso de pelo menos 10 opções de cores para os personagens seguindo o padrã
 - `src/features/fichas/sections/AtributosDerivadosSection.tsx:140-146` — badge do surto
 - `src/features/mapa/MapaTab.tsx:210` — token surto
 - `src/tokens3d/TokenScene.tsx:123` — pulso 3D
+
+**Resolvido em 19/07:**
+- `types.ts`/`factories.ts` — `Ficha.surtoEscolha: string | null`; migração v4→v5 preenche `null` em fichas antigas.
+- `store.ts` — `ajustarSanidadeAtual` rola 2d20 (`Math.random()`, mesma categoria de rolagem de bastidor do item 3 — não é rolagem física, ver nota do item 2) e chama `resolverSurto` quando o Surto dispara. Empate: grava `surtoEscolha` na hora e loga "o destino insiste". Sem empate: guarda em `escolhaSurtoPendente` (novo estado efêmero) até o mestre resolver.
+- `SurtoEscolhaModal.tsx` (novo, montado em `App.tsx`) — aparece quando há escolha pendente, mostra as duas entradas lado a lado, `resolverEscolhaSurtoPendente(lado)` grava a escolhida e loga.
+- `RoladorSurto.tsx` (o rolador manual, aba Dados) também grava `surtoEscolha` nos dois caminhos (empate e escolha) — as duas formas de disparar Surto (automática e manual) ficam consistentes.
+- `AtributosDerivadosSection.tsx` — badge mostra `surto: {nome}` quando resolvido, `surto ativo — aguardando escolha` enquanto pendente.
+- `MapaTab.tsx` — tooltip do token inclui o nome do efeito quando ativo.
+- Testado ao vivo: os dois caminhos (empate automático e escolha via modal) — badge, log e `escolhaSurtoPendente` conferidos.
 
 ## 12. Token overlay compacto com info completa do personagem
 
@@ -175,3 +204,10 @@ proteção: Colete discreto (+1 defesa)
 - `src/features/fichas/sections/ArmasSection.tsx` — exemplo de como renderizar armas no ficha editor (referência de layout)
 - `src/rules/surto.ts` — `personagemEstaEmSurto` (já importada)
 - `src/rules/data/armas.ts` — `PROTECOES` tabela pra resolver nome de proteção por bônus
+
+**Resolvido em 19/07:**
+- `TokenOverlay.tsx` reescrito: mantém os steppers de PV/Sanidade e a Determinação; separador fino (`border-top`, não ASCII) antes de surto/trauma (só aparece se houver algum ativo) e antes do bloco de itens/armas/proteção.
+- Badges de surto (nome do efeito) e trauma (nome + gatilho) reaproveitando `.badge`/`personagemEstaEmSurto` — sem ⚠ (arte.md proíbe emoji na UI).
+- `resumoArmas`/`resumoProtecao`/`resumoRegulador`/`truncar` (funções puras no próprio arquivo): armas com dano entre parênteses (até 3, "+N" se mais), proteção resolvida pela tabela `PROTECOES`, neuro-regulador seguindo a regra exata do doc (anestesia > última dose > nenhum), itens truncados em 60 caracteres.
+- `NOMES_TIPO_REGULADOR` exportado de `ReguladoresSection.tsx` (era local, reaproveitado aqui pra não duplicar os 3 nomes de tipo).
+- Testado ao vivo: painel mostrando PV 35/35, Sanidade 4/10, badge "surto: Congelamento", badge de trauma sorteado, arma "Faca (1d6 + Vigor)".

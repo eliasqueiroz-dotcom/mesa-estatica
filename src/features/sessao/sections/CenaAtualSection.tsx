@@ -1,3 +1,4 @@
+import { DIFICULDADES } from '../../../rules/data/dificuldades';
 import { useStore } from '../../../state/store';
 
 /** §2 — Cena atual expandida: mistura campos [Público] (chegam aos jogadores) e [Privado]
@@ -70,6 +71,37 @@ export default function CenaAtualSection() {
             value={sessaoPrivada.proximoEvento}
             onChange={(e) => atualizarSessaoPrivada({ proximoEvento: e.target.value })}
           />
+        </div>
+
+        <div className="campos-grid" style={{ gridTemplateColumns: sessaoPrivada.dificuldadeCena === 'custom' ? '1fr 1fr' : '1fr' }}>
+          <div>
+            <label htmlFor="cena-dificuldade">
+              Dificuldade da cena <span className="badge">privado</span>
+            </label>
+            <select
+              id="cena-dificuldade"
+              value={sessaoPrivada.dificuldadeCena}
+              onChange={(e) => atualizarSessaoPrivada({ dificuldadeCena: e.target.value as typeof sessaoPrivada.dificuldadeCena })}
+            >
+              {DIFICULDADES.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.nome}
+                  {d.dt ? ` (${d.dt})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          {sessaoPrivada.dificuldadeCena === 'custom' && (
+            <div>
+              <label htmlFor="cena-dificuldade-custom">DT customizada</label>
+              <input
+                id="cena-dificuldade-custom"
+                type="number"
+                value={sessaoPrivada.dificuldadeCenaCustom}
+                onChange={(e) => atualizarSessaoPrivada({ dificuldadeCenaCustom: Number(e.target.value) || 0 })}
+              />
+            </div>
+          )}
         </div>
       </div>
     </section>

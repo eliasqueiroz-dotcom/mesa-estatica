@@ -3,7 +3,7 @@ import { useStore } from '../../../state/store';
 import type { DoseRegulador, TipoRegulador } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
-const NOMES_TIPO: Record<TipoRegulador, string> = {
+export const NOMES_TIPO_REGULADOR: Record<TipoRegulador, string> = {
   generico: 'Genérico de esquina',
   pleno: 'Pleno® com receita',
   ajuste: 'Ajuste clínico',
@@ -78,7 +78,7 @@ export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps)
         ficha.reguladores.map((d) => (
           <div key={d.id} className="reguladores-linha mono">
             <span>
-              sessão {d.sessao} · {NOMES_TIPO[d.tipo]}
+              sessão {d.sessao} · {NOMES_TIPO_REGULADOR[d.tipo]}
             </span>
             <button className="icone-botao perigo" onClick={() => removerDose(d.id)}>
               ×

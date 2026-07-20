@@ -73,7 +73,10 @@ html[data-ruido='3'] .ruido-overlay::after {
   opacity: 1;
 }
 
-/* chroma aberration nos headers — a partir do tier 2 (cruzou a linha do Trauma) */
+/* chroma aberration nos headers — a partir do tier 2 (cruzou a linha do Trauma). Intencional que
+ * distorça o texto no tier 3 (correcoes-parte2.md item 4 — "pode incomodar de leve, é o ponto",
+ * arte.md); o indicador compacto "ruído sanidade: X" (DestaqueSuperior.tsx) dá ao mestre uma
+ * leitura de texto limpa em paralelo, sem precisar suavizar o efeito em si. */
 html[data-ruido='2'] h1,
 html[data-ruido='2'] h2,
 html[data-ruido='2'] h3,
