@@ -77,13 +77,13 @@ Isto é o que separa "ferramenta com skin" de "objeto do mundo do jogo". Exemplo
 
 - Log vazio: `sem registros. sinal limpo.`
 - Autosave: indicador discreto `● registrado` (mono, ciano) — nunca "Saved!"
-- Rolagem no log: `[23:41:07] HELENA · Percepção+Investigação vs DT15 → 14+5 = 19 ✓ margem 4`
+- Rolagem no log: `[23:41:07] HELENA · Percepção+Investigação → 14+5 = 19 · margem 10+ — efeito extra` (a DT não aparece — é privada do mestre, ver `arquitetura.md`)
 - Sucesso com margem 10+: `margem 10+ — efeito extra`
 - 1 natural: `1 natural — complicação`
 - Surto com números iguais: `o destino insiste.`
 - Sanidade caindo pra tier 2: toast `a garoa chia.`
 - Botão de nova sessão: `abrir turno`
-- Backup/export: `imprimir tudo — confie no papel, não na nuvem`
+- Backup/export: botão `exportar`, tooltip `confie no papel, não na nuvem`
 - Deletar ficha (confirmação): `apagar da rede? o papel não esquece.`
 - P$: sempre `P$` com ®  em contexto formal (`Ponto®`); R$ sempre associado a "papel/rua"
 

@@ -34,7 +34,7 @@ npx serve dist     # servidor local, funciona sem internet
 
 O estado vive no **localStorage do navegador** — ele **não** viaja com o git nem com a pasta. Para migrar de máquina (ou de navegador):
 
-1. Na máquina antiga: botão de **export JSON** ("imprimir tudo") → salva um arquivo.
+1. Na máquina antiga: botão **exportar** (export JSON) → salva um arquivo.
 2. Leve o arquivo junto com o projeto.
 3. Na máquina nova: **import JSON** → tudo de volta.
 
@@ -67,23 +67,4 @@ Exporte um backup **sempre** antes de migrar e antes de cada sessão. Confie no 
 - [ ] Determinação de todos resetada para 1 ("abrir turno")
 - [ ] d20 físico na mesa por garantia — *fé no rolador do navegador, mas o papel não esquece*
 
-## Observações de sessão (18/07/2026)
-
-- Correção aplicada na navegação de abas da shell principal: a aba "Dados & Regras" não deve desmontar ao trocar para "Personagens" e voltar. O problema raiz era renderização condicional que desmontava `DadosTab`, zerando estados locais (`useState`) e o container da bandeja física.
-- Ajuste adotado: manter o componente montado e trocar somente a visibilidade com `display` na aba principal. Isso preserva a seleção em Surto/Trauma e o estado visual da mesa de dados.
-- Verificação: `npm run build` passou após a correção (`vite build` concluído com sucesso).
-
-## Observações de sessão (18/07/2026 — refinamento de registro e telemetria)
-
-- O log da sessão agora aceita filtros por personagem, por tipo de evento e por texto livre, deixando o histórico legível mesmo em cenas longas.
-- A rolagem livre passou a registrar sua saída no log, com o mesmo fluxo de persistência dos outros roladores.
-- O contador de acessos (telemetria) agora fica mais explícito na ficha de reguladores, com ajuste manual rápido do mestre para controlar o rastreio por personagem.
-- Resultado verificado em build: `npm run build` concluiu com sucesso após a integração destes ajustes.
-
-## Observações de sessão (19/07/2026)
-
-- Correções do `correcoes-parte2.md`: item 5 (renomeio ruído → ruído sanidade + badges de severidade nos gauges + ruído narrativo com estática craquelê e glitch), itens 6-9 (exportar, largura da sessão, textarea maiores, paleta 10 cores, NPC com RGB livre, iniciais nos tokens).
-- Item 1 (aviso vazando entre fichas) corrigido com `key={fichaAtiva.id}` no `FichaEditor`.
-- Item 3 (Surto) parcial: função compartilhada `personagemEstaEmSurto` criada em `rules/surto.ts`, duração em combate (1d4+1 rodadas) implementada, mas aguarda validação visual.
-- Nav das abas agora mostra bolinha indicadora de conteúdo (log com registros, NPCs cadastrados, sessão em andamento, etc.) e tooltip com atalho de teclado.
-- Painel de rolagem rápida exibe dica dos atalhos R/S/X.
+Histórico de sessões de trabalho: ver [ROADMAP.md](ROADMAP.md) (resumo por dia) e `git log` (detalhe por commit).

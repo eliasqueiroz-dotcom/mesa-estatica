@@ -67,21 +67,23 @@ Regra de ouro: **`rules/` é TypeScript puro, sem imports de React ou Three** �
 ## Modelo de dados (resumo do shape persistido)
 
 ```ts
-type Estado = {
-  schemaVersion: number;          // migração explícita a cada mudança de shape
-  sessao: { nome, numero, cenaAtual, clima, hora };
-  fichas: Ficha[];                // ver ficha.md — inclui reguladores/acessos
+type EstadoGlobal = {
+  schemaVersion: number;          // migração explícita a cada mudança de shape (store.ts: migrate)
+  sessaoPublica: SessaoPublica;   // vai pra tela compartilhada: cena, clima, combate/turnos
+  sessaoPrivada: SessaoPrivada;   // só o mestre vê: o que realmente acontece, gauges, DT da cena
+  fichas: Ficha[];                // ver ficha.md — inclui reguladores/acessos/surto
   fichaAtivaId: string | null;    // controla o tier de ruído global
-  npcs: Npc[];                    // nome, pv, defesa, notas, iniciativa
+  npcs: Npc[];                    // nome, pv, defesa, notas, corVisual
   iniciativa: EntradaIniciativa[];
-  mapa: { imagemDataUrl, tokens: TokenPos[] };
+  mapa: EstadoMapa;               // imagemDataUrl, tokens, grade arrastável
   log: EntradaLog[];              // append-only, timestamp + tipo + payload
   config: { basePV: 10|20|30 };   // dial de letalidade
 };
 ```
 
-- Persistência: zustand/persist em localStorage, com `version` + `migrate`.
-- **Export/Import JSON** obrigatório (botão "imprimir tudo"): localStorage é frágil (limpeza de navegador, perfil errado). Backup antes da sessão faz parte do checklist.
+- Persistência: zustand/persist em localStorage, com `version` + `migrate`. Toda mudança de shape bumpa `SCHEMA_VERSION` (factories.ts) e ganha um bloco `if (versaoAnterior < N)` em `store.ts`.
+- **Público vs. privado** (aba Sessão): campos que só o mestre pode ver (o que realmente acontece, próximo evento, gauges de tensão/ruído/ameaça, DT da cena) ficam em `sessaoPrivada` e levam badge "privado" na UI — mesma tela física, mas o mestre não deve compartilhar essa aba. Roladores leem a DT da cena via `useDtDaCena()` sem exibir o número (só o mestre define/vê).
+- **Export/Import JSON** obrigatório (botão "exportar"): localStorage é frágil (limpeza de navegador, perfil errado). Backup antes da sessão faz parte do checklist.
 - Imagem do mapa como dataURL tem limite (~5MB localStorage) — comprimir via canvas para máx. ~1600px de largura na importação.
 
 ## Integração dice-box
