@@ -42,7 +42,7 @@ export default function CenaAtualSection() {
             value={sessaoPublica.cenaAtual}
             onChange={(e) => atualizarSessaoPublica({ cenaAtual: e.target.value })}
             placeholder="o que os jogadores estão vendo agora — atualiza ao vivo na tela compartilhada."
-            style={{ minHeight: '5em' }}
+            style={{ minHeight: '10em', resize: 'vertical' }}
           />
         </div>
 
@@ -55,7 +55,7 @@ export default function CenaAtualSection() {
             value={sessaoPrivada.oQueRealmenteAcontece}
             onChange={(e) => atualizarSessaoPrivada({ oQueRealmenteAcontece: e.target.value })}
             placeholder="só o mestre vê — nunca compartilhar esta tela."
-            style={{ minHeight: '5em' }}
+            style={{ minHeight: '8em', resize: 'vertical' }}
           />
         </div>
 

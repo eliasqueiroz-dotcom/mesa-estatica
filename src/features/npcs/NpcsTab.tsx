@@ -1,4 +1,3 @@
-import SeletorCor from '../fichas/SeletorCor';
 import { useStore } from '../../state/store';
 import './npcs.css';
 
@@ -50,7 +49,13 @@ export default function NpcsTab() {
                     onChange={(e) => atualizarNpc(n.id, { nome: e.target.value })}
                     style={{ flex: 1 }}
                   />
-                  <SeletorCor valor={n.corVisual} onEscolher={(cor) => atualizarNpc(n.id, { corVisual: cor })} />
+                  <input
+                    type="color"
+                    value={n.corVisual}
+                    onChange={(e) => atualizarNpc(n.id, { corVisual: e.target.value })}
+                    title="cor do token"
+                    style={{ width: 28, height: 28, padding: 0, border: 'none', cursor: 'pointer', background: 'none' }}
+                  />
                   <span
                     className="icone-botao"
                     role="button"

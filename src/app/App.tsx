@@ -5,10 +5,20 @@ import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
 import NpcsTab from '../features/npcs/NpcsTab';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
+import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import LogTab from './LogTab';
+
+const ATALHOS: Record<string, string> = {
+  sessao: '1',
+  personagens: '2',
+  dados: '3',
+  mapa: '4',
+  npcs: '5',
+  log: '6',
+};
 
 type AbaId = 'sessao' | 'personagens' | 'dados' | 'mapa' | 'npcs' | 'log';
 
@@ -56,7 +66,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
       </span>
       <div style={{ display: 'flex', gap: '0.4rem' }}>
         <button onClick={exportar} title="confie no papel, não na nuvem">
-          imprimir tudo
+          exportar
         </button>
         <button onClick={() => inputRef.current?.click()}>importar</button>
         {/* botão de controle agora oculto; o controle é acessível clicando no título principal */}
@@ -113,6 +123,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <RuidoOverlay />
+      <AlertaOverlay />
       <header
         style={{
           display: 'flex',
@@ -130,20 +141,25 @@ export default function App() {
           >
             Estática — Mesa
           </h1>
-          <nav style={{ display: 'flex', gap: '0.3rem' }}>
-            {ABAS.map((a, i) => (
-              <button
-                key={a.id}
-                onClick={() => setAba(a.id)}
-                style={
-                  aba === a.id
-                    ? { borderColor: 'var(--rede)', color: 'var(--rede)', boxShadow: '0 0 0 1px var(--rede-glow)' }
-                    : undefined
-                }
-              >
-                {i + 1} {a.label}
-              </button>
-            ))}
+          <nav style={{ display: 'flex', gap: '0.4rem' }}>
+            {ABAS.map((a) => {
+              const atalho = ATALHOS[a.id];
+              const ativa = aba === a.id;
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => setAba(a.id)}
+                  title={`${a.label} (atalho: ${atalho})`}
+                  style={
+                    ativa
+                      ? { borderColor: 'var(--rede)', color: 'var(--rede)', boxShadow: '0 0 0 1px var(--rede-glow)' }
+                      : undefined
+                  }
+                >
+                  {atalho} {a.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
         <ExportarImportar abrirControle={abrirControle} />

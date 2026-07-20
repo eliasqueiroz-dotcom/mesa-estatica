@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
+import { calcularExpiraSurto } from '../rules/surto';
 import { ordenarIniciativa } from '../rules/teste';
 import {
   COR_NPC_PADRAO,
@@ -167,7 +168,7 @@ export const useStore = create<Store>()(
                   sanidadeAtual: valor,
                   // marca o Surto até o fim da cena atual — avançar cena invalida sozinho
                   // (comparação por número, não precisa limpar ficha por ficha depois).
-                  surtoAtivo: alerta.surtoDisparado ? get().sessaoPublica.contadorCena : f.surtoAtivo,
+                  surtoAtivo: alerta.surtoDisparado ? calcularExpiraSurto(s.sessaoPublica) : f.surtoAtivo,
                 }
               : f,
           ),
@@ -317,7 +318,14 @@ export const useStore = create<Store>()(
           }));
         }
       },
-      limparLog: () => set({ log: [] }),
+      limparLog: () =>
+        set((s) => ({
+          log: [],
+          sessaoPrivada: {
+            ...s.sessaoPrivada,
+            estatisticas: { ...s.sessaoPrivada.estatisticas, rolagens: 0 },
+          },
+        })),
 
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
       atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),

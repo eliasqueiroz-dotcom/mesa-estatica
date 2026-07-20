@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../../state/store';
 import BarraSegmentada from '../../fichas/BarraSegmentada';
+import { tierDeGauge } from '../AlertaOverlay';
 
 function formatarDuracao(ms: number): string {
   const totalMin = Math.floor(ms / 60000);
@@ -28,10 +29,19 @@ export default function EstadoMesaSection() {
     return () => clearInterval(id);
   }, [iniciadaEm]);
 
-  const gauges: { label: string; campo: 'tensao' | 'ruidoNarrativo' | 'ameaca' }[] = [
-    { label: 'Tensão', campo: 'tensao' },
-    { label: 'Ruído narrativo', campo: 'ruidoNarrativo' },
-    { label: 'Ameaça', campo: 'ameaca' },
+  const TIER_GAUGE_NOME: Record<0 | 1 | 2 | 3, { label: string; icone: string }> = {
+    0: { label: 'normal', icone: '○' },
+    1: { label: 'atenção', icone: '◔' },
+    2: { label: 'crítico', icone: '◕' },
+    3: { label: 'colapso', icone: '●' },
+  };
+
+  // Tensão fica sem reflexo (decisão do usuário) — só Ruído narrativo/Ameaça acionam o
+  // AlertaOverlay no site inteiro; `comReflexo` reforça o mesmo tier localmente na barra.
+  const gauges: { label: string; campo: 'tensao' | 'ruidoNarrativo' | 'ameaca'; comReflexo: boolean }[] = [
+    { label: 'Tensão', campo: 'tensao', comReflexo: false },
+    { label: 'Ruído narrativo', campo: 'ruidoNarrativo', comReflexo: true },
+    { label: 'Ameaça', campo: 'ameaca', comReflexo: true },
   ];
 
   return (
@@ -55,23 +65,41 @@ export default function EstadoMesaSection() {
         )}
       </div>
 
-      {gauges.map(({ label, campo }) => (
-        <div key={campo} style={{ marginBottom: '0.6rem' }}>
-          <label htmlFor={`gauge-${campo}`}>
-            {label} — {sessaoPrivada[campo]}%
-          </label>
-          <input
-            id={`gauge-${campo}`}
-            type="range"
-            min={0}
-            max={100}
-            value={sessaoPrivada[campo]}
-            onChange={(e) => atualizarSessaoPrivada({ [campo]: Number(e.target.value) })}
-            style={{ width: '100%' }}
-          />
-          <BarraSegmentada atual={sessaoPrivada[campo]} maximo={100} variante="gauge" passoTick={25} />
-        </div>
-      ))}
+      {gauges.map(({ label, campo, comReflexo }) => {
+        const valor = sessaoPrivada[campo];
+        const tier = comReflexo ? tierDeGauge(valor) : 0;
+        const nomeTier = TIER_GAUGE_NOME[tier];
+        return (
+          <div key={campo} style={{ marginBottom: '0.6rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor={`gauge-${campo}`}>
+                {label} — {valor}%
+              </label>
+              {comReflexo && (
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: '11px',
+                    color: tier >= 2 ? 'var(--ruido)' : tier >= 1 ? 'var(--real)' : 'var(--ink-faint)',
+                  }}
+                >
+                  {nomeTier.icone} {nomeTier.label}
+                </span>
+              )}
+            </div>
+            <input
+              id={`gauge-${campo}`}
+              type="range"
+              min={0}
+              max={100}
+              value={valor}
+              onChange={(e) => atualizarSessaoPrivada({ [campo]: Number(e.target.value) })}
+              style={{ width: '100%' }}
+            />
+            <BarraSegmentada atual={valor} maximo={100} variante="gauge" passoTick={25} tier={tier} />
+          </div>
+        );
+      })}
     </section>
   );
 }

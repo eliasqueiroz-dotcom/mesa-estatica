@@ -57,6 +57,16 @@ Exporte um backup **sempre** antes de migrar e antes de cada sessão. Confie no 
 - [.claude/docs/arquitetura.md](.claude/docs/arquitetura.md) — decisões técnicas
 - [.claude/docs/arte.md](.claude/docs/arte.md) — direção de arte
 
+## Checklist do dia da sessão (25/07)
+
+- [ ] `npm run build` + `npx serve dist` funcionando **offline** (desligar wifi e testar)
+- [ ] Export JSON de backup salvo fora do navegador
+- [ ] Fichas dos jogadores conferidas contra as fichas de papel deles
+- [ ] Mapa(s) do caso já importado(s), NPCs pré-cadastrados
+- [ ] Discord: compartilhar a **janela** do navegador (não a tela), 1080p, modo "otimizar para vídeo" desligado
+- [ ] Determinação de todos resetada para 1 ("abrir turno")
+- [ ] d20 físico na mesa por garantia — *fé no rolador do navegador, mas o papel não esquece*
+
 ## Observações de sessão (18/07/2026)
 
 - Correção aplicada na navegação de abas da shell principal: a aba "Dados & Regras" não deve desmontar ao trocar para "Personagens" e voltar. O problema raiz era renderização condicional que desmontava `DadosTab`, zerando estados locais (`useState`) e o container da bandeja física.
@@ -69,3 +79,11 @@ Exporte um backup **sempre** antes de migrar e antes de cada sessão. Confie no 
 - A rolagem livre passou a registrar sua saída no log, com o mesmo fluxo de persistência dos outros roladores.
 - O contador de acessos (telemetria) agora fica mais explícito na ficha de reguladores, com ajuste manual rápido do mestre para controlar o rastreio por personagem.
 - Resultado verificado em build: `npm run build` concluiu com sucesso após a integração destes ajustes.
+
+## Observações de sessão (19/07/2026)
+
+- Correções do `correcoes-parte2.md`: item 5 (renomeio ruído → ruído sanidade + badges de severidade nos gauges + ruído narrativo com estática craquelê e glitch), itens 6-9 (exportar, largura da sessão, textarea maiores, paleta 10 cores, NPC com RGB livre, iniciais nos tokens).
+- Item 1 (aviso vazando entre fichas) corrigido com `key={fichaAtiva.id}` no `FichaEditor`.
+- Item 3 (Surto) parcial: função compartilhada `personagemEstaEmSurto` criada em `rules/surto.ts`, duração em combate (1d4+1 rodadas) implementada, mas aguarda validação visual.
+- Nav das abas agora mostra bolinha indicadora de conteúdo (log com registros, NPCs cadastrados, sessão em andamento, etc.) e tooltip com atalho de teclado.
+- Painel de rolagem rápida exibe dica dos atalhos R/S/X.

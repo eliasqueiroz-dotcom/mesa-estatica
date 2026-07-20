@@ -8,6 +8,7 @@ import {
   estaFerido,
   metade,
 } from '../../../rules/derivados';
+import { personagemEstaEmSurto } from '../../../rules/surto';
 import { ATRIBUTOS } from '../../../rules/data/pericias';
 import { useStore } from '../../../state/store';
 import BarraSegmentada from '../BarraSegmentada';
@@ -16,7 +17,7 @@ import type { SecaoFichaProps } from '../tipos';
 const NOME_TIER_RUIDO: Record<0 | 1 | 2 | 3, string> = {
   0: 'limpo',
   1: 'interferência',
-  2: 'ruído',
+  2: 'ruído sanidade',
   3: 'colapso',
 };
 
@@ -25,7 +26,9 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
   const ajustarDeterminacao = useStore((s) => s.ajustarDeterminacao);
+  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
+  const rodada = useStore((s) => s.sessaoPublica.rodada);
   const [alertas, setAlertas] = useState<string[]>([]);
 
   const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
@@ -36,14 +39,14 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const linhaSanidade = metade(sanidadeMaxima);
   const traumasAtivos = ficha.traumas.filter((t) => !t.virouCicatriz).length;
   const tierRuido = calcularTierRuido(ficha.sanidadeAtual, sanidadeMaxima);
-  const surtoAtivoAgora = ficha.surtoAtivo === contadorCena;
+  const surtoAtivoAgora = personagemEstaEmSurto(ficha.surtoAtivo, { modoCombate, contadorCena, rodada });
 
   const handleSanidade = (valor: number) => {
     const resultado = ajustarSanidadeAtual(ficha.id, valor);
     const novosAlertas: string[] = [];
     // ambos podem disparar juntos: um Surto não dispensa marcar o Trauma da linha cruzada.
     if (resultado.cruzouLinhaSanidade) novosAlertas.push('a garoa chia — Sanidade cruzou a metade, marque um Trauma.');
-    if (resultado.surtoDisparado) novosAlertas.push('SURTO — role duas vezes na tabela (aba Dados & Regras).');
+    if (resultado.surtoDisparado) novosAlertas.push('SURTO — role na tabela (aba Dados & Regras).');
     if (novosAlertas.length > 0) setAlertas(novosAlertas);
   };
 
@@ -102,7 +105,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
           </div>
           <BarraSegmentada atual={ficha.sanidadeAtual} maximo={sanidadeMaxima} variante="sanidade" tier={tierRuido} />
           <div className="vazio" style={{ marginTop: '0.3rem' }}>
-            nível de ruído: {NOME_TIER_RUIDO[tierRuido]}
+            ruído sanidade: {NOME_TIER_RUIDO[tierRuido]}
           </div>
         </div>
 

@@ -366,6 +366,22 @@
   background: var(--rede-dim);
 }
 
+/* Ruído narrativo/Ameaça (Sessão § Estado da mesa) — mesmo tier que aciona o AlertaOverlay
+   no site inteiro, reforçado aqui localmente. Tensão não usa tier (fica sempre neutro acima). */
+.barra-segmentada[data-variante='gauge'][data-tier='2'] .barra-segmentada__preenchimento {
+  background: var(--real);
+}
+.barra-segmentada[data-variante='gauge'][data-tier='3'] .barra-segmentada__preenchimento {
+  background: var(--ruido);
+  background-image: repeating-linear-gradient(45deg, rgba(11, 13, 17, 0.35) 0 2px, transparent 2px 4px);
+  animation: gauge-colapso-pulso 2s ease-in-out infinite;
+}
+
+@keyframes gauge-colapso-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 .barra-segmentada__tick {
   position: absolute;
   top: 0;

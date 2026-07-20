@@ -11,7 +11,7 @@ import SituacaoSection from './sections/SituacaoSection';
  *  (só o mestre vê). "Cena atual" mistura os dois — fica na largura toda, acima das colunas. */
 export default function SessaoTab() {
   return (
-    <div style={{ maxWidth: 1100, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <CenaAtualSection />
       <div
         style={{

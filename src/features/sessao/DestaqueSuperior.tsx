@@ -1,13 +1,11 @@
 import { useStore } from '../../state/store';
 
-/** §8 — Destaque superior [Público]: painel sempre visível, deriva de sessaoPublica —
- *  não é estado novo. Montado em App.tsx (fora da aba Sessão) porque "sempre visível" quer
- *  dizer em qualquer aba, não só na de Sessão. */
+/** §8 — Destaque superior [Público]: resumo da situação da sessão (§1), sempre visível —
+ *  deriva de sessaoPublica, não é estado novo. Montado em App.tsx (fora da aba Sessão)
+ *  porque "sempre visível" quer dizer em qualquer aba, não só na de Sessão. */
 export default function DestaqueSuperior() {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
-  const { localAtual, objetivo, hora } = sessaoPublica;
-
-  if (!localAtual && !objetivo && !hora) return null;
+  const { numeroSessao, localAtual, objetivo, progresso } = sessaoPublica;
 
   return (
     <div
@@ -23,6 +21,9 @@ export default function DestaqueSuperior() {
         color: 'var(--ink-dim)',
       }}
     >
+      <span>
+        SESSÃO: <span style={{ color: 'var(--ink)' }}>{numeroSessao}</span>
+      </span>
       {localAtual && (
         <span>
           LOCAL: <span style={{ color: 'var(--ink)' }}>{localAtual.toUpperCase()}</span>
@@ -33,9 +34,12 @@ export default function DestaqueSuperior() {
           OBJETIVO: <span style={{ color: 'var(--ink)' }}>{objetivo}</span>
         </span>
       )}
-      {hora && (
+      {progresso.total > 0 && (
         <span>
-          TEMPO: <span style={{ color: 'var(--ink)' }}>{hora}</span>
+          PROGRESSO:{' '}
+          <span style={{ color: 'var(--ink)' }}>
+            {progresso.atual}/{progresso.total}
+          </span>
         </span>
       )}
     </div>

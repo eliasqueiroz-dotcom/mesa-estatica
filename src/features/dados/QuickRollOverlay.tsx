@@ -67,6 +67,9 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
               ×
             </button>
           </div>
+          <div className="vazio" style={{ fontSize: 10, marginBottom: '0.4rem', textAlign: 'center' }}>
+            atalhos: R=rolar · S=abrir · X=fechar
+          </div>
           {!modo2D && (
             <div
               id="dice-overlay-rapido"

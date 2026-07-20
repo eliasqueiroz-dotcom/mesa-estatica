@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
+import { personagemEstaEmSurto } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
 import { comprimirImagem } from './comprimirImagem';
+import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import TokenOverlay from './TokenOverlay';
 
@@ -13,6 +15,16 @@ const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup em um tok
 
 // arredonda pro campo numérico ficar digitável (arrastar produz float; digitar quer inteiro).
 const clamp = (valor: number, min: number, max: number) => Math.round(Math.max(min, Math.min(max, valor)));
+
+/** extrai a primeira letra do primeiro nome e a primeira letra do último nome
+ *  ex: "Guarda 1" → "G1", "Maria Silva" → "MS", "João" → "J" */
+const iniciaisToken = (nome: string): string => {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length === 0) return '?';
+  const primeira = partes[0].charAt(0).toUpperCase();
+  if (partes.length === 1) return primeira;
+  return primeira + partes[partes.length - 1].charAt(0).toUpperCase();
+};
 
 type Alca = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
 
@@ -42,7 +54,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
   const removerTokenMapa = useStore((s) => s.removerTokenMapa);
 
+  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
+  const rodada = useStore((s) => s.sessaoPublica.rodada);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
@@ -193,7 +207,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const sanidadeCritica = p.ficha
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
       : false;
-    const surtoAtivo = p.ficha ? p.ficha.surtoAtivo === contadorCena : false;
+    const surtoAtivo = p.ficha ? personagemEstaEmSurto(p.ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, nome: p.nome };
   });
 
@@ -208,14 +222,6 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           <input type="file" accept="image/*" hidden onChange={importar} />
         </label>
         {erro && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erro}</span>}
-        <label className="mapa-grade-toggle">
-          <input
-            type="checkbox"
-            checked={mapa.grade.ativa}
-            onChange={(e) => atualizarGrade({ ativa: e.target.checked })}
-          />
-          grid
-        </label>
         <div className="mapa-toolbar__espaco" />
         {fichasDisponiveis.length + npcsDisponiveis.length > 0 && (
           <div className="mapa-toolbar__add">
@@ -247,79 +253,6 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           <img src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false} />
         ) : (
           <p className="vazio mapa-vazio">nenhum mapa carregado — clique em &quot;carregar mapa&quot;.</p>
-        )}
-
-        {/* painel flutuante, não sibling no flex — não pode alterar o tamanho de .mapa-area
-            (bug de layout corrigido, mesa-estatica-multiplayer-completo.md Parte II §5). */}
-        {mapa.grade.ativa && (
-          <div className="campos-grid mapa-grade-config">
-            <div>
-              <label htmlFor="grade-colunas">colunas</label>
-              <input
-                id="grade-colunas"
-                type="number"
-                min={1}
-                max={100}
-                value={mapa.grade.colunas}
-                onChange={(e) => atualizarGrade({ colunas: clamp(Number(e.target.value) || 1, 1, 100) })}
-              />
-            </div>
-            <div>
-              <label htmlFor="grade-linhas">linhas</label>
-              <input
-                id="grade-linhas"
-                type="number"
-                min={1}
-                max={100}
-                value={mapa.grade.linhas}
-                onChange={(e) => atualizarGrade({ linhas: clamp(Number(e.target.value) || 1, 1, 100) })}
-              />
-            </div>
-            <div>
-              <label htmlFor="grade-x">x (%)</label>
-              <input
-                id="grade-x"
-                type="number"
-                min={0}
-                max={100}
-                value={mapa.grade.x}
-                onChange={(e) => atualizarGrade({ x: clamp(Number(e.target.value) || 0, 0, 100) })}
-              />
-            </div>
-            <div>
-              <label htmlFor="grade-y">y (%)</label>
-              <input
-                id="grade-y"
-                type="number"
-                min={0}
-                max={100}
-                value={mapa.grade.y}
-                onChange={(e) => atualizarGrade({ y: clamp(Number(e.target.value) || 0, 0, 100) })}
-              />
-            </div>
-            <div>
-              <label htmlFor="grade-largura">largura (%)</label>
-              <input
-                id="grade-largura"
-                type="number"
-                min={0}
-                max={100}
-                value={mapa.grade.largura}
-                onChange={(e) => atualizarGrade({ largura: clamp(Number(e.target.value) || 0, 0, 100) })}
-              />
-            </div>
-            <div>
-              <label htmlFor="grade-altura">altura (%)</label>
-              <input
-                id="grade-altura"
-                type="number"
-                min={0}
-                max={100}
-                value={mapa.grade.altura}
-                onChange={(e) => atualizarGrade({ altura: clamp(Number(e.target.value) || 0, 0, 100) })}
-              />
-            </div>
-          </div>
         )}
 
         {mapa.grade.ativa && (
@@ -379,7 +312,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
             onPointerDown={iniciarArrastoToken(t.id)}
             title={t.nome}
           >
-            <span className="mapa-token__inicial">{t.nome.charAt(0).toUpperCase() || '?'}</span>
+            <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
             <span
               className="mapa-token__remover"
               role="button"
@@ -393,6 +326,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         ))}
       </div>
 
+      <GradeOverlay />
       {tokenOverlay && <TokenOverlay tipo={tokenOverlay.tipo} id={tokenOverlay.id} onFechar={() => setTokenOverlay(null)} />}
     </div>
   );

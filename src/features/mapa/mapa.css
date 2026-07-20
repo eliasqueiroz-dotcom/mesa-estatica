@@ -152,30 +152,6 @@
   }
 }
 
-.mapa-grade-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 13px;
-  cursor: pointer;
-  margin: 0;
-}
-
-/* painel flutuante — position:absolute dentro de .mapa-area, NUNCA sibling no fluxo da coluna
-   flex de .mapa-tab (era isso que fazia o mapa encolher ao ligar o grid — Parte II §5). */
-.mapa-grade-config {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  z-index: 5;
-  width: min(320px, calc(100% - 1.2rem));
-  background: color-mix(in srgb, var(--concrete-1) 92%, transparent);
-  border: 1px solid var(--concrete-2);
-  border-radius: 3px;
-  padding: 0.75rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
 .mapa-grade {
   position: absolute;
   pointer-events: none;
