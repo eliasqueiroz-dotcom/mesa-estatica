@@ -92,6 +92,10 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const iniciativa = useStore((s) => s.iniciativa);
+  const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[id] ?? EMPTY_CONDICOES);
+  const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

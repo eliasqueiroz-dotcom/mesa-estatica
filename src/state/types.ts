@@ -160,6 +160,9 @@ export interface SessaoPublica {
   modoCombate: boolean;
   indiceAtualTurno: number;
   rodada: number;
+  /** Condições de combate por combatente (participanteId → ids de `CONDICOES_COMBATE`). Lembrete
+   *  visual pro mestre, não modificador automático (Parte II §4). Limpo ao encerrar o combate. */
+  condicoesCombate: Record<string, string[]>;
 }
 
 export interface EventoSessao {

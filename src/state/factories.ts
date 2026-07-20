@@ -89,6 +89,7 @@ export function criarSessaoPublica(): SessaoPublica {
     modoCombate: false,
     indiceAtualTurno: 0,
     rodada: 1,
+    condicoesCombate: {},
   };
 }
 
@@ -107,7 +108,7 @@ export function criarSessaoPrivada(): SessaoPrivada {
   };
 }
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

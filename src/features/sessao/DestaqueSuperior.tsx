@@ -18,7 +18,7 @@ export default function DestaqueSuperior() {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
   const tierRuido = useTierRuidoFichaAtiva();
-  const { numeroSessao, localAtual, objetivo, progresso } = sessaoPublica;
+  const { numeroSessao, localAtual, objetivo } = sessaoPublica;
 
   return (
     <div
@@ -47,6 +47,7 @@ export default function DestaqueSuperior() {
           OBJETIVO: <span style={{ color: 'var(--ink)' }}>{objetivo}</span>
         </span>
       )}
+      {/* progresso removido em 20/07 a pedido do usuário — manter comentado pra reativar fácil
       {progresso.total > 0 && (
         <span>
           PROGRESSO:{' '}
@@ -55,6 +56,7 @@ export default function DestaqueSuperior() {
           </span>
         </span>
       )}
+      */}
       {fichaAtivaId && (
         <span>
           SANIDADE:{' '}

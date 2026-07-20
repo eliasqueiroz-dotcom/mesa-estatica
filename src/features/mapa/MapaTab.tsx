@@ -5,7 +5,9 @@ import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
+import { nomeCondicao } from '../../rules/data/condicoesCombate';
 import { comprimirImagem } from './comprimirImagem';
+import CombatOverlay from './CombatOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import TokenOverlay from './TokenOverlay';
@@ -57,6 +59,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
+  const iniciativa = useStore((s) => s.iniciativa);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
@@ -202,6 +207,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     inicioCliqueRef.current = null;
   };
 
+  const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
+
   const tokensVisuais = mapa.tokens.map((t) => {
     const p = participantePorId(t.participanteId);
     const sanidadeCritica = p.ficha
@@ -209,7 +216,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
       : false;
     const surtoAtivo = p.ficha ? personagemEstaEmSurto(p.ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
     const surtoEscolha = surtoAtivo ? p.ficha?.surtoEscolha ?? null : null;
-    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, nome: p.nome };
+    const turnoAtivo = participanteNaVez === t.participanteId;
+    const condicoes = condicoesCombate[t.participanteId] ?? [];
+    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome };
   });
 
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
@@ -304,30 +313,38 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           <TokenScene tokens={tokensVisuais} width={tamanho.width} height={tamanho.height} active={active} />
         )}
 
-        {tokensVisuais.map((t) => (
-          <div
-            key={t.id}
-            className="mapa-token"
-            data-surto={t.surtoAtivo}
-            style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, borderColor: t.cor }}
-            onPointerDown={iniciarArrastoToken(t.id)}
-            title={t.surtoAtivo ? `${t.nome} — surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}` : t.nome}
-          >
-            <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
-            <span
-              className="mapa-token__remover"
-              role="button"
-              tabIndex={0}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => removerTokenMapa(t.id)}
+        {tokensVisuais.map((t) => {
+          const partesTitulo = [t.nome];
+          if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
+          if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
+          return (
+            <div
+              key={t.id}
+              className="mapa-token"
+              data-surto={t.surtoAtivo}
+              data-turno={t.turnoAtivo}
+              style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, borderColor: t.cor }}
+              onPointerDown={iniciarArrastoToken(t.id)}
+              title={partesTitulo.join(' — ')}
             >
-              ×
-            </span>
-          </div>
-        ))}
+              <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
+              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
+              <span
+                className="mapa-token__remover"
+                role="button"
+                tabIndex={0}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => removerTokenMapa(t.id)}
+              >
+                ×
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       <GradeOverlay />
+      <CombatOverlay />
       {tokenOverlay && <TokenOverlay tipo={tokenOverlay.tipo} id={tokenOverlay.id} onFechar={() => setTokenOverlay(null)} />}
     </div>
   );

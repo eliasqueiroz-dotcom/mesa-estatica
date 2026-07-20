@@ -152,6 +152,72 @@
   }
 }
 
+/* Vez no combate — anel ciano estático por fora (outline, pra compor com o anel vermelho de
+   surto sem brigar com a animação de box-shadow dele). Marca de quem é o turno no mapa. */
+.mapa-token[data-turno='true'] {
+  outline: 2px solid var(--rede);
+  outline-offset: 3px;
+}
+
+/* Contador de condições de combate ativas — canto inferior-esquerdo, oposto ao × de remover. */
+.mapa-token__condicoes {
+  position: absolute;
+  bottom: -8px;
+  left: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--concrete-1);
+  border: 1px solid var(--rede-dim);
+  color: var(--rede);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Linha de um combatente no rastreador (CombatOverlay) + toggles de condição. */
+.combate-linha {
+  border: 1px solid var(--concrete-2);
+  border-radius: 4px;
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.combate-condicoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.combate-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--concrete-2);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.combate-chip:hover {
+  border-color: var(--rede-dim);
+  color: var(--ink);
+}
+
+.combate-chip--ativa {
+  border-color: var(--rede);
+  color: var(--rede);
+  background: color-mix(in srgb, var(--rede) 12%, transparent);
+}
+
 .mapa-grade {
   position: absolute;
   pointer-events: none;

@@ -79,8 +79,10 @@ interface Acoes {
   iniciarModoCombate: () => void;
   /** Passa pro próximo em `iniciativa`; dá a volta soma 1 em `rodada`. */
   avancarTurno: () => void;
-  /** Só para de checar a trava — não zera `iniciativa`/`rodada` (mesa-estatica-multiplayer-completo.md Parte I §6.3). */
+  /** Só para de checar a trava — não zera `iniciativa`/`rodada` (mesa-estatica-multiplayer-completo.md Parte I §6.3); limpa `condicoesCombate`. */
   encerrarModoCombate: () => void;
+  /** Liga/desliga uma condição de combate (`CONDICOES_COMBATE`) num combatente. */
+  alternarCondicaoCombate: (participanteId: string, condicaoId: string) => void;
 
   atualizarMapa: (patch: Partial<EstadoMapa>) => void;
   atualizarGrade: (patch: Partial<GradeMapa>) => void;
@@ -363,7 +365,19 @@ export const useStore = create<Store>()(
           const rodada = proximo === 0 ? s.sessaoPublica.rodada + 1 : s.sessaoPublica.rodada;
           return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada } };
         }),
-      encerrarModoCombate: () => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false } })),
+      encerrarModoCombate: () =>
+        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {} } })),
+      alternarCondicaoCombate: (participanteId, condicaoId) =>
+        set((s) => {
+          const atuais = s.sessaoPublica.condicoesCombate[participanteId] ?? [];
+          const proximas = atuais.includes(condicaoId)
+            ? atuais.filter((c) => c !== condicaoId)
+            : [...atuais, condicaoId];
+          const condicoesCombate = { ...s.sessaoPublica.condicoesCombate };
+          if (proximas.length === 0) delete condicoesCombate[participanteId];
+          else condicoesCombate[participanteId] = proximas;
+          return { sessaoPublica: { ...s.sessaoPublica, condicoesCombate } };
+        }),
 
       atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
       atualizarGrade: (patch) => set((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ...patch } } })),
@@ -547,6 +561,10 @@ export const useStore = create<Store>()(
         // privado em "cena atual" — só o mestre define/vê.
         if (versaoAnterior < 6 && estado.sessaoPrivada) {
           estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...estado.sessaoPrivada };
+        }
+        // v6 → v7: condições de combate por combatente (Parte II §4).
+        if (versaoAnterior < 7 && estado.sessaoPublica) {
+          estado.sessaoPublica = { condicoesCombate: {}, ...estado.sessaoPublica };
         }
         return estado as Store;
       },

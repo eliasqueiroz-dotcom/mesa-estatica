@@ -78,6 +78,7 @@ export default function SituacaoSection() {
             onChange={(e) => atualizarSessaoPublica({ objetivo: e.target.value })}
           />
         </div>
+        {/* progresso da investigação removido em 20/07 a pedido do usuário — comentado pra reativar fácil
         <div>
           <label htmlFor="sessao-progresso">Progresso da investigação</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -106,6 +107,7 @@ export default function SituacaoSection() {
             <span className="vazio">pistas</span>
           </div>
         </div>
+        */}
       </div>
     </section>
   );
