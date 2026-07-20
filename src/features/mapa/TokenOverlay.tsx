@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
+import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PROTECOES } from '../../rules/data/armas';
 import { PERICIAS } from '../../rules/data/pericias';
 import { personagemEstaEmSurto } from '../../rules/surto';
@@ -131,7 +131,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
       <div className="secao" style={{ width: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ margin: 0 }}>{(tipo === 'pc' ? ficha!.nome : npc!.nome) || 'sem nome'}</h3>
-          <button className="icone-botao" onClick={onFechar} title="fechar (Esc)">
+          <button className="icone-botao" onClick={onFechar} title="fechar (Esc)" style={{ color: 'var(--ruido)' }}>
             ×
           </button>
         </div>
@@ -163,6 +163,10 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                   />
                 </label>
               ))}
+            </div>
+
+            <div className="vazio" style={{ fontSize: 12, textAlign: 'center', marginTop: '0.5rem' }}>
+              🛡 defesa: <span className="mono">{calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa)}</span>
             </div>
 
             {(emSurto || traumasAtivos.length > 0) && (
@@ -210,8 +214,11 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
           </>
         )}
 
-        {tipo === 'npc' && npc && (
+          {tipo === 'npc' && npc && (
           <>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <span className="vazio" style={{ fontSize: 12 }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
+            </div>
             <div className="campos-grid">
               <div>
                 <label htmlFor="ov-npc-pv">PV atual</label>

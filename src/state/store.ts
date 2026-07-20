@@ -76,6 +76,8 @@ interface Acoes {
   rolarIniciativa: (participanteIds: string[]) => void;
   removerDaIniciativa: (id: string) => void;
   limparIniciativa: () => void;
+  /** Reordena a lista de iniciativa (drag-and-drop). Ajusta `indiceAtualTurno` se o turno atual for movido. */
+  reordenarIniciativa: (de: number, para: number) => void;
 
   /** Rola iniciativa se ainda não houver, e liga o modo combate na 1ª entrada da ordem. */
   iniciarModoCombate: () => void;
@@ -371,6 +373,22 @@ export const useStore = create<Store>()(
       },
       removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
       limparIniciativa: () => set({ iniciativa: [] }),
+      reordenarIniciativa: (de, para) =>
+        set((s) => {
+          if (de === para) return s;
+          const ordem = [...s.iniciativa];
+          const [movido] = ordem.splice(de, 1);
+          ordem.splice(para, 0, movido);
+          let indiceAtualTurno = s.sessaoPublica.indiceAtualTurno;
+          if (de === indiceAtualTurno) {
+            indiceAtualTurno = para;
+          } else if (de < indiceAtualTurno && para >= indiceAtualTurno) {
+            indiceAtualTurno--;
+          } else if (de > indiceAtualTurno && para <= indiceAtualTurno) {
+            indiceAtualTurno++;
+          }
+          return { iniciativa: ordem, sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno } };
+        }),
 
       iniciarModoCombate: () => {
         if (get().iniciativa.length === 0) get().rolarIniciativaTodos();
