@@ -38,12 +38,11 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const linhaSanidade = metade(sanidadeMaxima);
   const traumasAtivos = ficha.traumas.filter((t) => !t.virouCicatriz).length;
   const tierRuido = calcularTierRuido(ficha.sanidadeAtual, sanidadeMaxima);
-  const surtoAtivoAgora = personagemEstaEmSurto(ficha.surtoAtivo, { modoCombate, contadorCena, rodada });
+  const surtoAtivoAgora = personagemEstaEmSurto(ficha.surtosAtivos, { modoCombate, contadorCena, rodada });
 
   const handleSanidade = (valor: number) => {
     const resultado = ajustarSanidadeAtual(ficha.id, valor);
     const novosAlertas: string[] = [];
-    // ambos podem disparar juntos: um Surto não dispensa marcar o Trauma da linha cruzada.
     if (resultado.cruzouLinhaSanidade) novosAlertas.push('a garoa chia — Sanidade cruzou a metade, marque um Trauma.');
     if (resultado.surtoDisparado) novosAlertas.push('SURTO — role duas vezes; escolha o efeito abaixo.');
     if (novosAlertas.length > 0) setAlertas(novosAlertas);
@@ -166,15 +165,19 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
 
       {(traumasAtivos >= 3 || (surtoAtivoAgora && !escolhaSurtoPendente)) && (
         <div className="badges-linha">
-          {surtoAtivoAgora && !escolhaSurtoPendente && (
+          {surtoAtivoAgora && !escolhaSurtoPendente && ficha.surtosAtivos.filter((s) => {
+            if (modoCombate) return s.expiraEm >= rodada;
+            return s.expiraEm === contadorCena;
+          }).map((s) => (
             <span
+              key={s.id}
               className="badge"
               style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}
-              title={ficha.surtoEscolha ? descricaoSurto(ficha.surtoEscolha) : undefined}
+              title={s.escolha ? descricaoSurto(s.escolha) : undefined}
             >
-              surto{ficha.surtoEscolha ? `: ${ficha.surtoEscolha}` : ' ativo'}
+              surto{s.escolha ? `: ${s.escolha}` : ' ativo'}
             </span>
-          )}
+          ))}
           {traumasAtivos >= 3 && <span className="badge">à beira de se perder — 3+ traumas</span>}
         </div>
       )}

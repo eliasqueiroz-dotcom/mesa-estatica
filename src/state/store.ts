@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
-import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
+import { resolverSurto } from '../rules/surto';
 import type { EntradaSurto } from '../rules/data/surto';
 import { ordenarIniciativa } from '../rules/teste';
 import {
@@ -25,6 +25,7 @@ import type {
   Npc,
   SessaoPrivada,
   SessaoPublica,
+  SurtoAtivo,
   TipoLog,
   TokenMapa,
 } from './types';
@@ -184,11 +185,6 @@ export const useStore = create<Store>()(
           surtoDisparado: perdeuCincoOuMaisDeUmaVez(anterior, valor),
         };
 
-        // Surto: rola a tabela na hora (2d20, comportamento igual ao Rolador de Surto manual —
-        // não é uma rolagem física na bandeja, é resolução automática de bastidor, como a
-        // iniciativa e a duração em combate; ver correcoes-parte2.md item 2). Empate resolve
-        // sozinho ("o destino insiste"); senão fica pendente até o mestre escolher.
-        let surtoEscolhaImediata: string | null = null;
         let logSurtoImediato: string | null = null;
         let pendente: EstadoEfemero['escolhaSurtoPendente'] = null;
         if (alerta.surtoDisparado) {
@@ -196,35 +192,50 @@ export const useStore = create<Store>()(
           const d20B = Math.floor(Math.random() * 20) + 1;
           const resultado = resolverSurto(d20A, d20B);
           if (resultado.mesmoNumero) {
-            surtoEscolhaImediata = resultado.entradaA.nome;
             logSurtoImediato = `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${resultado.entradaA.nome} — ${resultado.entradaA.descricao}`;
+            set((s) => ({
+              fichas: s.fichas.map((f) =>
+                f.id === id
+                  ? {
+                      ...f,
+                      sanidadeAtual: valor,
+                      surtosAtivos: [
+                        ...(f.surtosAtivos ?? []),
+                        { id: crypto.randomUUID(), expiraEm: s.sessaoPublica.contadorCena + 1, escolha: resultado.entradaA.nome },
+                      ],
+                    }
+                  : f,
+              ),
+            }));
           } else {
             pendente = { fichaId: id, nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB };
+            set((s) => ({
+              fichas: s.fichas.map((f) =>
+                f.id === id
+                  ? {
+                      ...f,
+                      sanidadeAtual: valor,
+                      surtosAtivos: [
+                        ...(f.surtosAtivos ?? []),
+                        { id: crypto.randomUUID(), expiraEm: s.sessaoPublica.contadorCena + 1, escolha: null },
+                      ],
+                    }
+                  : f,
+              ),
+              escolhaSurtoPendente: pendente,
+            }));
           }
+        } else {
+          set((s) => ({
+            fichas: s.fichas.map((f) => (f.id === id ? { ...f, sanidadeAtual: valor } : f)),
+          }));
         }
-
-        set((s) => ({
-          fichas: s.fichas.map((f) =>
-            f.id === id
-              ? {
-                  ...f,
-                  sanidadeAtual: valor,
-                  // marca o Surto até o fim da cena atual — avançar cena invalida sozinho
-                  // (comparação por número, não precisa limpar ficha por ficha depois).
-                  surtoAtivo: alerta.surtoDisparado ? calcularExpiraSurto(s.sessaoPublica) : f.surtoAtivo,
-                  surtoEscolha: alerta.surtoDisparado ? surtoEscolhaImediata : f.surtoEscolha,
-                }
-              : f,
-          ),
-          escolhaSurtoPendente: pendente ?? s.escolhaSurtoPendente,
-        }));
         get().registrarLog(
           'sanidade',
           `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
           id,
         );
         if (logSurtoImediato) get().registrarLog('surto', logSurtoImediato, id);
-        // qualquer queda de Sanidade acende o burst do ruído, não só o Surto — reação instantânea.
         if (delta < 0) get().dispararBurstRuido();
         if (alerta.surtoDisparado) {
           set((s) => ({
@@ -242,7 +253,16 @@ export const useStore = create<Store>()(
         if (!pendente) return;
         const entrada = lado === 'A' ? pendente.entradaA : pendente.entradaB;
         set((s) => ({
-          fichas: s.fichas.map((f) => (f.id === pendente.fichaId ? { ...f, surtoEscolha: entrada.nome } : f)),
+          fichas: s.fichas.map((f) =>
+            f.id === pendente.fichaId
+              ? {
+                  ...f,
+                  surtosAtivos: (f.surtosAtivos ?? []).map((s) =>
+                    s.escolha === null ? { ...s, escolha: entrada.nome } : s,
+                  ),
+                }
+              : f,
+          ),
           escolhaSurtoPendente: null,
         }));
         get().registrarLog(
@@ -490,17 +510,20 @@ export const useStore = create<Store>()(
           id: crypto.randomUUID(),
           timestamp: new Date().toISOString(),
         };
-        set((s) => ({ rollsLog: [roll, ...s.rollsLog] }));
+        set((s) => ({ rollsLog: [roll, ...(s.rollsLog ?? [])] }));
       },
       revelarRoll: (id) =>
         set((s) => ({
-          rollsLog: s.rollsLog.map((r) => (r.id === id ? { ...r, visibilidade: 'publica' } : r)),
+          rollsLog: (s.rollsLog ?? []).map((r) => (r.id === id ? { ...r, visibilidade: 'publica' } : r)),
         })),
 
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
       atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),
       avancarCena: () =>
-        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, contadorCena: s.sessaoPublica.contadorCena + 1 } })),
+        set((s) => ({
+          sessaoPublica: { ...s.sessaoPublica, contadorCena: s.sessaoPublica.contadorCena + 1 },
+          fichas: s.fichas.map((f) => ({ ...f, surtosAtivos: [] })),
+        })),
 
       adicionarEvento: (texto) =>
         set((s) => ({
@@ -667,6 +690,25 @@ export const useStore = create<Store>()(
         // v9 → v10: rolls_log
         if (versaoAnterior < 10) {
           estado.rollsLog = [];
+        }
+        // v10 → v11: surto vira array surtosAtivos em cada ficha
+        if (versaoAnterior < 11 && estado.fichas) {
+          estado.fichas = estado.fichas.map((f: any) => {
+            const { surtoAtivo, surtoEscolha, ...resto } = f;
+            const surtosAtivos: SurtoAtivo[] = [];
+            if (surtoAtivo != null) {
+              surtosAtivos.push({
+                id: crypto.randomUUID(),
+                expiraEm: surtoAtivo,
+                escolha: surtoEscolha ?? null,
+              });
+            }
+            return { ...resto, surtosAtivos };
+          });
+        }
+        // v11 → v12: garante surtosAtivos em toda ficha
+        if (versaoAnterior < 12 && estado.fichas) {
+          estado.fichas = estado.fichas.map((f: any) => ({ surtosAtivos: [], ...f }));
         }
         return estado as Store;
       },
