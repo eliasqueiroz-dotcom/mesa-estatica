@@ -10,7 +10,6 @@ interface QuickRollOverlayProps {
   abaAtual: string;
   aberto: boolean;
   onAbertoChange: (aberto: boolean) => void;
-  /** incrementa a cada pedido de rolagem via atalho de teclado (tecla R) — dispara a rolagem do modo atual. */
   pedidoRolagem: number;
 }
 
@@ -21,79 +20,122 @@ function descricaoResultado(r: ResultadoTeste): string {
   return r.sucesso ? 'sucesso' : 'falha';
 }
 
-/**
- * Bandeja flutuante de rolagem rápida, acessível de qualquer aba — pra não precisar navegar
- * até "Dados & Regras" só pra rolar. Dois modos: "simples" (d20 honesto solto, sem perícia/DT)
- * e "perícia" (teste completo — mesma lógica de RoladorTeste.tsx, `rules/teste.ts`). Os dois
- * usam a ficha ativa (fichaAtivaId); o modo perícia precisa dela pra ter atributos/graus.
- * Desligada enquanto a própria aba de Dados está ativa, pra não duplicar instância de física.
- */
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {
   const habilitado = abaAtual !== 'dados' && aberto;
-  // baseScale menor: o painel é ~metade da bandeja principal, então o dado no padrão (100) fica
-  // grande demais pra área. 45 deixa o d20 proporcional ao container pequeno.
   const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado, 45);
   const fichas = useStore((s) => s.fichas);
+  const npcs = useStore((s) => s.npcs);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
   const basePV = useStore((s) => s.config.basePV);
   const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const [modo, setModo] = useState<'simples' | 'pericia'>('simples');
+  const [quem, setQuem] = useState<'pc' | 'npc'>('pc');
+  const [npcId, setNpcId] = useState('');
+  const [bonus, setBonus] = useState(0);
+  const [privado, setPrivado] = useState(false);
   const [resultado, setResultado] = useState<number | null>(null);
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
-  const [resultadoTeste, setResultadoTeste] = useState<ResultadoTeste | null>(null);
+  const [resultadoPericia, setResultadoPericia] = useState<{ sucesso: boolean; d20: number; modificador: number; total: number; descricao?: string } | null>(null);
 
   const ficha = fichas.find((f) => f.id === fichaAtivaId) ?? null;
+  const npc = npcs.find((n) => n.id === npcId) ?? null;
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
   const dt = useDtDaCena();
 
+  useEffect(() => {
+    setPrivado(quem === 'npc');
+  }, [quem]);
+
+  const visibilidade = privado ? 'privada' as const : 'publica' as const;
+
+  const podeRolarSimples = true;
+  const podeRolarPericia = quem === 'pc' ? ficha !== null : npc !== null;
+  const podeRolar = modo === 'simples' ? podeRolarSimples : podeRolarPericia;
+
   const rolarSimples = () => {
     setResultado(null);
+    if (quem === 'npc' && !npc) return;
     rolar('1d20', (grupos) => {
       const valor = grupos[0]?.rolls[0]?.value ?? 0;
-      setResultado(valor);
-      registrarLog(
-        'teste',
-        `${ficha?.nome || 'd20 rápido'} · rolagem rápida (sem perícia/DT) → ${valor}`,
-        ficha?.id ?? null,
-      );
+      const total = quem === 'npc' ? valor + bonus : valor;
+      setResultado(total);
+
+      const origem = quem === 'npc' && npc ? npc.nome || 'NPC' : ficha?.nome || 'd20 rápido';
+      const id = quem === 'npc' && npc ? npc.id : ficha?.id ?? null;
+      const formula = quem === 'npc' && bonus !== 0 ? `d20+${bonus}` : 'd20';
+      registrarLog('teste', `${origem} · rolagem rápida (sem perícia/DT) → ${total}`, id);
+      registrarRoll({
+        origem,
+        personagemId: id,
+        formula,
+        total,
+        bruto: valor,
+        visibilidade,
+      });
     }, 'rede', ficha?.id ?? null);
   };
 
   const rolarPericia = () => {
-    if (!ficha) return;
-    setResultadoTeste(null);
-    rolar('1d20', (grupos) => {
-      const d20 = grupos[0]?.rolls[0]?.value ?? 0;
-      const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-      const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-      const grauPericia = ficha.pericias[periciaId] ?? 0;
-      const r = resolverTeste({
-        d20,
-        atributoId: pericia.atributo,
-        valorAtributo: ficha.atributos[pericia.atributo],
-        grauPericia,
-        personagemFerido: ferido,
-        dt,
-      });
-      setResultadoTeste(r);
-      registrarLog(
-        'teste',
-        `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} → ${d20}${
-          r.modificador >= 0 ? '+' : ''
-        }${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
-        ficha.id,
-      );
-    }, 'rede', ficha.id);
+    if (quem === 'pc' && ficha) {
+      setResultadoPericia(null);
+      rolar('1d20', (grupos) => {
+        const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+        const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
+        const ferido = estaFerido(ficha.pvAtual, pvMaximo);
+        const grauPericia = ficha.pericias[periciaId] ?? 0;
+        const r = resolverTeste({
+          d20,
+          atributoId: pericia.atributo,
+          valorAtributo: ficha.atributos[pericia.atributo],
+          grauPericia,
+          personagemFerido: ferido,
+          dt,
+        });
+        setResultadoPericia({ sucesso: r.sucesso, d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
+        const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
+        registrarLog(
+          'teste',
+          `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          ficha.id,
+        );
+        registrarRoll({
+          origem: ficha.nome || 'Personagem',
+          personagemId: ficha.id,
+          formula,
+          total: r.total,
+          bruto: d20,
+          visibilidade,
+        });
+      }, 'rede', ficha.id);
+    } else if (quem === 'npc' && npc) {
+      setResultadoPericia(null);
+      rolar('1d20', (grupos) => {
+        const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+        const total = d20 + bonus;
+        setResultadoPericia({ sucesso: true, d20, modificador: bonus, total });
+        const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
+        registrarLog(
+          'teste',
+          `${npc.nome || 'NPC'} · teste rápido → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
+          npc.id,
+        );
+        registrarRoll({
+          origem: npc.nome || 'NPC',
+          personagemId: npc.id,
+          formula,
+          total,
+          bruto: d20,
+          visibilidade,
+        });
+      }, undefined, npc.id);
+    }
   };
 
-  const podeRolar = modo === 'simples' ? true : ficha !== null;
   const rolarAtual = modo === 'simples' ? rolarSimples : rolarPericia;
 
-  // atalho "R": se a bandeja já estava pronta, rola na hora (modo atual); senão só abre o painel
-  // (a física leva um instante pra inicializar — melhor deixar o mestre clicar do que arriscar
-  // um roll() perdido silenciosamente contra uma bandeja ainda não pronta).
   useEffect(() => {
     if (pedidoRolagem === 0) return;
     if (ready && !rolando && podeRolar) rolarAtual();
@@ -138,7 +180,49 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             </button>
           </div>
 
-          {modo === 'pericia' && (
+          <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
+            <button
+              className={quem === 'pc' ? 'acento' : undefined}
+              style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
+              onClick={() => setQuem('pc')}
+            >
+              PC
+            </button>
+            <button
+              className={quem === 'npc' ? 'acento' : undefined}
+              style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
+              onClick={() => setQuem('npc')}
+            >
+              NPC
+            </button>
+          </div>
+
+          {quem === 'npc' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
+              <div>
+                <label htmlFor="qr-npc">NPC</label>
+                <select id="qr-npc" value={npcId} onChange={(e) => setNpcId(e.target.value)}>
+                  <option value="">— selecione —</option>
+                  {npcs.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.nome || 'sem nome'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="qr-bonus">Bônus</label>
+                <input
+                  id="qr-bonus"
+                  type="number"
+                  value={bonus}
+                  onChange={(e) => setBonus(Number(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+          )}
+
+          {modo === 'pericia' && quem === 'pc' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
               <div>
                 <label htmlFor="qr-pericia">Perícia</label>
@@ -165,15 +249,19 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             </p>
           )}
 
-          {modo === 'simples' ? (
-            <p className="vazio" style={{ marginTop: '0.4rem' }}>
-              {ficha ? ficha.nome : 'sem personagem ativo'} · rolagem honesta, sem perícia/DT
-            </p>
-          ) : (
-            <p className="vazio" style={{ marginTop: '0.4rem' }}>
-              {ficha ? ficha.nome : 'selecione um personagem na aba Personagens'}
-            </p>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem' }}>
+            <span className="vazio">
+              {quem === 'pc'
+                ? (ficha ? ficha.nome : 'sem personagem ativo')
+                : (npc ? npc.nome : 'selecione um NPC')}
+            </span>
+            {quem === 'npc' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '11px' }}>
+                <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+                privado
+              </label>
+            )}
+          </div>
 
           <button
             className="acento"
@@ -189,18 +277,19 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
               <span style={{ fontSize: 20 }}>{resultado}</span>
             </div>
           )}
-          {modo === 'pericia' && resultadoTeste && (
+          {modo === 'pericia' && resultadoPericia && (
             <div
               className="alerta-banner mono"
               style={{
                 marginTop: '0.5rem',
-                borderColor: resultadoTeste.sucesso ? 'var(--rede)' : 'var(--ruido)',
-                color: resultadoTeste.sucesso ? 'var(--rede)' : 'var(--ruido)',
+                borderColor: resultadoPericia.sucesso ? 'var(--rede)' : 'var(--ruido)',
+                color: resultadoPericia.sucesso ? 'var(--rede)' : 'var(--ruido)',
               }}
             >
               <span style={{ fontSize: 12 }}>
-                d20={resultadoTeste.d20} {resultadoTeste.modificador >= 0 ? '+' : ''}
-                {resultadoTeste.modificador} = {resultadoTeste.total} — {descricaoResultado(resultadoTeste)}
+                d20={resultadoPericia.d20} {resultadoPericia.modificador >= 0 ? '+' : ''}
+                {resultadoPericia.modificador} = {resultadoPericia.total}
+                {resultadoPericia.descricao ? ` — ${resultadoPericia.descricao}` : ''}
               </span>
             </div>
           )}

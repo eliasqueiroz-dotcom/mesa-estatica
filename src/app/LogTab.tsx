@@ -17,6 +17,46 @@ const LABELS_TIPO: Record<TipoLog | 'todos', string> = {
   iniciativa: 'iniciativa',
 };
 
+function RolsSection() {
+  const rollsLog = useStore((s) => s.rollsLog);
+  const revelarRoll = useStore((s) => s.revelarRoll);
+
+  return (
+    <div style={{ marginTop: '2rem' }}>
+      <h3 className="label">Rolagens</h3>
+
+      {rollsLog.length === 0 ? (
+        <p className="vazio" style={{ marginTop: '0.75rem' }}>nenhuma rolagem ainda.</p>
+      ) : (
+        <div className="mono" style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.75rem' }}>
+          {rollsLog.map((r) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ opacity: r.visibilidade === 'privada' ? 0.6 : 1 }}>
+                [{new Date(r.timestamp).toLocaleTimeString()}] [{r.origem}] rolou {r.formula}: {r.total} (bruto: {r.bruto})
+              </span>
+              {r.visibilidade === 'privada' ? (
+                <>
+                  <span style={{ fontSize: '11px', opacity: 0.5 }}>privado</span>
+                  <button
+                    className="icone-botao"
+                    onClick={() => revelarRoll(r.id)}
+                    title="revelar rolagem"
+                    style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
+                  >
+                    revelar
+                  </button>
+                </>
+              ) : (
+                <span style={{ fontSize: '11px', opacity: 0.5 }}>público</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LogTab() {
   const log = useStore((s) => s.log);
   const fichas = useStore((s) => s.fichas);
@@ -100,6 +140,8 @@ export default function LogTab() {
           ))}
         </div>
       )}
+
+      <RolsSection />
     </div>
   );
 }

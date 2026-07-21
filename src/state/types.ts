@@ -87,6 +87,13 @@ export interface Ficha {
   surtoEscolha: string | null;
 }
 
+export interface NpcAcao {
+  id: string;
+  nome: string;
+  bonus: number;
+  dano: string;
+}
+
 export interface Npc {
   id: string;
   nome: string;
@@ -94,8 +101,12 @@ export interface Npc {
   pvAtual: number;
   pvMaximo: number;
   defesa: number;
-  agilidade: number; // pra Iniciativa (d20 + Agilidade, regras.md Parte V)
+  agilidade: number;
   notas: string;
+  visivel: boolean;
+  notasMestre: string;
+  categoria: string;
+  acoes: NpcAcao[];
 }
 
 export interface EntradaIniciativa {
@@ -129,10 +140,21 @@ export type TipoLog =
 
 export interface EntradaLog {
   id: string;
-  timestamp: string; // ISO
+  timestamp: string;
   tipo: TipoLog;
   personagemId: string | null;
   texto: string;
+}
+
+export interface EntradaRoll {
+  id: string;
+  timestamp: string;
+  origem: string;
+  personagemId: string | null;
+  formula: string;
+  total: number;
+  bruto: number;
+  visibilidade: 'publica' | 'privada';
 }
 
 export interface Progresso {
@@ -231,5 +253,6 @@ export interface EstadoGlobal {
   iniciativa: EntradaIniciativa[];
   mapa: EstadoMapa;
   log: EntradaLog[];
+  rollsLog: EntradaRoll[];
   config: EstadoConfig;
 }

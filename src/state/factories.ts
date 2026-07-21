@@ -1,5 +1,5 @@
 import type { Atributo } from '../rules/data/pericias';
-import type { EstadoGlobal, Ficha, GradeMapa, Npc, SessaoPrivada, SessaoPublica } from './types';
+import type { EstadoGlobal, Ficha, GradeMapa, Npc, NpcAcao, SessaoPrivada, SessaoPublica } from './types';
 
 const gerarId = () => crypto.randomUUID();
 
@@ -56,6 +56,10 @@ export function criarFichaVazia(corIndex = 0): Ficha {
   };
 }
 
+export function criarNpcAcao(): NpcAcao {
+  return { id: gerarId(), nome: '', bonus: 0, dano: '' };
+}
+
 export function criarNpcVazio(): Npc {
   return {
     id: gerarId(),
@@ -66,6 +70,10 @@ export function criarNpcVazio(): Npc {
     defesa: 10,
     agilidade: 1,
     notas: '',
+    visivel: false,
+    notasMestre: '',
+    categoria: '',
+    acoes: [],
   };
 }
 
@@ -109,7 +117,7 @@ export function criarSessaoPrivada(): SessaoPrivada {
   };
 }
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 10;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -122,6 +130,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     iniciativa: [],
     mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() },
     log: [],
+    rollsLog: [],
     config: { basePV: 20 },
   };
 }

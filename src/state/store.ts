@@ -17,6 +17,7 @@ import {
 import type {
   EntradaIniciativa,
   EntradaLog,
+  EntradaRoll,
   EstadoGlobal,
   EstadoMapa,
   Ficha,
@@ -69,6 +70,7 @@ interface Acoes {
   adicionarNpc: () => string;
   atualizarNpc: (id: string, patch: Partial<Npc>) => void;
   removerNpc: (id: string) => void;
+  duplicarNpc: (id: string) => void;
 
   /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
   rolarIniciativaTodos: () => void;
@@ -97,6 +99,9 @@ interface Acoes {
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
   limparLog: () => void;
+
+  registrarRoll: (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
+  revelarRoll: (id: string) => void;
 
   atualizarSessaoPublica: (patch: Partial<SessaoPublica>) => void;
   atualizarSessaoPrivada: (patch: Partial<SessaoPrivada>) => void;
@@ -316,6 +321,19 @@ export const useStore = create<Store>()(
       atualizarNpc: (id, patch) =>
         set((s) => ({ npcs: s.npcs.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
       removerNpc: (id) => set((s) => ({ npcs: s.npcs.filter((n) => n.id !== id) })),
+      duplicarNpc: (id) =>
+        set((s) => {
+          const original = s.npcs.find((n) => n.id === id);
+          if (!original) return s;
+          const copia = { ...criarNpcVazio(), ...original, id: crypto.randomUUID(), acoes: (original.acoes ?? []).map((a) => ({ ...a, id: crypto.randomUUID() })) };
+          const match = copia.nome.match(/^(.+?)(\s+(\d+))?$/);
+          if (match) {
+            const base = match[1];
+            const num = match[3] ? parseInt(match[3], 10) + 1 : 2;
+            copia.nome = `${base} ${num}`;
+          }
+          return { npcs: [...s.npcs, copia] };
+        }),
 
       rolarIniciativaTodos: () => {
         const { fichas, npcs } = get();
@@ -466,6 +484,19 @@ export const useStore = create<Store>()(
           },
         })),
 
+      registrarRoll: (entrada) => {
+        const roll: EntradaRoll = {
+          ...entrada,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        };
+        set((s) => ({ rollsLog: [roll, ...s.rollsLog] }));
+      },
+      revelarRoll: (id) =>
+        set((s) => ({
+          rollsLog: s.rollsLog.map((r) => (r.id === id ? { ...r, visibilidade: 'publica' } : r)),
+        })),
+
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
       atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),
       avancarCena: () =>
@@ -533,10 +564,10 @@ export const useStore = create<Store>()(
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
           get();
         return JSON.stringify(
-          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, log, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, log, rollsLog, config },
           null,
           2,
         );
@@ -617,6 +648,21 @@ export const useStore = create<Store>()(
         if (versaoAnterior < 8) {
           estado.sessaoPrivada = { selecionadosIniciativa: [], ...(estado.sessaoPrivada ?? {}) };
           estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
+        }
+        // v8 → v9: visivel, notasMestre, categoria, acoes em Npc
+        if (versaoAnterior < 9 && estado.npcs) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          estado.npcs = estado.npcs.map((n: any) => ({
+            ...n,
+            visivel: false,
+            notasMestre: '',
+            categoria: '',
+            acoes: [],
+          }));
+        }
+        // v9 → v10: rolls_log
+        if (versaoAnterior < 10) {
+          estado.rollsLog = [];
         }
         return estado as Store;
       },

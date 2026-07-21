@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+import { personagemEstaEmSurto, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 
 interface PvCombatente {
@@ -20,6 +21,7 @@ export default function CombatOverlay() {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
@@ -40,11 +42,21 @@ export default function CombatOverlay() {
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
 
+  const registrarLog = useStore((s) => s.registrarLog);
+
   const [aberto, setAberto] = useState(false);
+
+  const toggleAberto = () => {
+    if (!aberto) setPanelPos({ x: 8, y: 8 });
+    setAberto(!aberto);
+  };
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [adicionarAberto, setAdicionarAberto] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const [panelPos, setPanelPos] = useState({ x: 8, y: 8 });
+  const [arrastando, setArrastando] = useState<{ origemX: number; origemY: number; painelX: number; painelY: number } | null>(null);
+  const painelRef = useRef<HTMLDivElement>(null);
 
   const participantesDisponiveis = [
     ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome' })),
@@ -92,6 +104,42 @@ export default function CombatOverlay() {
   };
 
   const adicionarDisponiveis = disponiveis.filter((p) => selecionadosIniciativa.includes(p.id));
+
+  const iniciarArrasto = (ev: React.PointerEvent) => {
+    if (ev.button !== 0) return;
+    setArrastando({ origemX: ev.clientX, origemY: ev.clientY, painelX: panelPos.x, painelY: panelPos.y });
+  };
+
+  const moverArrasto = useCallback((ev: PointerEvent) => {
+    if (!arrastando) return;
+    const area = document.querySelector('.mapa-area');
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const dx = ev.clientX - arrastando.origemX;
+    const dy = ev.clientY - arrastando.origemY;
+    const alturaPainel = painelRef.current?.offsetHeight ?? 200;
+    const larguraPainel = painelRef.current?.offsetWidth ?? 380;
+    const maxX = rect.width - larguraPainel - 8;
+    const maxY = rect.height - Math.min(alturaPainel + 16, rect.height - 16);
+    setPanelPos({
+      x: Math.max(-30, Math.min(arrastando.painelX + dx, maxX)),
+      y: Math.max(8, Math.min(arrastando.painelY + dy, maxY)),
+    });
+  }, [arrastando]);
+
+  const soltarArrasto = useCallback(() => {
+    setArrastando(null);
+  }, []);
+
+  useEffect(() => {
+    if (!arrastando) return;
+    window.addEventListener('pointermove', moverArrasto);
+    window.addEventListener('pointerup', soltarArrasto);
+    return () => {
+      window.removeEventListener('pointermove', moverArrasto);
+      window.removeEventListener('pointerup', soltarArrasto);
+    };
+  }, [arrastando, moverArrasto, soltarArrasto]);
 
   const toggleExpandido = (id: string) => {
     setExpandidos((prev) => {
@@ -141,8 +189,8 @@ export default function CombatOverlay() {
     <div
       style={{
         position: 'absolute',
-        left: '0.5rem',
-        top: '0.5rem',
+        left: panelPos.x,
+        top: panelPos.y,
         zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
@@ -151,14 +199,18 @@ export default function CombatOverlay() {
     >
       {aberto && (
         <div
+          ref={painelRef}
           className="secao"
-          style={{ width: 380, maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
+          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+          <div
+            onPointerDown={iniciarArrasto}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', cursor: arrastando ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none' }}
+          >
             <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
               combate {modoCombate ? `· rodada ${rodada}` : ''}
             </h3>
-            <button className="icone-botao" onClick={() => setAberto(false)} title="fechar">
+            <button className="icone-botao" onClick={() => setAberto(false)} title="fechar" onPointerDown={(ev) => ev.stopPropagation()}>
               ×
             </button>
           </div>
@@ -226,6 +278,9 @@ export default function CombatOverlay() {
                 const defesa = defesaDoCombatente(e.participanteId, e.tipo);
                 const ativas = (condicoesCombate ?? {})[e.participanteId] ?? [];
                 const pvPct = pv ? pv.atual / pv.maximo : 0;
+                const sessaoSurto: EstadoSessaoParaSurto = { modoCombate, contadorCena, rodada };
+                const fichaSurto = e.tipo === 'pc' ? fichas.find((f) => f.id === e.participanteId)?.surtoAtivo ?? null : null;
+                const emSurto = personagemEstaEmSurto(fichaSurto, sessaoSurto);
                 const sendoArrastado = dragIndex === i;
                 const alvoDrop = dropIndex === i;
                 return (
@@ -269,12 +324,19 @@ export default function CombatOverlay() {
                       <span
                         className="mono"
                         style={{
-                          flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
                           color: naVez ? 'var(--rede)' : undefined,
                         }}
                       >
                         {e.nome}
                       </span>
+                      {emSurto && (
+                        <span style={{ color: 'var(--ruido)', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title="em surto">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                          </svg>
+                        </span>
+                      )}
                       {pv && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
                           <div style={{ width: 56, height: 8, background: 'var(--void)', borderRadius: 2, overflow: 'hidden' }}>
@@ -293,6 +355,48 @@ export default function CombatOverlay() {
                     </div>
                     {exp && (
                       <div style={{ padding: '0.25rem 0 0.1rem 1.1rem' }}>
+                        {emSurto && (
+                          <span className="badge" style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start', marginBottom: '0.25rem', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                            </svg>
+                            em surto
+                          </span>
+                        )}
+                        {e.tipo === 'npc' && (() => {
+                          const npcAcoes = npcs.find((n) => n.id === e.participanteId)?.acoes ?? [];
+                          if (npcAcoes.length === 0) return null;
+                          return (
+                            <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                              {npcAcoes.map((a) => (
+                                <button
+                                  key={a.id}
+                                  className="combate-chip combate-chip--ativa"
+                                  onClick={() => {
+                                    const d20 = Math.floor(Math.random() * 20) + 1;
+                                    const total = d20 + a.bonus;
+                                    let dmg = 0;
+                                    if (a.dano) {
+                                      const m = a.dano.match(/^(\d+)d(\d+)(?:\+(\d+))?$/i);
+                                      if (m) {
+                                        for (let i = 0; i < parseInt(m[1], 10); i++) dmg += Math.floor(Math.random() * parseInt(m[2], 10)) + 1;
+                                        if (m[3]) dmg += parseInt(m[3], 10);
+                                      }
+                                    }
+                                    const partes = [`${e.nome} · ${a.nome}`];
+                                    partes.push(`teste d20${a.bonus >= 0 ? '+' : ''}${a.bonus} → ${d20}${a.bonus >= 0 ? '+' : ''}${a.bonus} = ${total}`);
+                                    if (a.dano && dmg > 0) partes.push(`dano ${a.dano} → ${dmg}`);
+                                    registrarLog('rolagem-livre', partes.join(' | '));
+                                  }}
+                                  title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
+                                  style={{ fontSize: 10, cursor: 'pointer' }}
+                                >
+                                  🗡 {a.nome}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
                         <div className="combate-condicoes" style={{ marginBottom: '0.25rem' }}>
                           {CONDICOES_COMBATE.map((c) => {
                             const ligada = ativas.includes(c.id);
@@ -319,7 +423,7 @@ export default function CombatOverlay() {
                           )}
                           {defesa && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <span className="vazio" style={{ fontSize: 10 }}>🛡</span>
+                              <span className="vazio" style={{ fontSize: 10, color: 'var(--real)' }}>🛡</span>
                               <button className="icone-botao" onClick={() => defesa.ajustar(-1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
                               <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa.valor}</span>
                               <button className="icone-botao" onClick={() => defesa.ajustar(1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
@@ -375,7 +479,7 @@ export default function CombatOverlay() {
         </div>
       )}
       <button
-        onClick={() => setAberto(!aberto)}
+        onClick={toggleAberto}
         title="combate"
         style={
           modoCombate
@@ -383,7 +487,7 @@ export default function CombatOverlay() {
             : { borderRadius: '50%', width: 48, height: 48, padding: 0 }
         }
       >
-        {modoCombate ? `R${rodada}` : 'X1'}
+        ATK
       </button>
     </div>
   );

@@ -99,6 +99,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const iniciativa = useStore((s) => s.iniciativa);
   const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[id] ?? EMPTY_CONDICOES);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
+  const registrarLog = useStore((s) => s.registrarLog);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -165,7 +166,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
               ))}
             </div>
 
-            <div className="vazio" style={{ fontSize: 12, textAlign: 'center', marginTop: '0.5rem' }}>
+            <div className="vazio" style={{ fontSize: 12, textAlign: 'center', marginTop: '0.5rem', color: 'var(--real)' }}>
               🛡 defesa: <span className="mono">{calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa)}</span>
             </div>
 
@@ -217,8 +218,38 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
           {tipo === 'npc' && npc && (
           <>
             <div style={{ marginBottom: '0.5rem' }}>
-              <span className="vazio" style={{ fontSize: 12 }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
+            <span className="vazio" style={{ fontSize: 12, color: 'var(--real)' }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
             </div>
+            {(npc.acoes ?? []).length > 0 && (
+              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+                {(npc.acoes ?? []).map((a) => (
+                  <button
+                    key={a.id}
+                    className="combate-chip combate-chip--ativa"
+                    onClick={() => {
+                      const d20 = Math.floor(Math.random() * 20) + 1;
+                      const total = d20 + a.bonus;
+                      let dmg = 0;
+                      if (a.dano) {
+                        const m = a.dano.match(/^(\d+)d(\d+)(?:\+(\d+))?$/i);
+                        if (m) {
+                          for (let i = 0; i < parseInt(m[1], 10); i++) dmg += Math.floor(Math.random() * parseInt(m[2], 10)) + 1;
+                          if (m[3]) dmg += parseInt(m[3], 10);
+                        }
+                      }
+                      const partes = [`${npc.nome || 'NPC'} · ${a.nome}`];
+                      partes.push(`teste d20${a.bonus >= 0 ? '+' : ''}${a.bonus} → ${d20}${a.bonus >= 0 ? '+' : ''}${a.bonus} = ${total}`);
+                      if (a.dano && dmg > 0) partes.push(`dano ${a.dano} → ${dmg}`);
+                      registrarLog('rolagem-livre', partes.join(' | '));
+                    }}
+                    title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
+                    style={{ fontSize: 10, cursor: 'pointer' }}
+                  >
+                    🗡 {a.nome}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="campos-grid">
               <div>
                 <label htmlFor="ov-npc-pv">PV atual</label>
