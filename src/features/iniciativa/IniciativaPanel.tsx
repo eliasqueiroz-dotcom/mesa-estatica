@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+import { TABELA_SURTO } from '../../rules/data/surto';
 import { personagemEstaEmSurto, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
 
@@ -8,9 +9,10 @@ interface IniciativaPanelProps {
   header: ReactNode;
   banner?: ReactNode;
   estiloItem?: React.CSSProperties;
+  podeArrastar?: boolean;
 }
 
-export default function IniciativaPanel({ hook, header, banner, estiloItem }: IniciativaPanelProps) {
+export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true }: IniciativaPanelProps) {
   const {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
     condicoesCombate, fichas, npcs,
@@ -95,15 +97,19 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem }: In
             const ativas = (condicoesCombate ?? {})[e.participanteId] ?? [];
             const pvPct = pv ? pv.atual / pv.maximo : 0;
             const sessaoSurto: EstadoSessaoParaSurto = { modoCombate, contadorCena, rodada };
-            const fichaSurto = e.tipo === 'pc' ? fichas.find((f) => f.id === e.participanteId)?.surtoAtivo ?? null : null;
-            const emSurto = personagemEstaEmSurto(fichaSurto, sessaoSurto);
+            const fichaSurtos = e.tipo === 'pc' ? fichas.find((f) => f.id === e.participanteId)?.surtosAtivos ?? [] : [];
+            const emSurto = personagemEstaEmSurto(fichaSurtos, sessaoSurto);
+            const surtosVisiveis = fichaSurtos.filter((s) => {
+              if (modoCombate) return s.expiraEm >= rodada;
+              return s.expiraEm === contadorCena;
+            });
             const sendoArrastado = dragIndex === i;
             const alvoDrop = dropIndex === i;
             const npcAcoes = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId)?.acoes ?? [] : [];
             return (
               <div
                 key={e.id}
-                draggable
+                draggable={podeArrastar}
                 onDragStart={() => { setDragIndex(i); setDropIndex(null); }}
                 onDragOver={(ev) => { ev.preventDefault(); setDropIndex(i); }}
                 onDragLeave={() => setDropIndex(null)}
@@ -150,7 +156,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem }: In
                     {e.nome}
                   </span>
                   {emSurto && (
-                    <span style={{ color: 'var(--ruido)', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title="em surto">
+                    <span style={{ color: 'var(--ruido)', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                       </svg>
@@ -174,14 +180,37 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem }: In
                 </div>
                 {exp && (
                   <div style={{ padding: '0.25rem 0 0.1rem 1.1rem' }}>
-                    {emSurto && (
-                      <span className="badge" style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start', marginBottom: '0.25rem', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    {surtosVisiveis.filter((s) => s.escolha).map((s) => (
+                      <span
+                        key={s.id}
+                        className="badge"
+                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start', marginBottom: '0.25rem', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                        title={TABELA_SURTO.find((e) => e.nome === s.escolha)?.descricao ?? ''}
+                      >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                         </svg>
-                        em surto
+                        {s.escolha}
                       </span>
-                    )}
+                    ))}
+                    {e.tipo === 'pc' && (() => {
+                      const ficha = fichas.find((f) => f.id === e.participanteId);
+                      if (!ficha || ficha.armas.length === 0) return null;
+                      return (
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                          {ficha.armas.map((a) => (
+                            <span
+                              key={a.id}
+                              className="badge"
+                              style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
+                            >
+                              🗡 {a.nome || 'arma'}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {npcAcoes.length > 0 && (
                       <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                         {npcAcoes.map((a) => (

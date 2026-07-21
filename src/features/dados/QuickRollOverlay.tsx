@@ -28,9 +28,8 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const [npcId, setNpcId] = useState('');
   const [bonus, setBonus] = useState(0);
   const [privado, setPrivado] = useState(false);
-  const [resultado, setResultado] = useState<number | null>(null);
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
-  const [resultadoPericia, setResultadoPericia] = useState<{ sucesso: boolean; d20: number; modificador: number; total: number; descricao?: string } | null>(null);
+  const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number; descricao?: string } | null>(null);
 
   const ficha = fichas.find((f) => f.id === fichaAtivaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
@@ -49,12 +48,13 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const podeRolar = modo === 'simples' ? podeRolarSimples : podeRolarPericia;
 
   const rolarSimples = () => {
-    setResultado(null);
+    setResultadoRoll(null);
     if (quem === 'npc' && !npc) return;
     rolar('1d20', (grupos) => {
       const valor = grupos[0]?.rolls[0]?.value ?? 0;
-      const total = quem === 'npc' ? valor + bonus : valor;
-      setResultado(total);
+      const mod = quem === 'npc' ? bonus : 0;
+      const total = valor + mod;
+      setResultadoRoll({ d20: valor, modificador: mod, total });
 
       const origem = quem === 'npc' && npc ? npc.nome || 'NPC' : ficha?.nome || 'd20 rápido';
       const id = quem === 'npc' && npc ? npc.id : ficha?.id ?? null;
@@ -73,7 +73,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
 
   const rolarPericia = () => {
     if (quem === 'pc' && ficha) {
-      setResultadoPericia(null);
+      setResultadoRoll(null);
       rolar('1d20', (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
         const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
@@ -87,7 +87,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           personagemFerido: ferido,
           dt,
         });
-        setResultadoPericia({ sucesso: r.sucesso, d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
+        setResultadoRoll({ d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
         const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
         registrarLog(
           'teste',
@@ -104,11 +104,11 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         });
       }, 'rede', ficha.id);
     } else if (quem === 'npc' && npc) {
-      setResultadoPericia(null);
+      setResultadoRoll(null);
       rolar('1d20', (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
         const total = d20 + bonus;
-        setResultadoPericia({ sucesso: true, d20, modificador: bonus, total });
+        setResultadoRoll({ d20, modificador: bonus, total });
         const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
         registrarLog(
           'teste',
@@ -129,24 +129,26 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
 
   const pendenteRef = useRef(false);
   const rolarAtual = modo === 'simples' ? rolarSimples : rolarPericia;
+  const rolarAtualRef = useRef(rolarAtual);
+  rolarAtualRef.current = rolarAtual;
 
   useEffect(() => {
     if (pedidoRolagem === 0) return;
     if (ready && !rolando && podeRolar) {
-      rolarAtual();
+      rolarAtualRef.current();
     } else {
       pendenteRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedidoRolagem, ready, rolando, podeRolar]);
+  }, [pedidoRolagem]);
 
   useEffect(() => {
     if (ready && pendenteRef.current) {
       pendenteRef.current = false;
-      if (!rolando && podeRolar) rolarAtual();
+      if (!rolando && podeRolar) rolarAtualRef.current();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  }, [ready, rolando]);
 
   if (abaAtual === 'dados') return null;
 
@@ -166,24 +168,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             </button>
           </div>
           <div className="vazio" style={{ fontSize: 10, marginBottom: '0.4rem', textAlign: 'center' }}>
-            atalhos: R=rolar · S=abrir · X=fechar
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
-            <button
-              className={modo === 'simples' ? 'acento' : undefined}
-              style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
-              onClick={() => setModo('simples')}
-            >
-              simples
-            </button>
-            <button
-              className={modo === 'pericia' ? 'acento' : undefined}
-              style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
-              onClick={() => setModo('pericia')}
-            >
-              perícia
-            </button>
+            atalhos: R=abrir/rolar · X=fechar
           </div>
 
           <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
@@ -197,11 +182,42 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             <button
               className={quem === 'npc' ? 'acento' : undefined}
               style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
-              onClick={() => setQuem('npc')}
+              onClick={() => { setQuem('npc'); setModo('simples'); }}
             >
               NPC
             </button>
           </div>
+
+          {quem === 'pc' && (
+            <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
+              <button
+                className={modo === 'simples' ? 'acento' : undefined}
+                style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
+                onClick={() => setModo('simples')}
+              >
+                simples
+              </button>
+              <button
+                className={modo === 'pericia' ? 'acento' : undefined}
+                style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
+                onClick={() => setModo('pericia')}
+              >
+                perícia
+              </button>
+            </div>
+          )}
+
+          {quem === 'npc' && (
+            <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.5rem' }}>
+              <button
+                className={modo === 'simples' ? 'acento' : undefined}
+                style={{ flex: 1, fontSize: 11, padding: '0.35em' }}
+                onClick={() => setModo('simples')}
+              >
+                simples
+              </button>
+            </div>
+          )}
 
           {quem === 'npc' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
@@ -278,24 +294,19 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             {modo === 'simples' ? 'rolar d20' : 'rolar teste'}
           </button>
 
-          {modo === 'simples' && resultado !== null && (
-            <div className="alerta-banner mono" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
-              <span style={{ fontSize: 20 }}>{resultado}</span>
-            </div>
-          )}
-          {modo === 'pericia' && resultadoPericia && (
+          {resultadoRoll && (
             <div
               className="alerta-banner mono"
               style={{
                 marginTop: '0.5rem',
-                borderColor: resultadoPericia.sucesso ? 'var(--rede)' : 'var(--ruido)',
-                color: resultadoPericia.sucesso ? 'var(--rede)' : 'var(--ruido)',
+                justifyContent: 'center',
               }}
             >
               <span style={{ fontSize: 12 }}>
-                d20={resultadoPericia.d20} {resultadoPericia.modificador >= 0 ? '+' : ''}
-                {resultadoPericia.modificador} = {resultadoPericia.total}
-                {resultadoPericia.descricao ? ` — ${resultadoPericia.descricao}` : ''}
+                {resultadoRoll.modificador === 0
+                  ? `1d20 → ${resultadoRoll.total}`
+                  : `1d20: ${resultadoRoll.d20}${resultadoRoll.modificador > 0 ? ` + ${resultadoRoll.modificador}` : ` - ${Math.abs(resultadoRoll.modificador)}`} = ${resultadoRoll.total}`}
+                {resultadoRoll.descricao ? ` — ${resultadoRoll.descricao}` : ''}
               </span>
             </div>
           )}

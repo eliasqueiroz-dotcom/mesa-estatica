@@ -108,10 +108,11 @@ export default function App() {
       }
       const tecla = e.key.toLowerCase();
       if (tecla === 'r') {
-        setOverlayAberto(true);
-        setPedidosRolagemRapida((n) => n + 1);
-      } else if (tecla === 's') {
-        setOverlayAberto(true);
+        setOverlayAberto((prev) => {
+          if (!prev) return true;
+          setPedidosRolagemRapida((n) => n + 1);
+          return true;
+        });
       } else if (tecla === 'x') {
         setOverlayAberto(false);
       }

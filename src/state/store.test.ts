@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { useStore } from './store';
 import { calcularSanidadeMaxima } from '../rules/derivados';
-import { criarEstadoInicial, criarFichaVazia, criarNpcVazio, SCHEMA_VERSION } from './factories';
+import { criarEstadoInicial, criarFichaVazia, criarNpcVazio } from './factories';
 import { TABELA_SURTO } from '../rules/data/surto';
 
 beforeEach(() => {
@@ -114,19 +114,19 @@ describe('resolverEscolhaSurtoPendente', () => {
   }
 
   it('atualiza escolha do surto pendente', () => {
-    const id = setupComSurtoPendente();
+    setupComSurtoPendente();
     useStore.getState().resolverEscolhaSurtoPendente('A');
     expect(useStore.getState().fichas[0].surtosAtivos[0].escolha).toBe(TABELA_SURTO.find((e) => e.d20 === 1)!.nome);
   });
 
   it('não duplica entradas', () => {
-    const id = setupComSurtoPendente();
+    setupComSurtoPendente();
     useStore.getState().resolverEscolhaSurtoPendente('A');
     expect(useStore.getState().fichas[0].surtosAtivos.length).toBe(1);
   });
 
   it('limpa escolhaSurtoPendente após resolver', () => {
-    const id = setupComSurtoPendente();
+    setupComSurtoPendente();
     useStore.getState().resolverEscolhaSurtoPendente('A');
     expect(useStore.getState().escolhaSurtoPendente).toBeNull();
   });

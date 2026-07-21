@@ -2,10 +2,9 @@ import { useEffect } from 'react';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PROTECOES } from '../../rules/data/armas';
 import { PERICIAS } from '../../rules/data/pericias';
-import { personagemEstaEmSurto } from '../../rules/surto';
 import { descricaoSurto } from '../../rules/data/surto';
 import { useStore } from '../../state/store';
-import type { ArmaFicha, Ficha } from '../../state/types';
+import type { Ficha } from '../../state/types';
 import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 
@@ -49,12 +48,6 @@ function truncar(texto: string, max: number): string {
   return texto.length > max ? `${texto.slice(0, max - 1)}…` : texto;
 }
 
-function resumoArmas(armas: ArmaFicha[]): string {
-  if (armas.length === 0) return 'nenhuma';
-  const nomes = armas.slice(0, 3).map((a) => (a.dano ? `${a.nome || 'sem nome'} (${a.dano})` : a.nome || 'sem nome'));
-  const resto = armas.length - 3;
-  return resto > 0 ? `${nomes.join(', ')}, +${resto}` : nomes.join(', ');
-}
 
 function resumoProtecao(bonusDefesa: number): string {
   if (bonusDefesa === 0) return 'nenhuma';
@@ -113,7 +106,11 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   if (tipo === 'npc' && !npc) return null;
 
   const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
-  const emSurto = ficha ? personagemEstaEmSurto(ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
+  const surtosVisiveis = (ficha?.surtosAtivos ?? []).filter((s) => {
+    if (modoCombate) return s.expiraEm >= rodada;
+    return s.expiraEm === contadorCena;
+  });
+  const emSurto = surtosVisiveis.length > 0;
   const turnoAtivo = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === id;
 
   return (
@@ -175,17 +172,18 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
               <>
                 <Separador />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  {emSurto && (
+                  {surtosVisiveis.map((s) => (
                     <span
+                      key={s.id}
                       className="badge"
                       style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start' }}
-                      title={ficha.surtoEscolha ? descricaoSurto(ficha.surtoEscolha) : undefined}
+                      title={s.escolha ? descricaoSurto(s.escolha) : undefined}
                     >
-                      surto{ficha.surtoEscolha ? `: ${ficha.surtoEscolha}` : ' ativo — aguardando escolha'}
+                      surto{s.escolha ? `: ${s.escolha}` : ' ativo — aguardando escolha'}
                     </span>
-                  )}
+                  ))}
                   {traumasAtivos.map((t) => (
-                    <span key={t.id} className="badge" style={{ alignSelf: 'flex-start' }}>
+                    <span key={t.id} className="badge" style={{ alignSelf: 'flex-start' }} title={t.resposta}>
                       trauma: {t.nome || 'sem nome'}
                       {t.gatilho ? ` — ${t.gatilho}` : ''}
                     </span>
@@ -210,7 +208,19 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                 acessos: {ficha.acessos} · neuro-regulador: {resumoRegulador(ficha)}
               </span>
               <span>itens: {ficha.outrosItens ? truncar(ficha.outrosItens, 60) : 'nenhum'}</span>
-              <span>armas: {resumoArmas(ficha.armas)}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
+                armas:
+                {ficha.armas.length === 0 ? ' nenhuma' : ficha.armas.map((a) => (
+                  <span
+                    key={a.id}
+                    className="badge"
+                    style={{ fontSize: 10 }}
+                    title={`${a.nome || 'sem nome'}${a.bonusAtaque ? ` · bônus: ${a.bonusAtaque}` : ''}${a.dano ? ` · dano: ${a.dano}` : ''}${a.alcance ? ` · alcance: ${a.alcance}` : ''}${a.nota ? ` · ${a.nota}` : ''}`}
+                  >
+                    🗡 {a.nome || 'sem nome'}
+                  </span>
+                ))}
+              </span>
               <span>proteção: {resumoProtecao(ficha.equipamentoModificadorDefesa)}</span>
             </div>
           </>
