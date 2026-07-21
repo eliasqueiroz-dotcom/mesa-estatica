@@ -58,6 +58,18 @@ export default function CombatOverlay() {
   const [arrastando, setArrastando] = useState<{ origemX: number; origemY: number; painelX: number; painelY: number } | null>(null);
   const painelRef = useRef<HTMLDivElement>(null);
 
+  // re-clampa a posição sempre que o modoCombate muda (ex.: "iniciar" expande o 1º combatente)
+  // ou o painel abre, pra não vazar quando o tamanho do conteúdo muda.
+  useEffect(() => {
+    if (!aberto) return;
+    const area = document.querySelector('.mapa-area');
+    if (!area || !painelRef.current) return;
+    const rect = area.getBoundingClientRect();
+    const larguraPainel = painelRef.current.offsetWidth;
+    const maxX = rect.width - larguraPainel - 8;
+    setPanelPos((prev) => ({ x: Math.max(0, Math.min(prev.x, maxX)), y: prev.y }));
+  }, [aberto, modoCombate]);
+
   const participantesDisponiveis = [
     ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome' })),
     ...npcs.map((n) => ({ id: n.id, tipo: 'npc' as const, nome: n.nome || 'sem nome' })),
@@ -122,7 +134,7 @@ export default function CombatOverlay() {
     const maxX = rect.width - larguraPainel - 8;
     const maxY = rect.height - Math.min(alturaPainel + 16, rect.height - 16);
     setPanelPos({
-      x: Math.max(-30, Math.min(arrastando.painelX + dx, maxX)),
+      x: Math.max(0, Math.min(arrastando.painelX + dx, maxX)),
       y: Math.max(8, Math.min(arrastando.painelY + dy, maxY)),
     });
   }, [arrastando]);
@@ -327,6 +339,7 @@ export default function CombatOverlay() {
                           flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
                           color: naVez ? 'var(--rede)' : undefined,
                         }}
+                        title={e.nome}
                       >
                         {e.nome}
                       </span>

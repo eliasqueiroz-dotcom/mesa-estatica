@@ -279,7 +279,7 @@ export default function NpcsTab() {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) minmax(280px, 380px)', gap: '1rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1rem', alignItems: 'start' }}>
       <div className="secao">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ margin: 0 }}>npcs</h3>
@@ -312,7 +312,7 @@ export default function NpcsTab() {
         {npcsFiltrados.length === 0 ? (
           <p className="vazio">nenhum npc cadastrado ainda.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.6rem' }}>
             {npcsFiltrados.map((n) => {
               const editando = editandoNpcs.has(n.id);
               return (
@@ -575,7 +575,7 @@ export default function NpcsTab() {
         )}
       </div>
 
-      <div className="secao" style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="secao" style={{ display: 'flex', flexDirection: 'column', padding: '0.75rem 0.9rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <h3 style={{ margin: 0 }}>iniciativa</h3>
         </div>
@@ -629,7 +629,7 @@ export default function NpcsTab() {
             {disponiveis.map((p) => {
               const marcado = selecionadosIniciativa.includes(p.id);
               return (
-                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: 13, marginBottom: '0.25rem', opacity: marcado ? 1 : 0.5 }}>
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: 13, marginBottom: '0.35rem', opacity: marcado ? 1 : 0.5 }}>
                   <input type="checkbox" checked={marcado} onChange={() => toggleSelecionado(p.id)} />
                   <span className="mono">{p.nome}</span>
                   <span className="vazio" style={{ fontSize: 11 }}>({p.tipo === 'pc' ? 'PC' : 'NPC'})</span>
@@ -662,7 +662,7 @@ export default function NpcsTab() {
                   onDrop={() => { if (dragIndex !== null && dragIndex !== i) { reordenarIniciativa(dragIndex, i); } setDragIndex(null); setDropIndex(null); }}
                   onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
                   style={{
-                    borderBottom: '2px solid var(--concrete-2)', padding: '0.25rem 0',
+                    borderBottom: '2px solid var(--concrete-2)', padding: '0.35rem 0',
                     opacity: sendoArrastado ? 0.3 : 1,
                     borderTop: alvoDrop ? '2px solid var(--rede)' : undefined,
                     transition: 'opacity 0.15s',
