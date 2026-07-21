@@ -3,16 +3,9 @@ import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
+import { descricaoResultado, resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
 import { useDtDaCena } from './useDtDaCena';
-
-function descricaoResultado(r: ResultadoTeste): string {
-  if (r.natural1) return '1 natural — complicação';
-  if (r.natural20) return '20 natural — margem garantida';
-  if (r.margem10Mais) return 'margem 10+ — efeito extra';
-  return r.sucesso ? 'sucesso' : 'falha';
-}
 
 interface RoladorTesteProps {
   ready: boolean;

@@ -39,7 +39,6 @@ interface RoladorSanidadeProps {
 export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) {
   const fichas = useStore((s) => s.fichas);
   const basePV = useStore((s) => s.config.basePV);
-  const registrarLog = useStore((s) => s.registrarLog);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
 
   const [fichaId, setFichaId] = useState('');
@@ -75,13 +74,6 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
       setResultado({ sucesso: teste.sucesso, d20, perdaRolada, perda });
       setRolando(false);
 
-      registrarLog(
-        'teste',
-        `${ficha.nome || 'Personagem'} · Sanidade (${gatilho.nome}) · Vontade → d20=${d20}${
-          teste.modificador >= 0 ? '+' : ''
-        }${teste.modificador} = ${teste.total} · ${teste.sucesso ? 'sucesso, perde metade' : 'falha, perde tudo'}`,
-        ficha.id,
-      );
       ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
     }, 'ruido', ficha.id);
   };

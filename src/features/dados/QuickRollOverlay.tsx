@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDiceBox } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
+import { descricaoResultado, resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
 import { useDtDaCena } from './useDtDaCena';
 
@@ -11,13 +11,6 @@ interface QuickRollOverlayProps {
   aberto: boolean;
   onAbertoChange: (aberto: boolean) => void;
   pedidoRolagem: number;
-}
-
-function descricaoResultado(r: ResultadoTeste): string {
-  if (r.natural1) return '1 natural — complicação';
-  if (r.natural20) return '20 natural — margem garantida';
-  if (r.margem10Mais) return 'margem 10+ — efeito extra';
-  return r.sucesso ? 'sucesso' : 'falha';
 }
 
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {

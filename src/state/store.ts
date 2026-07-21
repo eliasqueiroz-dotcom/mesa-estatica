@@ -588,6 +588,10 @@ export const useStore = create<Store>()(
     {
       name: 'estatica-mesa',
       version: SCHEMA_VERSION,
+      partialize: (state) => {
+        const { escolhaSurtoPendente, ...rest } = state;
+        return rest;
+      },
       migrate: (persistedState, versaoAnterior) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const estado = persistedState as any;
