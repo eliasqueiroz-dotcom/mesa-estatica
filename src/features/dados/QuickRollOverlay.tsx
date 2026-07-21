@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDiceBox } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -51,7 +51,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
 
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
-  const podeRolarSimples = true;
+  const podeRolarSimples = quem === 'pc' || (quem === 'npc' && npc !== null);
   const podeRolarPericia = quem === 'pc' ? ficha !== null : npc !== null;
   const podeRolar = modo === 'simples' ? podeRolarSimples : podeRolarPericia;
 
@@ -134,13 +134,26 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
     }
   };
 
+  const pendenteRef = useRef(false);
   const rolarAtual = modo === 'simples' ? rolarSimples : rolarPericia;
 
   useEffect(() => {
     if (pedidoRolagem === 0) return;
-    if (ready && !rolando && podeRolar) rolarAtual();
+    if (ready && !rolando && podeRolar) {
+      rolarAtual();
+    } else {
+      pendenteRef.current = true;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedidoRolagem]);
+  }, [pedidoRolagem, ready, rolando, podeRolar]);
+
+  useEffect(() => {
+    if (ready && pendenteRef.current) {
+      pendenteRef.current = false;
+      if (!rolando && podeRolar) rolarAtual();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   if (abaAtual === 'dados') return null;
 

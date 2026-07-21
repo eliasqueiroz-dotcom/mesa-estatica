@@ -53,7 +53,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
     setResultadoRolagem(null);
   }, [modo]);
 
-  const podeRolar = ready && !rolando && (modo === 'nenhum' || (modo === 'pc' && ficha) || (modo === 'npc' && npc));
+  const podeRolar = ready && !rolando && ((modo === 'pc' && ficha) || (modo === 'npc' && npc));
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
   const rolarTeste = () => {

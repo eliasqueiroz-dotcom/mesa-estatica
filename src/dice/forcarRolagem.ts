@@ -63,7 +63,8 @@ canal?.addEventListener('message', (ev: MessageEvent<Mensagem>) => {
       canal?.postMessage({ tipo: 'estado', fila } satisfies Mensagem);
       break;
     case 'estado':
-      fila = msg.fila;
+      // merge: itens da outra janela vêm primeiro (já estavam lá antes de recarregarmos)
+      fila = [...msg.fila, ...fila];
       notificar();
       break;
   }

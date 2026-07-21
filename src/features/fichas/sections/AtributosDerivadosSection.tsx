@@ -190,6 +190,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
               checked={ficha.determinacao >= n}
               onChange={() => ajustarDeterminacao(ficha.id, ficha.determinacao >= n ? n - 1 : n)}
             />
+            <span>nível {n}</span>
           </label>
         ))}
       </div>

@@ -13,5 +13,5 @@ export function useDtDaCena(): number {
   const dificuldadeCena = sessaoPrivada?.dificuldadeCena ?? 'media';
   const dificuldadeCenaCustom = sessaoPrivada?.dificuldadeCenaCustom ?? 15;
   const dificuldade = DIFICULDADES.find((d) => d.id === dificuldadeCena) ?? DIFICULDADES.find((d) => d.id === 'media')!;
-  return dificuldade.dt ?? dificuldadeCenaCustom;
+  return Math.max(1, dificuldade.dt ?? dificuldadeCenaCustom);
 }

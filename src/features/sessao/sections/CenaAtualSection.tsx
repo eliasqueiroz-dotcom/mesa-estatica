@@ -98,7 +98,7 @@ export default function CenaAtualSection() {
                 id="cena-dificuldade-custom"
                 type="number"
                 value={sessaoPrivada.dificuldadeCenaCustom}
-                onChange={(e) => atualizarSessaoPrivada({ dificuldadeCenaCustom: Number(e.target.value) || 0 })}
+                onChange={(e) => atualizarSessaoPrivada({ dificuldadeCenaCustom: Math.max(1, Number(e.target.value) || 1) })}
               />
             </div>
           )}

@@ -20,6 +20,7 @@ import '../../styles/base.css';
  */
 export default function ControlPanel() {
   const fichas = useStore((s) => s.fichas);
+  const npcs = useStore((s) => s.npcs);
   const [fila, setFila] = useState<EntradaForca[]>(filaAtual());
   const [alvo, setAlvo] = useState<string>('qualquer');
   const [valorUnico, setValorUnico] = useState(20);
@@ -32,8 +33,13 @@ export default function ControlPanel() {
     return desassinar;
   }, []);
 
-  const nomeDoAlvo = (personagemId: string | null) =>
-    personagemId === null ? 'qualquer' : fichas.find((f) => f.id === personagemId)?.nome || 'sem nome';
+  const nomeDoAlvo = (personagemId: string | null) => {
+    if (personagemId === null) return 'qualquer';
+    const ficha = fichas.find((f) => f.id === personagemId);
+    if (ficha) return ficha.nome || 'sem nome';
+    const npc = npcs.find((n) => n.id === personagemId);
+    return npc?.nome || 'sem nome';
+  };
 
   const adicionar = (valores: number[]) => {
     if (valores.length === 0) return;
@@ -71,11 +77,20 @@ export default function ControlPanel() {
             <label htmlFor="ctrl-alvo">Personagem</label>
             <select id="ctrl-alvo" value={alvo} onChange={(e) => setAlvo(e.target.value)}>
               <option value="qualquer">qualquer (próxima rolagem)</option>
-              {fichas.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nome || 'sem nome'}
-                </option>
-              ))}
+              <optgroup label="— PC —">
+                {fichas.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome || 'sem nome'}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="— NPC —">
+                {npcs.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    [NPC] {n.nome || 'sem nome'}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
         </div>
@@ -126,11 +141,20 @@ export default function ControlPanel() {
           <select id="ctrl-filtro" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
             <option value="todos">todos</option>
             <option value="qualquer">qualquer</option>
-            {fichas.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.nome || 'sem nome'}
-              </option>
-            ))}
+            <optgroup label="— PC —">
+              {fichas.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome || 'sem nome'}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="— NPC —">
+              {npcs.map((n) => (
+                <option key={n.id} value={n.id}>
+                  [NPC] {n.nome || 'sem nome'}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </div>
 

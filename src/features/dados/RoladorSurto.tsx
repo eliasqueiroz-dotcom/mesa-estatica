@@ -38,13 +38,16 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
       setResultado(r);
       setRolando(false);
       dispararBurstRuido();
+      const expiraSurto = calcularExpiraSurto(sessaoPublica);
       if (r.mesmoNumero) {
-        atualizarFicha(ficha.id, { surtoEscolha: r.entradaA.nome, surtoAtivo: calcularExpiraSurto(sessaoPublica) });
+        atualizarFicha(ficha.id, { surtoEscolha: r.entradaA.nome, surtoAtivo: expiraSurto });
         registrarLog(
           'surto',
           `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
           ficha.id,
         );
+      } else {
+        atualizarFicha(ficha.id, { surtoAtivo: expiraSurto });
       }
     }, 'ruido', ficha.id);
   };
