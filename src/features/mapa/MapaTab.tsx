@@ -15,6 +15,22 @@ import TokenOverlay from './TokenOverlay';
 const LARGURA_ALTURA_MINIMA = 2; // % — evita a caixa do grid colapsar a zero arrastando uma alça
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup em um token conta como clique, não arrasto
 
+/** calcula onde a imagem (object-fit: contain) é renderizada dentro do container.
+ *  retorna offset (px do canto superior esquerdo do container) e tamanho renderizado. */
+function getImgRenderRect(
+  containerW: number, containerH: number,
+  imgW: number, imgH: number,
+): { offsetX: number; offsetY: number; renderW: number; renderH: number } {
+  const containerAspect = containerW / containerH;
+  const imgAspect = imgW / imgH;
+  if (imgAspect > containerAspect) {
+    const renderH = containerW / imgAspect;
+    return { offsetX: 0, offsetY: (containerH - renderH) / 2, renderW: containerW, renderH };
+  }
+  const renderW = containerH * imgAspect;
+  return { offsetX: (containerW - renderW) / 2, offsetY: 0, renderW, renderH: containerH };
+}
+
 // arredonda pro campo numérico ficar digitável (arrastar produz float; digitar quer inteiro).
 const clamp = (valor: number, min: number, max: number) => Math.round(Math.max(min, Math.min(max, valor)));
 
@@ -64,7 +80,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const iniciativa = useStore((s) => s.iniciativa);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
+  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [tokenOverlay, setTokenOverlay] = useState<{ tipo: 'pc' | 'npc'; id: string } | null>(null);
@@ -151,8 +169,16 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
     if (estado.tipo === 'token') {
       const rect = container.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
+      const imgEl = imgRef.current;
+      let x: number, y: number;
+      if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+        const imgR = getImgRenderRect(rect.width, rect.height, imgEl.naturalWidth, imgEl.naturalHeight);
+        x = (e.clientX - rect.left - imgR.offsetX) / imgR.renderW;
+        y = (e.clientY - rect.top - imgR.offsetY) / imgR.renderH;
+      } else {
+        x = (e.clientX - rect.left) / rect.width;
+        y = (e.clientY - rect.top) / rect.height;
+      }
       moverTokenMapa(estado.id, x, y);
       return;
     }
@@ -224,6 +250,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
   const npcsDisponiveis = npcs.filter((n) => !mapa.tokens.some((t) => t.participanteId === n.id));
 
+  const imgRenderRect = imgNatural && tamanho.width > 0
+    ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
+    : null;
+
   return (
     <div className="mapa-tab">
       <div className="mapa-toolbar">
@@ -260,7 +290,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         onPointerCancel={soltarArrasto}
       >
         {mapa.imagemDataUrl ? (
-          <img src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false} />
+          <img ref={imgRef} src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false}
+            onLoad={() => { if (imgRef.current) setImgNatural({ w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight }); }} />
         ) : (
           <p className="vazio mapa-vazio">nenhum mapa carregado — clique em &quot;carregar mapa&quot;.</p>
         )}
@@ -310,20 +341,22 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         )}
 
         {tamanho.width > 0 && (
-          <TokenScene tokens={tokensVisuais} width={tamanho.width} height={tamanho.height} active={active} />
+          <TokenScene tokens={tokensVisuais} width={tamanho.width} height={tamanho.height} active={active} imgRenderRect={imgRenderRect} />
         )}
 
         {tokensVisuais.map((t) => {
           const partesTitulo = [t.nome];
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
           if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
+          const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
+          const topo = imgRenderRect ? `${imgRenderRect.offsetY + t.y * imgRenderRect.renderH}px` : `${t.y * 100}%`;
           return (
             <div
               key={t.id}
               className="mapa-token"
               data-surto={t.surtoAtivo}
               data-turno={t.turnoAtivo}
-              style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, borderColor: t.cor }}
+              style={{ left: esq, top: topo, borderColor: t.cor }}
               onPointerDown={iniciarArrastoToken(t.id)}
               title={partesTitulo.join(' — ')}
             >

@@ -16,14 +16,17 @@ interface Props {
   width: number;
   height: number;
   active: boolean;
+  /** imagem renderizada (object-fit: contain) — se null, usa container inteiro (fallback). */
+  imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
 }
 
 /**
  * Camada 3D decorativa sobre o mapa: um cristal low-poly por token, cor do personagem, rotação
  * lenta; jitter quando a Sanidade do participante está em tier 3 — ≤25% (arte.md). O drag continua
  * em DOM (pointer events no MapaTab) — esta cena só espelha a posição normalizada de cada token.
- * Câmera ortográfica em pixels do container, então x*width / y*height bate 1:1 com o layout DOM
- * por cima. Corte barato (ROADMAP): trocar isso por divs coloridas não muda a lógica de drag.
+ * Câmera ortográfica em pixels do container, com posição derivada de imgRenderRect
+ * para que o cristal bata 1:1 com o token DOM sobre a imagem do mapa.
+ * Corte barato (ROADMAP): trocar isso por divs coloridas não muda a lógica de drag.
  *
  * IMPORTANTE: um `<canvas>` só aceita um contexto WebGL por toda a sua vida — reaproveitar um
  * `<canvas>` fixo do JSX quebra em StrictMode (que monta/desmonta/remonta os efeitos: a 2ª
@@ -32,12 +35,14 @@ interface Props {
  * próprio `<canvas>` via `document.createElement` e o remove do DOM inteiro no cleanup — cada
  * montagem começa com um elemento (e contexto) 100% novo.
  */
-export default function TokenScene({ tokens, width, height, active }: Props) {
+export default function TokenScene({ tokens, width, height, active, imgRenderRect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tokensRef = useRef(tokens);
   tokensRef.current = tokens;
   const tamanhoRef = useRef({ width, height });
   tamanhoRef.current = { width, height };
+  const imgRectRef = useRef(imgRenderRect);
+  imgRectRef.current = imgRenderRect;
   const activeRef = useRef(active);
   activeRef.current = active;
 
@@ -107,12 +112,19 @@ export default function TokenScene({ tokens, width, height, active }: Props) {
       ultimoTempo = agora;
       if (!document.hidden && activeRef.current) {
         const { width: w, height: h } = tamanhoRef.current;
+        const ir = imgRectRef.current;
         sincronizarMeshes();
         for (const t of tokensRef.current) {
           const mesh = meshes.get(t.id);
           if (!mesh) continue;
-          let px = t.x * w;
-          let py = t.y * h;
+          let px: number, py: number;
+          if (ir) {
+            px = ir.offsetX + t.x * ir.renderW;
+            py = ir.offsetY + t.y * ir.renderH;
+          } else {
+            px = t.x * w;
+            py = t.y * h;
+          }
           if (t.sanidadeCritica) {
             px += (Math.random() - 0.5) * 4;
             py += (Math.random() - 0.5) * 4;

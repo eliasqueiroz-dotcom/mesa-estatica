@@ -47,7 +47,7 @@ export default function CombatOverlay() {
   const [aberto, setAberto] = useState(false);
 
   const toggleAberto = () => {
-    if (!aberto) setPanelPos({ x: 8, y: 8 });
+    setPanelPos({ x: 8, y: 8 });
     setAberto(!aberto);
   };
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
@@ -210,7 +210,7 @@ export default function CombatOverlay() {
             <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
               combate {modoCombate ? `· rodada ${rodada}` : ''}
             </h3>
-            <button className="icone-botao" onClick={() => setAberto(false)} title="fechar" onPointerDown={(ev) => ev.stopPropagation()}>
+            <button className="icone-botao" onClick={() => { setPanelPos({ x: 8, y: 8 }); setAberto(false); }} title="fechar" onPointerDown={(ev) => ev.stopPropagation()}>
               ×
             </button>
           </div>
