@@ -96,7 +96,7 @@ type EstadoGlobal = {
 
 ## Tokens 3D sobre o mapa
 
-- Mapa: `<img>` 2D + camada de tokens. Drag por pointer events em coordenadas normalizadas (0–1) — sobrevive a resize.
+- Mapa: `<img>` 2D (`object-fit: contain`) + camada de tokens. Posição armazenada como fração (0–1) **relativa ao conteúdo da imagem** (não ao container). Helper `getImgRenderRect` calcula o retângulo renderizado da imagem dentro de `.mapa-area` em tempo real. Arrasto converte pixel → fração via retângulo da imagem; renderização (DOM + Three.js) converte fração → pixel via mesmo retângulo. Tudo recalculado no `ResizeObserver` — posição consistente entre resoluções e janelas diferentes (necessário para multiplayer).
 - Renderização: um `<canvas>` Three.js transparente sobre o mapa, câmera ortográfica; cada token é um mesh (cristal low-poly, ou `.glb` de `assets/faces/` se existir, ou placa com foto + shader scanline).
 - Animação idle (rotação/flutuação) roda em um único rAF; **pausar quando a aba Mapa não está visível** e quando `document.hidden`.
 - Corte barato pré-combinado: trocar a camada 3D por divs coloridas é uma mudança só em `tokens3d/` — a lógica de drag não muda.
