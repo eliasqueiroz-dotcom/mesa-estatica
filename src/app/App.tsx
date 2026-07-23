@@ -9,6 +9,8 @@ import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
+import { iniciarAuthMultiplayer } from '../multiplayer/auth';
+import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import LogTab from './LogTab';
 
@@ -93,9 +95,24 @@ export default function App() {
     );
   };
 
-  // Fase A do multiplayer (mesa-estatica-multiplayer-completo.md §11): sincroniza posição
-  // de tokens via Supabase Realtime quando as env vars estão presentes; vira no-op sem elas.
-  useEffect(() => iniciarSyncTokens(), []);
+  // Multiplayer Fases A+B (mesa-estatica-multiplayer-completo.md §11): sessão anônima +
+  // vínculo por URL primeiro, sync de tokens/fichas via Supabase Realtime depois — nessa
+  // ordem, pra RLS já enxergar auth.uid() na primeira assinatura. Vira no-op sem env vars.
+  useEffect(() => {
+    let pararTokens = () => {};
+    let pararFichas = () => {};
+    let cancelado = false;
+    iniciarAuthMultiplayer().then(() => {
+      if (cancelado) return;
+      pararTokens = iniciarSyncTokens();
+      pararFichas = iniciarSyncFichas();
+    });
+    return () => {
+      cancelado = true;
+      pararTokens();
+      pararFichas();
+    };
+  }, []);
 
   // atalhos: 1–6 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel.
   // ignorados enquanto o foco está num campo de texto (senão digitar "1" numa ficha trocaria de aba).
