@@ -217,7 +217,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           <button
                             key={a.id}
                             className="combate-chip combate-chip--ativa"
-                            onClick={() => usarAcaoNpc(e.nome, a)}
+                            onClick={() => usarAcaoNpc(e.participanteId, e.nome, a)}
                             title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
                             style={{ fontSize: 10, cursor: 'pointer' }}
                           >

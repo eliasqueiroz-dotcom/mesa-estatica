@@ -94,6 +94,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[id] ?? EMPTY_CONDICOES);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -238,7 +239,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                   <button
                     key={a.id}
                     className="combate-chip combate-chip--ativa"
-                    onClick={() => usarAcaoNpc(npc.nome || 'NPC', a, registrarLog)}
+                    onClick={() => usarAcaoNpc(npc.id, npc.nome || 'NPC', a, registrarLog, registrarRoll)}
                     title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
                     style={{ fontSize: 10, cursor: 'pointer' }}
                   >

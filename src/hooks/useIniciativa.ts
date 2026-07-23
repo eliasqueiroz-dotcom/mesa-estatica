@@ -45,6 +45,7 @@ export function useIniciativa() {
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const participantesDisponiveis = [
     ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome' })),
@@ -141,8 +142,8 @@ export function useIniciativa() {
     };
   };
 
-  const usarAcaoNpc = (nome: string, acao: { nome: string; bonus: number; dano: string }) => {
-    usarAcaoNpcCompartilhada(nome, acao, registrarLog);
+  const usarAcaoNpc = (npcId: string, nome: string, acao: { nome: string; bonus: number; dano: string }) => {
+    usarAcaoNpcCompartilhada(npcId, nome, acao, registrarLog, registrarRoll);
   };
 
   return {

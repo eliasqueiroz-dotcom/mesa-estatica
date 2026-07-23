@@ -43,21 +43,22 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
 
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
-  const podeRolarSimples = (quem === 'pc' && ficha !== null) || (quem === 'npc' && npc !== null);
+  // NPC não exige selecionar um NPC específico da lista — o mestre pode rolar um "d20 de NPC"
+  // genérico na hora (mesmo padrão que RolagemLivre já usa pro modo 'nenhum').
+  const podeRolarSimples = (quem === 'pc' && ficha !== null) || quem === 'npc';
   const podeRolarPericia = quem === 'pc' ? ficha !== null : npc !== null;
   const podeRolar = modo === 'simples' ? podeRolarSimples : podeRolarPericia;
 
   const rolarSimples = () => {
     setResultadoRoll(null);
-    if (quem === 'npc' && !npc) return;
     rolar('1d20', (grupos) => {
       const valor = grupos[0]?.rolls[0]?.value ?? 0;
       const mod = quem === 'npc' ? bonus : 0;
       const total = valor + mod;
       setResultadoRoll({ d20: valor, modificador: mod, total });
 
-      const origem = quem === 'npc' && npc ? npc.nome || 'NPC' : ficha?.nome || 'd20 rápido';
-      const id = quem === 'npc' && npc ? npc.id : ficha?.id ?? null;
+      const origem = quem === 'npc' ? (npc?.nome || 'NPC') : (ficha?.nome || 'd20 rápido');
+      const id = quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null);
       const formula = quem === 'npc' && bonus !== 0 ? `d20+${bonus}` : 'd20';
       registrarLog('teste', `${origem} · rolagem rápida (sem perícia/DT) → ${total}`, id);
       registrarRoll({

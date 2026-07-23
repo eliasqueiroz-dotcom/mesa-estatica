@@ -564,7 +564,7 @@ export const useStore = create<Store>()(
             sessaoPublica: { ...s.sessaoPublica, contadorCena: novaCena },
             fichas: s.fichas.map((f) => ({
               ...f,
-              surtosAtivos: f.surtosAtivos.filter((surto) => surto.expiraEm !== novaCena),
+              surtosAtivos: (f.surtosAtivos ?? []).filter((surto) => surto.expiraEm !== novaCena),
             })),
           };
         }),

@@ -395,7 +395,7 @@ export default function NpcsTab() {
                             <button
                               key={a.id}
                               className="combate-chip combate-chip--ativa"
-                              onClick={() => iniciativa.usarAcaoNpc(n.nome || 'NPC', a)}
+                              onClick={() => iniciativa.usarAcaoNpc(n.id, n.nome || 'NPC', a)}
                               title={`+${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
                               style={{ fontSize: 11, cursor: 'pointer' }}
                             >
