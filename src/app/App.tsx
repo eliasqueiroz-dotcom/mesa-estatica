@@ -9,6 +9,7 @@ import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
+import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import LogTab from './LogTab';
 
 const ATALHOS: Record<string, string> = {
@@ -91,6 +92,10 @@ export default function App() {
       'width=620,height=760',
     );
   };
+
+  // Fase A do multiplayer (mesa-estatica-multiplayer-completo.md §11): sincroniza posição
+  // de tokens via Supabase Realtime quando as env vars estão presentes; vira no-op sem elas.
+  useEffect(() => iniciarSyncTokens(), []);
 
   // atalhos: 1–6 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel.
   // ignorados enquanto o foco está num campo de texto (senão digitar "1" numa ficha trocaria de aba).
