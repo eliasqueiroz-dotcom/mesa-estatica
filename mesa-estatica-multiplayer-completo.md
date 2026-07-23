@@ -36,8 +36,8 @@ Postgres RLS decide se uma **linha inteira** é visível/editável — não esco
 
 | Tabela | Leitura | Escrita | Conteúdo |
 |---|---|---|---|
-| `characters` | todos os participantes | jogador: só a(s) própria(s) linha(s) (`owner_token`), pode criar mais de uma · GM: todas | ficha completa de PC |
-| `npcs` | todos | **insert**: todos · **update/delete**: só GM | PV, Defesa, Agilidade, notas, `controlado_por` (nullable — delegação de movimento) |
+| `characters` | todos os participantes | jogador: só a própria linha (`owner_token`) — cria exatamente 1 personagem no primeiro acesso, sem criar adicionais · GM: todas, sem limite | ficha completa de PC |
+| `npcs` | todos | **insert/update/delete**: só GM — jogador nunca cria NPC | PV, Defesa, Agilidade, notas, `controlado_por` (nullable — delegação **de movimento**, nunca de criação ou edição de stats) |
 | `tokens` | todos (o tabuleiro é visível a todos) | posição: dono do `character_id` (PC) ou GM (qualquer token) ou jogador com `controlado_por` = ele (NPC delegado) · **insert/delete**: só do próprio `character_id` (jogador pode colocar/tirar o próprio token do mapa); NPC insert/delete: só GM | id, character_id, x, y, tipo (`pc`/`npc`) |
 | `rolls_log` | todos | escrita: só via Edge Function · **delete ("limpar log")**: só GM | resultado final, origem, alvo (opcional), tipo (teste/sanidade/surto/trauma) |
 | `forced_queue` | **ninguém no cliente** — RLS `USING (false)` pra `anon`; só a Edge Function com `service_role` | idem | character_id, valor_forçado, consumido, criado_por |
@@ -61,7 +61,7 @@ Tanto o cliente do GM quanto o do jogador chamam a **mesma** Edge Function pra r
 
 ## 6. Papéis: GM vs. Jogador
 
-- **Jogador**: entra por um link com `session_id` + um **`owner_token` secreto e não-adivinhável** (UUID aleatório, ex: `?s=abc&t=7f3e…`) — é o mesmo `owner_token` da tabela `characters` (§4). O link **não** carrega `character_id` puro: id de personagem aparece no tráfego de rede visível a todos (log, tokens), então um link baseado só nele seria forjável por qualquer jogador. O token resolve pra qual(is) ficha(s) o portador é dono. Sem privilégio elevado.
+- **Jogador**: entra por um link com `session_id` + um **`owner_token` secreto e não-adivinhável** (UUID aleatório, ex: `?s=abc&t=7f3e…`) — é o mesmo `owner_token` da tabela `characters` (§4). O link **não** carrega `character_id` puro: id de personagem aparece no tráfego de rede visível a todos (log, tokens), então um link baseado só nele seria forjável por qualquer jogador. O token resolve pra **a** ficha (uma só — jogador comum não cria personagem adicional) da qual o portador é dono. Sem privilégio elevado.
 - **GM**: entra por um link com um **token de GM**, comparado dentro da Edge Function — nunca embutido no bundle JS que vai pro navegador. Só esse token dá acesso a `queue-forced-roll`, à janela `#controle`, à edição de `npcs`/`sessao_privada`/mapas, e ao "limpar log".
 
 **Limitação técnica que define a implementação:** a chave `anon` do Supabase é **compartilhada por todos os clientes** — todo mundo chega ao banco com o mesmo JWT, então uma policy RLS `USING (owner_token = ...)` não tem, sozinha, como saber *quem* está chamando. Duas soluções, escolher uma:
@@ -100,11 +100,11 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 - **Jogador**: move o próprio token; adiciona/remove o próprio token do mapa (RLS: insert/delete em `tokens` só quando `character_id` = o próprio). Não se estende a token de outro jogador nem de NPC.
 - Mover ≠ editar: um jogador autorizado a mover um NPC ainda não edita PV/Defesa dele — isso continua GM-only.
 
-## 8. NPCs — "todos podem criar" sem abrir a trava de controle
+## 8. NPCs — só o mestre cria; delegação é só de movimento, pontual
 
-- **Insert**: qualquer participante cria um NPC.
-- **Update/Delete**: só GM — incluindo o próprio criador, se for jogador. Criar não dá dono nem privilégio contínuo.
-- `controlado_por` só é setado pelo GM, independente de quem criou o NPC.
+- **Insert/Update/Delete**: só GM, sem exceção — jogador comum não cria NPC em nenhuma circunstância (correção em relação a uma versão anterior deste doc, que abria o insert a todos).
+- `controlado_por` (nullable, §6.2/§7) é o único jeito de um jogador agir sobre um NPC além de `resolver-rolagem` (§6.1): o GM cede o campo pontualmente pra delegar **mover o token** daquele NPC — nunca editar PV/Defesa/Agilidade/notas, que continuam GM-only mesmo com o token delegado.
+- Delegação não é permanente: GM revoga a qualquer momento com `UPDATE controlado_por = null`; RLS reavalia a cada request, efeito instantâneo (§6.2).
 
 ## 9. Mídia — duas pastas
 
@@ -121,11 +121,11 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 |---|---|---|
 | Sessão — público | todos | só GM |
 | Sessão — privado | só GM | só GM |
-| Personagens | todos | jogador: só a própria (pode criar mais) · GM: todas |
+| Personagens | todos | jogador: só a própria, 1 única, sem criar adicionais · GM: todas |
 | Dados & Regras | todos | todos (via `resolver-rolagem`) |
 | Rolagem Forçada (`#controle`) | só GM | só GM |
 | Mapas | todos veem o tabuleiro | GM: tudo · jogador: próprio token + NPC delegado |
-| NPCs | todos | criar: todos · editar/mover: só GM (ou delegado p/ mover) |
+| NPCs | todos | criar/editar: só GM · mover: só GM (ou jogador delegado pontualmente via `controlado_por`) |
 | Logs | todos | escrita: via função · limpar: só GM |
 | Mídia | `geral`: todos · `gm`: só GM | `geral`: todos sobem · `gm`: só GM |
 
@@ -136,7 +136,7 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 - **Fase C — rolagens.** `resolver-rolagem` honesta primeiro, valida com dois dispositivos reais, depois liga `forced_queue` + `#controle` na função.
 - **Fase D — corte da janela `#controle`** pro novo transporte, com `BroadcastChannel` como fallback só pro GM sozinho sem internet.
 - **Fase E — Sessão pública/privada.** Criar as duas tabelas, migrar os campos do dashboard (Parte III), GM lendo ambas.
-- **Fase F — Permissões finas de Mapas/NPCs/Personagens.** RLS de múltiplas fichas por dono, insert aberto em `npcs` com update/delete GM, insert/delete de `tokens` restrito ao próprio `character_id`, `controlado_por` exposto na UI como "quem pode mover".
+- **Fase F — Permissões finas de Mapas/NPCs/Personagens.** RLS de 1 personagem por dono (`owner_token` vincula exatamente 1 linha em `characters`, sem insert adicional pelo jogador), insert/update/delete de `npcs` restrito ao GM, insert/delete de `tokens` restrito ao próprio `character_id`, `controlado_por` exposto na UI como "quem pode mover".
 - **Fase G — Mídia.** Tabela `media` + Storage, upload em `geral` liberado, `gm` restrito, ação "mover pra Geral".
 - **Fase H — Limpar logs.** Botão condicional (só GM) + policy de delete em `rolls_log`.
 
@@ -173,7 +173,8 @@ Fase A: ~1 dia · B: ~1–2 dias · C: ~1–2 dias (rolagem forçada exige teste
 - [ ] Toda Edge Function revalida no servidor (personagem existe? pertence a quem chamou? alvo válido?) — nunca confiar em dado vindo do cliente.
 - [ ] Botão que gera todos os links da sessão (GM + um por jogador) de uma vez.
 - [ ] Ensaio geral com pelo menos 2 pessoas reais, em dispositivos reais, tentando quebrar regra de propósito: mexer em token/NPC alheio, adivinhar se um dado foi forçado, ler a pasta `gm` de Mídia, atualizar a página no meio de uma ação.
-- [ ] Jogador cria NPC e depois confirma que não consegue editar PV dele.
+- [ ] Jogador tenta criar um NPC e a operação é recusada pelo RLS (não só escondida no front-end).
+- [ ] Jogador tenta criar uma segunda ficha própria e a operação é recusada pelo RLS.
 - [ ] Botão "limpar log" não aparece nem funciona via chamada direta pro jogador.
 
 ## 16. Ordem de prioridade
