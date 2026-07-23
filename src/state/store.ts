@@ -30,6 +30,15 @@ import type {
   TokenMapa,
 } from './types';
 
+const ATRIBUTOS_ZERO: Record<'vigor' | 'agilidade' | 'intelecto' | 'percepcao' | 'presenca' | 'vontade', number> = {
+  vigor: 0,
+  agilidade: 0,
+  intelecto: 0,
+  percepcao: 0,
+  presenca: 0,
+  vontade: 0,
+};
+
 /** tipos de log que representam uma rolagem de dado — conta pra `estatisticas.rolagens`. */
 const TIPOS_ROLAGEM: TipoLog[] = ['teste', 'rolagem-livre', 'surto', 'iniciativa'];
 
@@ -335,7 +344,7 @@ export const useStore = create<Store>()(
         if (direcao === 'pontoParaReal') {
           const debitado = Math.min(Math.max(0, Math.floor(valorBruto)), ficha.dinheiroPonto);
           if (debitado === 0) return;
-          const creditado = Math.floor(debitado * 0.7);
+          const creditado = Math.max(1, Math.round(debitado * 0.7));
           const novoPonto = ficha.dinheiroPonto - debitado;
           const novoReal = ficha.dinheiroReal + creditado;
           set((s) => ({
@@ -549,10 +558,16 @@ export const useStore = create<Store>()(
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
       atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),
       avancarCena: () =>
-        set((s) => ({
-          sessaoPublica: { ...s.sessaoPublica, contadorCena: s.sessaoPublica.contadorCena + 1 },
-          fichas: s.fichas.map((f) => ({ ...f, surtosAtivos: [] })),
-        })),
+        set((s) => {
+          const novaCena = s.sessaoPublica.contadorCena + 1;
+          return {
+            sessaoPublica: { ...s.sessaoPublica, contadorCena: novaCena },
+            fichas: s.fichas.map((f) => ({
+              ...f,
+              surtosAtivos: f.surtosAtivos.filter((surto) => surto.expiraEm !== novaCena),
+            })),
+          };
+        }),
 
       adicionarEvento: (texto) =>
         set((s) => ({
@@ -625,13 +640,74 @@ export const useStore = create<Store>()(
         );
       },
       importarJSON: (json) => {
-        const dados = JSON.parse(json) as EstadoGlobal;
+        let dados: EstadoGlobal;
+        try {
+          dados = JSON.parse(json) as EstadoGlobal;
+        } catch {
+          throw new Error('JSON inválido');
+        }
+        if (!dados || typeof dados !== 'object') throw new Error('JSON não é um objeto');
+        // validação estrutural mínima
+        const chavesObrigatorias = ['fichas', 'npcs', 'mapa', 'iniciativa', 'log', 'config'] as const;
+        for (const k of chavesObrigatorias) if (!(k in dados)) throw new Error(`Campo obrigatório ausente: ${k}`);
         const base = criarEstadoInicial();
+        const normalizar = (d: Partial<EstadoGlobal>): EstadoGlobal => ({
+          schemaVersion: d.schemaVersion ?? 0,
+          sessaoPublica: { ...base.sessaoPublica, ...d.sessaoPublica, condicoesCombate: d.sessaoPublica?.condicoesCombate ?? {} },
+          sessaoPrivada: { ...base.sessaoPrivada, ...d.sessaoPrivada, estatisticas: { ...base.sessaoPrivada.estatisticas, ...d.sessaoPrivada?.estatisticas }, eventos: d.sessaoPrivada?.eventos ?? [], lembretes: d.sessaoPrivada?.lembretes ?? [], selecionadosIniciativa: d.sessaoPrivada?.selecionadosIniciativa ?? [] },
+          fichas: (d.fichas ?? []).map((f) => ({
+            ...base.fichas[0] ?? criarFichaVazia(),
+            ...f,
+            surtosAtivos: f.surtosAtivos ?? [],
+            atributos: { ...ATRIBUTOS_ZERO, ...f.atributos },
+            pericias: f.pericias ?? {},
+            traumas: f.traumas ?? [],
+            armas: f.armas ?? [],
+            reguladores: f.reguladores ?? [],
+            vinculos: f.vinculos ?? [],
+            anotacoes: f.anotacoes ?? '',
+            kitAntecedente: f.kitAntecedente ?? '',
+            contatoOuRecurso: f.contatoOuRecurso ?? '',
+            contatoUsadoNesteCaso: f.contatoUsadoNesteCaso ?? false,
+            outrosItens: f.outrosItens ?? '',
+            acessos: f.acessos ?? 0,
+            anestesiaAte: f.anestesiaAte ?? null,
+            dinheiroReal: f.dinheiroReal ?? 0,
+            dinheiroPonto: f.dinheiroPonto ?? 0,
+            equipamentoModificadorDefesa: f.equipamentoModificadorDefesa ?? 0,
+            determinacao: f.determinacao ?? 1,
+            pvAtual: f.pvAtual ?? 20,
+            sanidadeAtual: f.sanidadeAtual ?? 10,
+          })),
+          fichaAtivaId: d.fichaAtivaId ?? null,
+          npcs: (d.npcs ?? []).map((n) => ({
+            ...base.npcs[0] ?? criarNpcVazio(),
+            ...n,
+            acoes: n.acoes ?? [],
+            visivel: n.visivel ?? false,
+            notasMestre: n.notasMestre ?? '',
+            categoria: n.categoria ?? '',
+          })),
+          iniciativa: d.iniciativa ?? [],
+          mapa: {
+            imagemDataUrl: d.mapa?.imagemDataUrl ?? null,
+            tokens: (d.mapa?.tokens ?? []).map((t) => ({
+              id: t.id ?? crypto.randomUUID(),
+              participanteId: t.participanteId ?? '',
+              tipo: t.tipo ?? 'pc',
+              x: typeof t.x === 'number' ? t.x : 0.5,
+              y: typeof t.y === 'number' ? t.y : 0.5,
+            })),
+            grade: { ...base.mapa.grade, ...d.mapa?.grade },
+          },
+          log: d.log ?? [],
+          rollsLog: d.rollsLog ?? [],
+          config: { ...base.config, ...d.config },
+        });
+        const estadoNormalizado = normalizar(dados);
         set({
           ...base,
-          ...dados,
-          sessaoPublica: { ...base.sessaoPublica, ...dados.sessaoPublica },
-          sessaoPrivada: { ...base.sessaoPrivada, ...dados.sessaoPrivada },
+          ...estadoNormalizado,
           schemaVersion: SCHEMA_VERSION,
         });
       },
