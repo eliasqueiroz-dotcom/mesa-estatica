@@ -72,8 +72,9 @@ Branch `multiplayer/parte-iv-view-jogador`, sem prazo — decisão do usuário d
 
 - **`FichaPublicaView` ✅**: superfície de mesa de um PC alheio (nome, cor, PV, ferido, surto) a partir do tipo `FichaPublica` já existente (Fase B).
 - **`NpcPublicaView` ✅**: superfície de mesa de um NPC revelado (nome, cor, PV, Defesa, Agilidade, categoria, notas, lista de ações só-exibição). Nunca `notasMestre`; recusa renderizar se `visivel` for falso, mesmo que quem chama esqueça de filtrar.
+- **`SessaoPublicaView` ✅**: situação da sessão + parte pública da cena atual (atmosfera, "o que os jogadores veem") + mini log. Nunca `sessaoPrivada` (gauges, lembretes, "o que realmente acontece", próximo evento, dificuldade da cena) — nem chega como prop.
 
-Faltam: `SessaoPublicaView`, split de bundle Vite (`PlayerApp` de verdade, rota `?t=owner_token`), hidratação via Realtime no lugar de localStorage pro cliente do jogador.
+Faltam: split de bundle Vite (`PlayerApp` de verdade, rota `?t=owner_token`), hidratação via Realtime no lugar de localStorage pro cliente do jogador.
 
 ## Dia 7 — Playtest e folga
 
