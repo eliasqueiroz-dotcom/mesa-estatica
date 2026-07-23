@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FichaPublicaView from '../features/fichas/FichaPublicaView';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
-import { dividirFicha } from '../multiplayer/fichaSplit';
-import { useStore } from '../state/store';
+import { iniciarAuthMultiplayer } from '../multiplayer/auth';
+import { useFichasPublicas, useHidratarSessaoPublica, useNpcsPublicos } from '../multiplayer/hidratacaoJogador';
 
 type AbaId = 'sessao' | 'personagens' | 'npcs';
 
@@ -16,17 +16,22 @@ const ABAS: { id: AbaId; label: string }[] = [
 /**
  * App reduzido do jogador (mesa-estatica-multiplayer-completo.md Parte IV §2, §5) — monta só as
  * `*View` de leitura. Sem `ControlPanel`, `FichaEditor`, `NpcsTab`, `MapaTab`, `DadosTab`,
- * `LogTab` de mestre; sem `#controle`. Hoje ainda lê do store local (mesma origem do `App` de
- * mestre) — vira Realtime filtrado por RLS na Fase 4 do plano (§6.4); a própria ficha do jogador
- * (editável) e o rolador próprio (`resolver-rolagem`) entram nas Fases 4–5, ainda não aqui.
+ * `LogTab` de mestre; sem `#controle`. Hidratado via Realtime (§6.4) — `fichas`/`npcs` vêm de
+ * `characters_publico`/`npcs_publico` (RLS já filtra `visivel`), `sessaoPublica` do store
+ * compartilhado (`FichaPublicaView`/`SessaoPublicaView` leem de lá diretamente). Sem
+ * Supabase configurado, as listas ficam vazias — não há fallback pro store local do GM
+ * (esse é só do `GmApp`, §13). A própria ficha do jogador (editável) e o rolador próprio
+ * (`resolver-rolagem`) ainda não entram aqui — Fase 5 do plano.
  */
 export default function PlayerApp() {
   const [aba, setAba] = useState<AbaId>('sessao');
-  const fichas = useStore((s) => s.fichas);
-  const npcs = useStore((s) => s.npcs);
-  const basePV = useStore((s) => s.config.basePV);
 
-  const npcsVisiveis = npcs.filter((n) => n.visivel);
+  useEffect(() => {
+    void iniciarAuthMultiplayer();
+  }, []);
+  useHidratarSessaoPublica();
+  const fichas = useFichasPublicas();
+  const npcs = useNpcsPublicos();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -68,16 +73,16 @@ export default function PlayerApp() {
             {fichas.length === 0 ? (
               <p className="vazio">nenhum personagem na mesa ainda.</p>
             ) : (
-              fichas.map((f) => <FichaPublicaView key={f.id} ficha={dividirFicha(f, basePV).publico} />)
+              fichas.map((f) => <FichaPublicaView key={f.id} ficha={f} />)
             )}
           </div>
         )}
         {aba === 'npcs' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {npcsVisiveis.length === 0 ? (
+            {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>
             ) : (
-              npcsVisiveis.map((n) => <NpcPublicaView key={n.id} npc={n} />)
+              npcs.map((n) => <NpcPublicaView key={n.id} npc={n} />)
             )}
           </div>
         )}

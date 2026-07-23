@@ -3,7 +3,9 @@ import type { Npc } from '../../state/types';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 
 interface Props {
-  npc: Npc;
+  /** Nunca `notasMestre` — nem o tipo aceita: quem monta essa view a partir do Realtime
+   *  (PlayerApp) não tem esse campo disponível de jeito nenhum (RLS de npcs_privado). */
+  npc: Omit<Npc, 'notasMestre'>;
 }
 
 /**

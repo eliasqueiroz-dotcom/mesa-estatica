@@ -6,7 +6,7 @@ import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } 
 
 type Cliente = NonNullable<typeof supabase>;
 
-interface LinhaPublico {
+export interface LinhaPublico {
   id: string;
   nome: string;
   cor_visual: string;
@@ -31,7 +31,7 @@ const paraLinhaPublico = (p: FichaPublica): LinhaPublico => ({
   surtos_ativos: p.surtosAtivos,
 });
 
-const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
+export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
