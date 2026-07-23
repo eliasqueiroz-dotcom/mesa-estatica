@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
 import { COLORSETS, type ColorsetId } from './colorsets';
 import { consumirForcados } from './forcarRolagem';
+import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
 
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
 export interface RollTermo {
@@ -46,10 +47,12 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  * ordem dos termos na notação (1º termo primeiro, etc.), então a ordem de `termos` aqui precisa
  * bater com a ordem que o valor forçado pretende atingir.
  */
-export function montarNotacao(termos: RollTermo[], personagemId: string | null = null): string {
+export async function montarNotacao(termos: RollTermo[], personagemId: string | null = null): Promise<string> {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = consumirForcados(totalDados, personagemId);
+  // Fase D (desligada por padrão — ver rolagemRemota.ts): tenta o servidor primeiro; null
+  // cai pro caminho local de sempre (fila local via BroadcastChannel, honesto se vazia).
+  const forcados = (await resolverRolagemRemota(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -183,7 +186,8 @@ export function useDiceBox(containerId: string, enabled = true, baseScale = 100)
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const r = await box.roll(montarNotacao(pedido.termos, pedido.personagemId));
+      const notacao = await montarNotacao(pedido.termos, pedido.personagemId);
+      const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
       setErro(String(e));
