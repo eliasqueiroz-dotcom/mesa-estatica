@@ -66,6 +66,15 @@ Doc `mesa-estatica-multiplayer-completo.md` ganhou **Parte IV** (separação de 
 
 **Extras da mesma sessão**: rolagem de NPC (chips de ação em `TokenOverlay`/`IniciativaPanel`/`NpcsTab`) agora sempre privada por padrão — só o `rollsLog` tem controle de privacidade de verdade, o log narrativo nunca teve. `QuickRollOverlay` no modo NPC não exige mais selecionar um NPC pra rolar (mesma flexibilidade que `RolagemLivre` já tinha). Corrigidos 6 bugs em `store.test.ts` que quebravam `npm run build` — alguns eram crash de verdade em runtime (`converterDinheiro` sem criar ficha antes), não só erro de tipo.
 
+### Parte IV — separação de visualização (em andamento, sem pressa pro dia 25)
+
+Branch `multiplayer/parte-iv-view-jogador`, sem prazo — decisão do usuário de construir com calma em vez de forçar caber antes da sessão. Ordem do plano: extrair componentes de leitura (`*View`) primeiro, único passo adiantável sem Supabase/bundle separado; cada um verificado ao vivo (montagem temporária numa aba existente, revertida antes do commit) sem tocar no app do mestre.
+
+- **`FichaPublicaView` ✅**: superfície de mesa de um PC alheio (nome, cor, PV, ferido, surto) a partir do tipo `FichaPublica` já existente (Fase B).
+- **`NpcPublicaView` ✅**: superfície de mesa de um NPC revelado (nome, cor, PV, Defesa, Agilidade, categoria, notas, lista de ações só-exibição). Nunca `notasMestre`; recusa renderizar se `visivel` for falso, mesmo que quem chama esqueça de filtrar.
+
+Faltam: `SessaoPublicaView`, split de bundle Vite (`PlayerApp` de verdade, rota `?t=owner_token`), hidratação via Realtime no lugar de localStorage pro cliente do jogador.
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
