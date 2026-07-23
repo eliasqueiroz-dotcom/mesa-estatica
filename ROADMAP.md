@@ -51,10 +51,12 @@
 
 **Log de rolagens dedicado**: tipo `EntradaRoll` + `rollsLog` no store (persistido, exportado). Ações `registrarRoll`/`revelarRoll` (toggle privado→público). Aba Log exibe rolagens separadas do log narrativo, com filtro de visibilidade. Migração v9→v10.
 
+**Refatoração iniciativa 21/07 ✅**: lógica de combate/iniciativa extraída de `CombatOverlay.tsx` e `NpcsTab.tsx` para um hook compartilhado `src/hooks/useIniciativa.ts` + componente `src/features/iniciativa/IniciativaPanel.tsx`. Elimina duplicação de PV/Defesa/seleção/drag-and-drop/ações de NPC entre as duas abas. **ControlPanel** (`#controle`) agora também aceita NPCs como alvo de rolagem forçada (antes só PCs). DT da cena não aceita mais valor zero (`Math.max(1, ...)`). Fila de forçados usa `assinar`/`filaAtual` do módulo em vez de Zustand como fonte primária, com merge na sincronização BroadcastChannel (`fila = [...msg.fila, ...fila]`). `TokenOverlay` adiciona label `nível {n}` nos checkboxes de Determinação.
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
-- [ ] README com o comando de subir offline (`npx serve dist`) e o checklist do dia.
+- [ ] README com o comando de subir offline (`npm run preview`) e o checklist do dia.
 - [ ] Folga real — é o buffer se o Dia 4 ou 5 estourar.
 
 ---
@@ -86,7 +88,7 @@
 
 ## Checklist do dia da sessão (25/07) — executar na máquina final
 
-- [ ] `npm run build` + `npx serve dist` funcionando **offline** (desligar wifi e testar)
+- [ ] `npm run build` + `npm run preview` funcionando **offline** (desligar wifi e testar)
 - [ ] Export JSON de backup salvo fora do navegador
 - [ ] Fichas dos jogadores conferidas contra as fichas de papel deles
 - [ ] Mapa(s) do caso já importado(s), NPCs pré-cadastrados

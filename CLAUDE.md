@@ -12,12 +12,22 @@ Ferramenta local de mestre para o RPG "Estática" (investigação/horror, São P
 
 ## Stack
 
-Vite 8 + React 18 + TypeScript + Zustand(persist) · `@3d-dice/dice-box-threejs` (Three.js + cannon-es) para dados 3D — escolhido por suportar **rolagem forçada nativa** (`1d20@X`), necessária para o modo determinístico do mestre; ver `.claude/docs/arquitetura.md` · Three.js para tokens · fontes via @fontsource (self-host). `npm run dev` / `npm run build` / `npm test` (vitest sobre `src/rules/`).
+Vite 8 + React 18 + TypeScript + Zustand(persist) · `@3d-dice/dice-box-threejs` (Three.js + cannon-es) para dados 3D — escolhido por suportar **rolagem forçada nativa** (`1d20@X`), necessária para o modo determinístico do mestre; ver `.claude/docs/arquitetura.md` · Three.js para tokens · fontes via @fontsource (self-host). `npm run dev` / `npm run build` / `npm run preview` / `npm test` (vitest sobre `src/rules/` e `src/dice/`) / `npm run test:watch`.
 
 ## Regras do projeto
 
-- `src/rules/` é TS puro (sem React/Three) e espelha `regras.md`; toda regra nova ganha teste.
-- Rolagem de dados é **honesta por padrão** (valor bruto vem da física; modificadores somados depois). **Exceção deliberada**: o mestre pode forçar um resultado pela janela de controle secreta (`#controle`, fora da tela compartilhada) — a lib faz swap da face via `1d20@X`, indistinguível na tela. Fluxo em `src/dice/forcarRolagem.ts` + `useDiceBox.ts`; nunca expor esse controle na janela principal.
+- `src/rules/` é TS puro (sem React/Three) e espelha `regras.md`; toda regra nova ganha teste. `src/rules/data/` contém tabelas do jogo tipadas (surto, traumas, armas, antecedentes, pericias, condicoesCombate, dificuldades).
+- `src/state/store.ts` concentra o Zustand com persist + migrations; `schemaVersion` em `factories.ts` — toda mudança de shape bumpa a versão e ganha bloco `migrate`. `rollsLog` é separado do log narrativo com toggle privado/público. `Ficha.surtosAtivos: SurtoAtivo[]` (array) substituiu os campos individuais `surtoAtivo: number | null` + `surtoEscolha: string | null` — permite múltiplos surtos simultâneos. `SCHEMA_VERSION` atual (factories.ts).
+- Rolagem de dados é **honesta por padrão** (valor bruto vem da física; modificadores somados depois). **Exceção deliberada**: o mestre pode forçar um resultado pela janela de controle secreta (`#controle`, fora da tela compartilhada) — a lib faz swap da face via `1d20@X`, indistinguível na tela. Fluxo em `src/dice/forcarRolagem.ts` + `useDiceBox.ts`; nunca expor esse controle na janela principal. Fallback 2D automático em `rolarFallback2D` se WebGL falhar.
+- `src/features/` organiza uma pasta por aba: `sessao/`, `fichas/`, `dados/`, `mapa/`, `npcs/`, `ruido/`, `controle/`. Cada aba usa `visibility`/`pointer-events` em vez de renderização condicional para preservar estado local (App.tsx).
+- `src/hooks/useIniciativa.ts` centraliza lógica de iniciativa/combate (PV, Defesa, seleção, drag-and-drop, ações de NPC). `src/features/iniciativa/IniciativaPanel.tsx` é o componente compartilhado usado em `CombatOverlay` e `NpcsTab`, com prop `podeArrastar` para habilitar drag-and-drop.
+- `src/rules/surto.ts`: `personagemEstaEmSurto` recebe `SurtoAtivo[]` (antes `number | null`). `surto.test.ts` testa múltiplos surtos ativos simultâneos.
+- `src/rules/teste.ts`: exporta `descricaoResultado` (string de resultado: "sucesso", "falha", "1 natural — complicação", "20 natural — margem garantida", "margem 10+ — efeito extra"). Testada em `teste.test.ts`.
+- Rolagem livre (`RolagemLivre.tsx`) não trava mais no modo `'nenhum'` — permite rolar sem selecionar personagem/NPC, e ainda loga a rolagem em `rollsLog`.
+- `ReguladoresSection.tsx`: `numeroSessao` → `contadorCena` (o campo da dose agora referencia cena, não sessão).
+- `ControlPanel.tsx` inclui NPCs como alvo de rolagem forçada. A fila de forçados usa `assinar`/`filaAtual` do módulo e sincroniza via BroadcastChannel com merge.
+- Ruído visual global em `features/ruido/RuidoOverlay.tsx` — tiers 0–3 (`data-ruido` no `<html>`) controlados pela Sanidade da ficha ativa, CSS puro. `AlertaOverlay.tsx` mostra gauges de Ruído Narrativo/Ameaça.
+- `CombatOverlay.tsx` no mapa — modo combate por turnos com seleção de combatentes, condições, drag-and-drop de reordenação, steppers PV/Defesa.
 - Textos de UI em pt-BR, seguindo o vocabulário de microcopy de `arte.md` — sem exclamações, sem emoji, log em minúsculas mono.
 - Nada pode depender de internet em runtime (fontes, libs, assets — tudo local). O app precisa rodar offline no dia da sessão.
 - **Portabilidade é requisito**: esta máquina de dev NÃO é a máquina da sessão. Tudo deve funcionar num clone limpo com `npm install` + `npm run dev` (o postinstall recria os assets 3D). Nunca versionar caminhos absolutos desta máquina; estado da mesa migra via export/import JSON (localStorage não viaja). Setup da máquina nova documentado no [README.md](README.md).
