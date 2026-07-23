@@ -66,32 +66,32 @@ describe('montarNotacao', () => {
 describe('rolarFallback2D', () => {
   afterEach(() => limparForcados());
 
-  it('honesta: valores caem dentro da faixa do dado', () => {
+  it('honesta: valores caem dentro da faixa do dado', async () => {
     for (let i = 0; i < 50; i++) {
-      const [grupo] = rolarFallback2D([{ sides: 6, qty: 1 }]);
+      const [grupo] = await rolarFallback2D([{ sides: 6, qty: 1 }]);
       expect(grupo.rolls[0].value).toBeGreaterThanOrEqual(1);
       expect(grupo.rolls[0].value).toBeLessThanOrEqual(6);
     }
   });
 
-  it('mantém o mesmo shape de GrupoResultado que a rolagem física (qty, sides, value, rolls)', () => {
-    const grupos = rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
+  it('mantém o mesmo shape de GrupoResultado que a rolagem física (qty, sides, value, rolls)', async () => {
+    const grupos = await rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
     expect(grupos).toHaveLength(2);
     expect(grupos[0]).toMatchObject({ qty: 1, sides: 20 });
     expect(grupos[1]).toMatchObject({ qty: 1, sides: 4 });
     expect(grupos[0].value).toBe(grupos[0].rolls[0].value);
   });
 
-  it('respeita valores forçados, na ordem dos termos — mesmo sem física', () => {
+  it('respeita valores forçados, na ordem dos termos — mesmo sem física', async () => {
     enfileirarForcado([5, 1], null, 'qualquer');
-    const [d20, d4] = rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
+    const [d20, d4] = await rolarFallback2D([{ sides: 20, qty: 1 }, { sides: 4, qty: 1 }]);
     expect(d20.rolls[0].value).toBe(5);
     expect(d4.rolls[0].value).toBe(1);
   });
 
-  it('soma corretamente múltiplos dados do mesmo termo (ex: surto 2d20)', () => {
+  it('soma corretamente múltiplos dados do mesmo termo (ex: surto 2d20)', async () => {
     enfileirarForcado([10, 20], null, 'qualquer');
-    const [grupo] = rolarFallback2D([{ sides: 20, qty: 2 }]);
+    const [grupo] = await rolarFallback2D([{ sides: 20, qty: 2 }]);
     expect(grupo.rolls.map((r) => r.value)).toEqual([10, 20]);
     expect(grupo.value).toBe(30);
   });
