@@ -36,7 +36,8 @@ Postgres RLS decide se uma **linha inteira** é visível/editável — não esco
 
 | Tabela | Leitura | Escrita | Conteúdo |
 |---|---|---|---|
-| `characters` | todos os participantes | jogador: só a própria linha (`owner_token`) — cria exatamente 1 personagem no primeiro acesso, sem criar adicionais · GM: todas, sem limite | ficha completa de PC |
+| `characters_publico` | todos os participantes | jogador: só a própria linha (`owner_token`) — cria exatamente 1 personagem no primeiro acesso, sem criar adicionais · GM: todas, sem limite | **superfície de mesa** de PC: nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido |
+| `characters_privado` | **só o dono** (via `owner_token`/`auth.uid()`) + GM | jogador: só a própria linha · GM: todas | resto da ficha: atributos, Sanidade, perícias, traumas, armas, Determinação, neuro-reguladores/Acessos, dinheiro, vínculos, antecedente/história, kit, anotações (ver Parte IV §3) |
 | `npcs` | todos | **insert/update/delete**: só GM — jogador nunca cria NPC | PV, Defesa, Agilidade, notas, `controlado_por` (nullable — delegação **de movimento**, nunca de criação ou edição de stats) |
 | `tokens` | todos (o tabuleiro é visível a todos) | posição: dono do `character_id` (PC) ou GM (qualquer token) ou jogador com `controlado_por` = ele (NPC delegado) · **insert/delete**: só do próprio `character_id` (jogador pode colocar/tirar o próprio token do mapa); NPC insert/delete: só GM | id, character_id, x, y, tipo (`pc`/`npc`) |
 | `rolls_log` | todos | escrita: só via Edge Function · **delete ("limpar log")**: só GM | resultado final, origem, alvo (opcional), tipo (teste/sanidade/surto/trauma) |
@@ -45,7 +46,7 @@ Postgres RLS decide se uma **linha inteira** é visível/editável — não esco
 | `sessao_privada` | só GM | só GM | "o que realmente está acontecendo", próximo evento, lembretes do mestre, gauges de Tensão/Ruído narrativo/Ameaça, estatísticas da sessão (rolagens/surtos/mortes/tempo) |
 | `media` | pasta `geral`: todos · pasta `gm`: só GM | `geral`: todos inserem · `gm`: só GM insere · mover de `gm`→`geral`: só GM · delete: GM sempre, jogador só o que ele mesmo subiu em `geral` *(assunção — confirmar antes de implementar)* | arquivo (via Supabase Storage, tabela guarda só a URL/metadados), pasta, autor, rótulo |
 
-O ponto que importa em todas as tabelas sensíveis: mesmo que um jogador abra o DevTools e inspecione o tráfego de rede, `forced_queue` e `sessao_privada` **nunca aparecem** — porque o cliente dele nunca teve permissão de consultar essas tabelas, em nenhum momento.
+O ponto que importa em todas as tabelas sensíveis: mesmo que um jogador abra o DevTools e inspecione o tráfego de rede, `forced_queue`, `sessao_privada` e o `characters_privado` **dos outros jogadores** **nunca aparecem** — porque o cliente dele nunca teve permissão de consultar essas linhas, em nenhum momento.
 
 ## 5. Como a rolagem forçada nunca vaza — o mecanismo
 
@@ -121,7 +122,7 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 |---|---|---|
 | Sessão — público | todos | só GM |
 | Sessão — privado | só GM | só GM |
-| Personagens | todos | jogador: só a própria, 1 única, sem criar adicionais · GM: todas |
+| Personagens | superfície pública de todos (nome/cor/PV/estado); ficha completa só a própria + GM | jogador: só a própria, 1 única, sem criar adicionais · GM: todas |
 | Dados & Regras | todos | todos (via `resolver-rolagem`) |
 | Rolagem Forçada (`#controle`) | só GM | só GM |
 | Mapas | todos veem o tabuleiro | GM: tudo · jogador: próprio token + NPC delegado |
@@ -195,7 +196,7 @@ Clicar num token (PC ou NPC) no mapa abre um overlay (fecha por botão X, clique
 - NPC: PV atual/máx, Defesa, Agilidade, notas.
 - Escreve direto no Zustand/Supabase — não duplicar estado. Mudar aqui reflete na aba Personagens/NPCs e vice-versa.
 - Precisa de **distinção clique vs. arrasto** (limiar de poucos pixels) pra não abrir o overlay toda vez que o token é só reposicionado.
-- **Permissão (pós-multiplayer):** steppers de edição só ficam ativos se for a própria ficha (jogador) ou GM; outros PCs/NPCs abrem em modo leitura — visualizar é permitido a todos (ficha de PC e NPC são de leitura pública, seção 4), editar segue a matriz.
+- **Permissão (pós-multiplayer):** steppers de edição só ficam ativos se for a própria ficha (jogador) ou GM; outros PCs/NPCs abrem em modo leitura. De um PC alheio o jogador vê só a **superfície pública** (`characters_publico`: nome/cor/PV/estado — seção 4 e Parte IV §3); Sanidade, perícias, traumas e o resto de `characters_privado` só aparecem pro dono e pro GM. NPC visível abre sem `notasMestre`.
 
 ## 2. Surto: marcação até o fim da cena
 
@@ -365,3 +366,143 @@ TEMPO: 23:47
 - Menos troca entre abas.
 - Sensação de software profissional durante a sessão.
 - **Adicional pós-multiplayer:** a separação público/privado que já fazia sentido pra organização visual do mestre agora também é a fronteira de segurança real — o mesmo desenho serve aos dois propósitos.
+
+---
+
+# Parte IV — Separação de visualização (cliente do jogador × cliente do mestre)
+
+> As Partes I–III projetam **dados, segurança e dashboard**, mas não o **cliente/renderização**: como um único codebase vira duas experiências distintas — o painel completo do mestre e a visão reduzida do jogador. Esta parte preenche isso. Trabalho **pós-25/07**, dependente do Supabase (Parte I).
+>
+> **Decisões travadas:** (a) **bundle separado** para o jogador — o JS que ele baixa não contém código de mestre; (b) **ficha dos outros = só a superfície pública** (nome/cor/PV/estado) — emenda o §4/§10 (ver `characters_publico`/`characters_privado`).
+
+## 1. Princípio central: sigilo em 3 camadas (defesa em profundidade)
+
+O jogador nunca descobre a rolagem forçada porque **três camadas independentes** o impedem — quebrar uma não expõe nada:
+
+1. **Código** — o bundle do jogador não contém `ControlPanel`, `forcarRolagem.ts`, nem as seções privadas. Inspecionar o JS no DevTools não revela o mecanismo (nem que ele existe).
+2. **Dados** — RLS recusa `forced_queue`/`sessao_privada`/`characters_privado` alheio antes da query sair do servidor (§13).
+3. **Servidor** — o valor forçado é decidido dentro da Edge Function `resolver-rolagem` (§5); o cliente do jogador recebe só `{ resultado: X }`, nunca um flag `forcado`.
+
+Hoje (máquina única) só existe a camada fraca "o controle mora noutro hash `#controle`". As três acima a substituem.
+
+## 2. Arquitetura de entrada — dois bundles Vite
+
+O split de janela de hoje é binário por hash (`src/main.tsx`: `#controle` → `ControlPanel`, senão `App`). Evoluir para **entradas separadas de build**:
+
+- `index.html` → `src/entries/mestre.tsx` → `<GmApp/>` (o `App` atual, completo).
+- `jogador.html` → `src/entries/jogador.tsx` → `<PlayerApp/>` (novo, reduzido).
+- A janela `#controle` continua, mas só alcançável a partir do `GmApp` (título clicável) — nunca referenciada no bundle do jogador.
+
+`vite.config.ts` ganha `build.rollupOptions.input` com as entradas HTML (o `base: '/mesa-estatica/'` do deploy continua). Efeito-chave: o Rollup faz *tree-shaking* por entrada — `forcarRolagem.ts` e `ControlPanel.tsx`, importados só pela árvore do mestre, **não entram** no chunk do jogador.
+
+**Detecção de papel:** o boot lê a URL (§6 — jogador entra com `?s=<session>&t=<owner_token>`; GM valida `gm_token` server-side). `jogador.tsx` só aceita `owner_token`; sem token válido, mostra "link inválido", nunca o painel.
+
+## 3. Camadas de componente — projeção pública compartilhada, controles isolados
+
+Regra: **componentes de leitura ("projeção pública") são compartilhados; controles de edição do mestre ficam em componentes GM-only** que o bundle do jogador nunca importa. Cada aba se divide em:
+
+- `*View.tsx` — apresentação pura de dados públicos (barra de PV, cristal do token, estado surto/ferido, mini-log público). Reusável nos dois clientes.
+- `*Tab.tsx`/`*Controls.tsx` (mestre) — steppers, edição de stats, campos privados, criação de NPC. Só na árvore do `GmApp`.
+
+O `PlayerApp` monta as `*View` + os controles restritos ao próprio jogador (editar a própria ficha, mover o próprio token, rolar os próprios dados); **não importa** os controles de mestre. Segue o padrão já usado ao extrair `IniciativaPanel`/`useIniciativa` — projeção compartilhada, comportamento parametrizado.
+
+**Divisão da ficha (`characters_publico` vs `characters_privado`, §4):**
+
+- **Público** (superfície de mesa): nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido.
+- **Privado** (só dono + GM): atributos, Sanidade, perícias, traumas, armas, Determinação, neuro-reguladores/Acessos, dinheiro, vínculos, antecedente/história, kit, anotações. (`Acessos` é lido pelo dono mas escrito só pelo GM.)
+- **NPCs** já têm o *seam* pronto: `visivel` (default oculto) e `notasMestre`. Player só lê NPC `visivel = true`, nunca `notasMestre`, e não cria/edita (§8). Sem campo novo.
+- **Rolls**: `rolls_log` tem visibilidade por entrada (privada→pública via "revelar"). Player lê só as públicas.
+
+## 4. Fonte de estado e rolagem no cliente do jogador
+
+- **Estado:** `PlayerApp` hidrata o cache local (Zustand) a partir de *subscriptions* Realtime filtradas por RLS — recebe só linhas que pode ver. `localStorage` deixa de ser a origem no cliente do jogador; segue como fallback GM-solo (§13) só no `GmApp`.
+- **Rolagem:** o bundle do jogador não contém a lógica de forçado. `useDiceBox` no jogador chama `resolver-rolagem`, recebe `{ resultado: X }` e faz o swap de face com esse X (mesma lib/animação) — indistinguível de honesto (§5, §12). O fallback 2D também parte do valor do servidor. Ações sobre NPC passam pela mesma função (§6.1) — o jogador nunca escreve em `npcs`.
+
+## 5. O que cada papel vê — aba por aba
+
+| Aba | Mestre (`GmApp`) | Jogador (`PlayerApp`) |
+|---|---|---|
+| Sessão | `sessao_publica` + `sessao_privada` (lembretes, gauges, "o que realmente acontece", DT da cena) | só `sessao_publica` + destaque superior + mini-log público. Zero campo privado |
+| Personagens | todas as fichas, edição total | própria ficha completa (editável) + superfície pública dos outros (read-only) |
+| Dados & Regras | roladores + acesso ao `#controle` | rola os próprios via `resolver-rolagem`. Sem `#controle`, sem menção a forçado |
+| Mapas | tudo (fundo, grid, todos os tokens, stats NPC) | vê o tabuleiro; move o próprio token (+ NPC delegado via `controlado_por`); read-only no resto |
+| NPCs | criar/editar/mover, `notasMestre`, `visivel` | só NPCs `visivel = true`, read-only, sem `notasMestre`, sem criar |
+| Log | narrativo + rolls (público e privado) + "limpar log" | narrativo público + rolls públicas. Sem "limpar log" |
+| Controle (`#controle`) | janela secreta | **não existe no bundle** |
+
+Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gauges **públicos** — Tensão/Ameaça (`sessao_privada`) não entram.
+
+## 6. Ordem de implementação (encaixe nas Fases do §11)
+
+1. **Refator de componentes** (adiantável já, local-first, sem Supabase): extrair as `*View` das abas atuais, sem mudar o comportamento do mestre. Baixo risco, valida a fronteira pública/privada de UI cedo. É a única parte adiantável.
+2. **Split de build**: multi-entrada + `PlayerApp` montando as `*View`; validar que o chunk do jogador não puxa código de mestre.
+3. **`characters_publico`/`characters_privado`** — casa com a Fase F.
+4. **Hidratação do `PlayerApp` via Realtime** (RLS) — Fases A/B.
+5. **`resolver-rolagem` no cliente do jogador** — Fase C; validar com 2 dispositivos antes de ligar `forced_queue`.
+6. **Corte do `#controle`/forçado** pro transporte novo — Fase D.
+
+---
+
+# Parte V — Operacional: colocar o projeto no ar
+
+> Preenche a lacuna de infra: o "como" concreto de sair do localStorage e virar serviço online. Decisões abaixo **travadas**; nada em aberto. Trabalho **pós-25/07**.
+>
+> **Decisões travadas:** (1) hospedagem = **GitHub Pages + Supabase** (mantém o deploy estático atual); (2) provisionamento = **importar o export JSON uma vez** (seed); (3) auth = **Anonymous Auth** (§6 solução 1); (4) links = **URL do GitHub Pages + query** (`?s=..&t=..`).
+>
+> **Lembrete:** adotar Supabase **revoga** o requisito "nada depende de internet em runtime" do CLAUDE.md — passa a valer só pro fallback GM-solo (§13). Atualizar o CLAUDE.md quando a Fase A começar.
+
+## 1. Configuração e segredos
+
+- Cliente precisa de `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (Vite só expõe vars com prefixo `VITE_` via `import.meta.env`). Injetados no build do GitHub Actions como **repo secrets** (passo `env:` novo no `deploy.yml`) — mesmo públicos, secret evita commit acidental e facilita rotação.
+- **Anon key é pública por design** — a fronteira de segurança é o RLS, não a chave. Pode ir no bundle; repo público não é problema.
+- **`service_role`**: SÓ dentro das Edge Functions (`supabase secrets set`), NUNCA no cliente/repo. É a chave que ignora RLS.
+- **`gm_token`**: validado dentro de Edge Function (comparado a um secret do projeto), nunca embutido no bundle (§6).
+
+## 2. Autenticação — Anonymous Auth (§6 solução 1)
+
+- Boot: `supabase.auth.signInAnonymously()` → `auth.uid()` estável por dispositivo, persistido pelo supabase-js. Reconexão/refresh re-hidratam a sessão anônima — jogador volta onde estava (§15).
+- Edge Function `vincular-jogador`: recebe `{ session_id, owner_token }` da URL, valida o token e grava `auth.uid()` na linha de `characters` daquele token — **só na 1ª vez**. Depois as policies usam `auth.uid()`.
+- GM também assina anônimo, mas o privilégio vem de validar o `gm_token` numa Edge Function, não do `auth.uid()`.
+
+## 3. Provisionamento inicial — seed via export JSON (uma vez)
+
+- Reusar o `exportarJSON` existente (serializa fichas/NPCs/mapa/sessão/rolls).
+- Edge Function `seed-mesa` (ou tela GM-only) recebe o JSON e faz INSERT com `service_role` (ignora RLS pra popular): `characters_publico`/`characters_privado`, `npcs`, `tokens`, `sessao_publica`/`sessao_privada`. Gera um `owner_token` (UUID) por ficha.
+- Idempotência por `session_id`. A imagem de mapa (base64 no JSON) sobe pro Storage e a **URL** substitui o base64 (ver §5). Roda UMA vez; depois o Supabase é a fonte da verdade.
+
+## 4. Geração de links
+
+- Jogador: `https://eliasqueiroz-dotcom.github.io/mesa-estatica/?s=<session_id>&t=<owner_token>`. O `owner_token` (UUID não-adivinhável) resolve pra 1 ficha (§6).
+- GM: preferir **não** pôr o `gm_token` na URL (evita vazar em histórico/print) — tela que pede pra colar o token.
+- "Botão que gera todos os links" (§15): tela GM-only listando ficha→link, copiável. Vazou um → GM regenera só aquele `owner_token` (§13).
+
+## 5. Storage de mapas e mídia
+
+- Buckets espelhando as políticas de tabela (§9): `media-geral` (todos leem), `media-gm` (só GM). Mapa num bucket `mapas` ou em `media-gm` até ser revelado.
+- Upload de mapa deixa de ser base64 no localStorage: `supabase.storage.upload()` → guarda só a URL. **Reusar `comprimirImagem.ts`** (1600px/JPEG já existe) antes do upload. Vídeo/áudio só no Storage (§9).
+
+## 6. Migrações de schema do Postgres
+
+- Tabelas + policies RLS versionadas em `supabase/migrations/*.sql` (Supabase CLI), aplicadas com `supabase db push`. **Independente** das migrações Zustand (que servem o cache local/GM-solo). Garante reprodutibilidade — paralelo ao requisito de portabilidade do CLAUDE.md.
+
+## 7. Realtime e Presence
+
+- Ligar Realtime só nas tabelas que o cliente assina: `characters_publico`, `npcs`, `tokens`, `rolls_log`, `sessao_publica`. **Não** em `forced_queue`/`sessao_privada`/`characters_privado` — RLS já bloqueia, e não expor no Realtime reduz a superfície.
+- Presence: canal por `session_id`; indicador **só-GM** de quem está conectado (§15).
+
+## 8. Online ↔ offline e reconciliação
+
+- Detecção: `navigator.onLine` + falha de request → GM cai pro modo local (Zustand localStorage + BroadcastChannel pro `#controle`); jogadores assistem por screen share (§13).
+- Reconciliação: só o GM edita no fallback, então **last-write-wins** (GM re-empurra o estado local) — sem merge fino, o fallback é degradado por design. Jogador sem net não age até voltar (turnos são cortáveis, §16).
+
+## 9. Checklist "primeira vez no ar"
+
+- [ ] Projeto Supabase criado; `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` nos secrets do Actions e no `deploy.yml`.
+- [ ] `service_role` e `gm_token` só nos secrets do Supabase — nunca no repo/bundle.
+- [ ] `supabase db push` aplicou tabelas + policies; teste com chave `anon` lê `forced_queue`/`sessao_privada` → vazio/erro (§15).
+- [ ] Seed da mesa via export JSON; links por ficha gerados.
+- [ ] 2 dispositivos reais: jogador entra pelo link, edita a própria ficha, rola, sincroniza via Realtime; tenta ler ficha privada alheia / adivinhar rolagem forçada → recusado/indistinguível.
+- [ ] Fallback offline testado (desligar o wifi do GM no meio de uma ação).
+- [ ] CLAUDE.md atualizado: "offline em runtime" agora vale só pro fallback GM-solo.
+
+**Custo:** um grupo pequeno cabe no free tier do Supabase (500 MB DB, ~200 conexões Realtime, 500 K invocações de Edge Function/mês, 1 GB Storage). Sem custo novo além do que já existe (GitHub Pages é grátis).
