@@ -14,7 +14,10 @@ export default function PericiasSection({ ficha, onChange }: SecaoFichaProps) {
 
   return (
     <section className="secao">
-      <h3 className="label">Perícias</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h3 className="label" style={{ margin: 0 }}>Perícias</h3>
+        <span className="vazio" style={{ fontSize: 10 }}>— · T=treinado · V=veterano</span>
+      </div>
       <div className="pericias-grid">
         {ATRIBUTOS.map((atributo) => {
           const daColuna = PERICIAS.filter((p) => p.atributo === atributo.id);

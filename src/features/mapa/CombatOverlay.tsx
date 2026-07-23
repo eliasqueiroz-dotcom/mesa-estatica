@@ -81,6 +81,7 @@ export default function CombatOverlay() {
         >
           <IniciativaPanel
             hook={iniciativa}
+            podeArrastar={true}
             header={
               <div
                 onPointerDown={iniciarArrasto}

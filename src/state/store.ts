@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { resolverSurto } from '../rules/surto';
-import type { EntradaSurto } from '../rules/data/surto';
+import type { EscolhaSurtoPendente } from './types';
 import { ordenarIniciativa } from '../rules/teste';
 import {
   COR_NPC_PADRAO,
@@ -44,9 +44,8 @@ interface EstadoEfemero {
    *  rolar na tabela de Surto; RuidoOverlay observa isso pro burst de 1,5s (arte.md). */
   ultimoBurstRuidoEm: number | null;
   /** quando um Surto dispara com os dois d20 diferentes, fica pendente até o mestre escolher
-   *  qual entrada vigora (regras.md: "o jogador escolhe qual acontece") — SurtoEscolhaModal
-   *  observa isso. null = nenhuma escolha pendente. */
-  escolhaSurtoPendente: { fichaId: string; nomeFicha: string; entradaA: EntradaSurto; entradaB: EntradaSurto } | null;
+   *  qual entrada vigora (regras.md: "o jogador escolhe qual acontece") — chaveado por fichaId. */
+  escolhasSurtoPendentes: Record<string, EscolhaSurtoPendente>;
 }
 
 interface Acoes {
@@ -59,8 +58,8 @@ interface Acoes {
   ajustarPvAtual: (id: string, novoValor: number) => void;
   /** Igual ao PV, mas também detecta cruzamento da linha (→ Trauma) e perda ≥5 de uma vez (→ Surto). */
   ajustarSanidadeAtual: (id: string, novoValor: number) => AlertaSanidade;
-  /** Resolve `escolhaSurtoPendente` (dois d20 diferentes) com o lado que o mestre escolheu. */
-  resolverEscolhaSurtoPendente: (lado: 'A' | 'B') => void;
+  /** Resolve a escolha pendente de um personagem (dois d20 diferentes) com o lado que o mestre escolheu. */
+  resolverEscolhaSurtoPendente: (fichaId: string, lado: 'A' | 'B') => void;
   ajustarDeterminacao: (id: string, novoValor: number) => void;
   ajustarDinheiro: (id: string, tipo: 'real' | 'ponto', novoValor: number) => void;
   /** Câmbio entre R$/P$ (regras.md "grana e equipamento") — P$→R$ com cambista desconta 30%;
@@ -138,7 +137,7 @@ export const useStore = create<Store>()(
     (set, get) => ({
       ...criarEstadoInicial(),
       ultimoBurstRuidoEm: null,
-      escolhaSurtoPendente: null,
+      escolhasSurtoPendentes: {},
 
       adicionarFicha: () => {
         const ficha = criarFichaVazia(get().fichas.length);
@@ -147,7 +146,25 @@ export const useStore = create<Store>()(
       },
       atualizarFicha: (id, patch) =>
         set((s) => ({
-          fichas: s.fichas.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+          fichas: s.fichas.map((f) => {
+            if (f.id !== id) return f;
+            const atualizada = { ...f, ...patch };
+            if (patch.atributos?.vontade !== undefined) {
+              const novaMax = calcularSanidadeMaxima(atualizada.atributos.vontade);
+              atualizada.sanidadeAtual =
+                atualizada.atributos.vontade > f.atributos.vontade
+                  ? novaMax
+                  : Math.min(atualizada.sanidadeAtual, novaMax);
+            }
+            if (patch.atributos?.vigor !== undefined) {
+              const novoPvMax = calcularPvMaximo(s.config.basePV, atualizada.atributos.vigor);
+              atualizada.pvAtual =
+                atualizada.atributos.vigor > f.atributos.vigor
+                  ? novoPvMax
+                  : Math.min(atualizada.pvAtual, novoPvMax);
+            }
+            return atualizada;
+          }),
         })),
       removerFicha: (id) =>
         set((s) => ({
@@ -186,7 +203,6 @@ export const useStore = create<Store>()(
         };
 
         let logSurtoImediato: string | null = null;
-        let pendente: EstadoEfemero['escolhaSurtoPendente'] = null;
         if (alerta.surtoDisparado) {
           const d20A = Math.floor(Math.random() * 20) + 1;
           const d20B = Math.floor(Math.random() * 20) + 1;
@@ -208,7 +224,6 @@ export const useStore = create<Store>()(
               ),
             }));
           } else {
-            pendente = { fichaId: id, nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB };
             set((s) => ({
               fichas: s.fichas.map((f) =>
                 f.id === id
@@ -222,7 +237,10 @@ export const useStore = create<Store>()(
                     }
                   : f,
               ),
-              escolhaSurtoPendente: pendente,
+              escolhasSurtoPendentes: {
+                ...s.escolhasSurtoPendentes,
+                [id]: { nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB },
+              },
             }));
           }
         } else {
@@ -248,27 +266,38 @@ export const useStore = create<Store>()(
         return alerta;
       },
 
-      resolverEscolhaSurtoPendente: (lado) => {
-        const pendente = get().escolhaSurtoPendente;
+      resolverEscolhaSurtoPendente: (fichaId, lado) => {
+        const pendente = get().escolhasSurtoPendentes[fichaId];
         if (!pendente) return;
         const entrada = lado === 'A' ? pendente.entradaA : pendente.entradaB;
-        set((s) => ({
-          fichas: s.fichas.map((f) =>
-            f.id === pendente.fichaId
-              ? {
-                  ...f,
-                  surtosAtivos: (f.surtosAtivos ?? []).map((s) =>
-                    s.escolha === null ? { ...s, escolha: entrada.nome } : s,
-                  ),
-                }
-              : f,
-          ),
-          escolhaSurtoPendente: null,
-        }));
+        set((s) => {
+          const { [fichaId]: _, ...resto } = s.escolhasSurtoPendentes;
+          return {
+            fichas: s.fichas.map((f) =>
+              f.id === fichaId
+                ? {
+                    ...f,
+                    surtosAtivos: (() => {
+                      const arr = f.surtosAtivos ?? [];
+                      let idx = -1;
+                      for (let i = arr.length - 1; i >= 0; i--) {
+                        if (arr[i].escolha === null) { idx = i; break; }
+                      }
+                      if (idx === -1) return arr;
+                      const copia = [...arr];
+                      copia[idx] = { ...copia[idx], escolha: entrada.nome };
+                      return copia;
+                    })(),
+                  }
+                : f,
+            ),
+            escolhasSurtoPendentes: resto,
+          };
+        });
         get().registrarLog(
           'surto',
           `${pendente.nomeFicha} · Surto · escolhido: ${entrada.nome} — ${entrada.descricao}`,
-          pendente.fichaId,
+          fichaId,
         );
       },
 
@@ -611,10 +640,7 @@ export const useStore = create<Store>()(
     {
       name: 'estatica-mesa',
       version: SCHEMA_VERSION,
-      partialize: (state) => {
-        const { escolhaSurtoPendente, ...rest } = state;
-        return rest;
-      },
+      partialize: (state) => state,
       migrate: (persistedState, versaoAnterior) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const estado = persistedState as any;

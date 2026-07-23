@@ -7,6 +7,7 @@ import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+import { usarAcaoNpc } from '../../rules/npcAcoes';
 
 const EMPTY_CONDICOES: string[] = [];
 
@@ -59,7 +60,7 @@ function resumoRegulador(ficha: Ficha): string {
   if (ficha.anestesiaAte !== null) return 'anestesia ativa';
   if (ficha.reguladores.length === 0) return 'nenhum';
   const ultima = ficha.reguladores[0];
-  return `ativo — ${NOMES_TIPO_REGULADOR[ultima.tipo]} (sessão ${ultima.sessao})`;
+  return `ativo — ${NOMES_TIPO_REGULADOR[ultima.tipo]} (cena ${ultima.sessao})`;
 }
 
 /** Perícias treinadas (grau 3) e veteranas (grau 6) — pra decidir um teste rápido sem abrir a
@@ -237,22 +238,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                   <button
                     key={a.id}
                     className="combate-chip combate-chip--ativa"
-                    onClick={() => {
-                      const d20 = Math.floor(Math.random() * 20) + 1;
-                      const total = d20 + a.bonus;
-                      let dmg = 0;
-                      if (a.dano) {
-                        const m = a.dano.match(/^(\d+)d(\d+)(?:\+(\d+))?$/i);
-                        if (m) {
-                          for (let i = 0; i < parseInt(m[1], 10); i++) dmg += Math.floor(Math.random() * parseInt(m[2], 10)) + 1;
-                          if (m[3]) dmg += parseInt(m[3], 10);
-                        }
-                      }
-                      const partes = [`${npc.nome || 'NPC'} · ${a.nome}`];
-                      partes.push(`teste d20${a.bonus >= 0 ? '+' : ''}${a.bonus} → ${d20}${a.bonus >= 0 ? '+' : ''}${a.bonus} = ${total}`);
-                      if (a.dano && dmg > 0) partes.push(`dano ${a.dano} → ${dmg}`);
-                      registrarLog('rolagem-livre', partes.join(' | '));
-                    }}
+                    onClick={() => usarAcaoNpc(npc.nome || 'NPC', a, registrarLog)}
                     title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
                     style={{ fontSize: 10, cursor: 'pointer' }}
                   >

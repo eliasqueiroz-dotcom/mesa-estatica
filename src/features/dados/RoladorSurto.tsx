@@ -19,6 +19,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
   const registrarLog = useStore((s) => s.registrarLog);
   const dispararBurstRuido = useStore((s) => s.dispararBurstRuido);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
+  const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
   const sessaoPublica = useStore((s) => s.sessaoPublica);
 
   const [fichaId, setFichaId] = useState('');
@@ -31,37 +32,51 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
   const rolarSurto = () => {
     if (!ficha) return;
     setRolando(true);
+    setResultado(null);
     setEscolhido(null);
+    useStore.setState((s) => {
+      const { [ficha.id]: _, ...resto } = s.escolhasSurtoPendentes;
+      return { escolhasSurtoPendentes: resto };
+    });
     rolar([{ sides: 20, qty: 2 }], (grupos) => {
       const [d20A, d20B] = grupos[0].rolls.map((r) => r.value);
       const r = resolverSurto(d20A, d20B);
       setResultado(r);
       setRolando(false);
       dispararBurstRuido();
-      const expiraSurto = calcularExpiraSurto(sessaoPublica);
       if (r.mesmoNumero) {
-        atualizarFicha(ficha.id, { surtoEscolha: r.entradaA.nome, surtoAtivo: expiraSurto });
+        atualizarFicha(ficha.id, {
+          surtosAtivos: [
+            ...(ficha.surtosAtivos ?? []),
+            { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: r.entradaA.nome },
+          ],
+        });
         registrarLog(
           'surto',
           `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
           ficha.id,
         );
       } else {
-        atualizarFicha(ficha.id, { surtoAtivo: expiraSurto });
+        atualizarFicha(ficha.id, {
+          surtosAtivos: [
+            ...(ficha.surtosAtivos ?? []).filter((s) => s.escolha !== null),
+            { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: null },
+          ],
+        });
+        useStore.setState((s) => ({
+          escolhasSurtoPendentes: {
+            ...s.escolhasSurtoPendentes,
+            [ficha.id]: { nomeFicha: ficha.nome ?? 'Personagem', entradaA: r.entradaA, entradaB: r.entradaB },
+          },
+        }));
       }
     }, 'ruido', ficha.id);
   };
 
   const escolher = (lado: 'A' | 'B') => {
     if (!ficha || !resultado) return;
-    const entrada = lado === 'A' ? resultado.entradaA : resultado.entradaB;
     setEscolhido(lado);
-    atualizarFicha(ficha.id, { surtoEscolha: entrada.nome, surtoAtivo: calcularExpiraSurto(sessaoPublica) });
-    registrarLog(
-      'surto',
-      `${ficha.nome || 'Personagem'} · Surto · d20=${resultado.d20A}/${resultado.d20B} · escolhido: ${entrada.nome} — ${entrada.descricao}`,
-      ficha.id,
-    );
+    resolverEscolhaSurtoPendente(ficha.id, lado);
   };
 
   return (

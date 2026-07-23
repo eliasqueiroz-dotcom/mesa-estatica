@@ -24,9 +24,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const escolhaSurtoPendente = useStore((s) =>
-    s.escolhaSurtoPendente?.fichaId === ficha.id ? s.escolhaSurtoPendente : null,
-  );
+  const escolhaSurtoPendente = useStore((s) => s.escolhasSurtoPendentes[ficha.id] ?? null);
   const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
   const [alertas, setAlertas] = useState<string[]>([]);
 
@@ -153,7 +151,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
                     d20={entrada.d20} — <strong>{entrada.nome}</strong>
                   </span>
                   <span style={{ fontFamily: 'var(--font-body)' }}>{entrada.descricao}</span>
-                  <button className="acento" onClick={() => resolverEscolhaSurtoPendente(lado)}>
+                  <button className="acento" onClick={() => resolverEscolhaSurtoPendente(ficha.id, lado)}>
                     escolher este
                   </button>
                 </div>

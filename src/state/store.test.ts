@@ -73,8 +73,7 @@ describe('ajustarSanidadeAtual', () => {
       .mockReturnValueOnce(19 / 20); // d20B = 20
     const id = adicionarFicha(10);
     useStore.getState().ajustarSanidadeAtual(id, 4);
-    expect(useStore.getState().escolhaSurtoPendente).not.toBeNull();
-    expect(useStore.getState().escolhaSurtoPendente!.fichaId).toBe(id);
+    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeDefined();
     vi.restoreAllMocks();
   });
 
@@ -103,36 +102,37 @@ describe('resolverEscolhaSurtoPendente', () => {
     ficha.surtosAtivos = [{ id: 's1', expiraEm: 3, escolha: null }];
     useStore.setState({
       fichas: [ficha],
-      escolhaSurtoPendente: {
-        fichaId: ficha.id,
-        nomeFicha: ficha.nome,
-        entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
-        entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
+      escolhasSurtoPendentes: {
+        [ficha.id]: {
+          nomeFicha: ficha.nome,
+          entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
+          entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
+        },
       },
     });
     return ficha.id;
   }
 
   it('atualiza escolha do surto pendente', () => {
-    setupComSurtoPendente();
-    useStore.getState().resolverEscolhaSurtoPendente('A');
+    const id = setupComSurtoPendente();
+    useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
     expect(useStore.getState().fichas[0].surtosAtivos[0].escolha).toBe(TABELA_SURTO.find((e) => e.d20 === 1)!.nome);
   });
 
   it('não duplica entradas', () => {
-    setupComSurtoPendente();
-    useStore.getState().resolverEscolhaSurtoPendente('A');
+    const id = setupComSurtoPendente();
+    useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
     expect(useStore.getState().fichas[0].surtosAtivos.length).toBe(1);
   });
 
-  it('limpa escolhaSurtoPendente após resolver', () => {
-    setupComSurtoPendente();
-    useStore.getState().resolverEscolhaSurtoPendente('A');
-    expect(useStore.getState().escolhaSurtoPendente).toBeNull();
+  it('limpa escolha pendente após resolver', () => {
+    const id = setupComSurtoPendente();
+    useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
+    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeUndefined();
   });
 
   it('não quebra se não há pendente', () => {
-    expect(() => useStore.getState().resolverEscolhaSurtoPendente('A')).not.toThrow();
+    expect(() => useStore.getState().resolverEscolhaSurtoPendente('inexistente', 'A')).not.toThrow();
   });
 });
 
@@ -196,14 +196,15 @@ describe('campos de array undefined/null', () => {
     it('resolverEscolhaSurtoPendente não quebra se surtosAtivos for undefined', () => {
       const id = fichaSemCampo('surtosAtivos');
       useStore.setState({
-        escolhaSurtoPendente: {
-          fichaId: id,
-          nomeFicha: 'Teste',
-          entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
-          entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
+        escolhasSurtoPendentes: {
+          [id]: {
+            nomeFicha: 'Teste',
+            entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
+            entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
+          },
         },
       });
-      expect(() => useStore.getState().resolverEscolhaSurtoPendente('A')).not.toThrow();
+      expect(() => useStore.getState().resolverEscolhaSurtoPendente(id, 'A')).not.toThrow();
     });
 
     it('avancarCena não quebra se surtosAtivos for undefined', () => {

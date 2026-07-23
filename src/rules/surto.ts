@@ -33,15 +33,16 @@ export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto): number {
 }
 
 /** Verifica se a ficha está em Surto ativo, considerando o modo combate.
- *  Fora de combate: surtoAtivo === contadorCena.
- *  Em combate: surtoAtivo >= rodada (expira quando a rodada ultrapassa). */
+ *  Fora de combate: algum surto.expiraEm === contadorCena.
+ *  Em combate: algum surto.expiraEm >= rodada. */
 export function personagemEstaEmSurto(
-  surtoAtivo: number | null,
+  surtosAtivos: { expiraEm: number; id?: string; escolha?: string | null }[],
   sessao: EstadoSessaoParaSurto,
 ): boolean {
-  if (surtoAtivo === null) return false;
-  if (sessao.modoCombate) {
-    return surtoAtivo >= sessao.rodada;
-  }
-  return surtoAtivo === sessao.contadorCena;
+  return surtosAtivos.some((s) => {
+    if (sessao.modoCombate) {
+      return s.expiraEm >= sessao.rodada;
+    }
+    return s.expiraEm === sessao.contadorCena;
+  });
 }

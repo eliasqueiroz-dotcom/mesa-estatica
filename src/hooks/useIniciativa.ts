@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
+import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
 import { useStore } from '../state/store';
 
 export interface PvCombatente {
@@ -17,21 +18,6 @@ export function corPv(atual: number, maximo: number): string {
   if (atual <= maximo * 0.25) return 'var(--ruido)';
   if (atual <= maximo * 0.5) return 'var(--real)';
   return 'var(--rede)';
-}
-
-function rolarD20(): number {
-  return Math.floor(Math.random() * 20) + 1;
-}
-
-function rolarDano(danoFormula: string): number {
-  const match = danoFormula.match(/^(\d+)d(\d+)(?:\+(\d+))?$/i);
-  if (!match) return 0;
-  const qtd = parseInt(match[1], 10);
-  const faces = parseInt(match[2], 10);
-  const mod = match[3] ? parseInt(match[3], 10) : 0;
-  let total = 0;
-  for (let i = 0; i < qtd; i++) total += Math.floor(Math.random() * faces) + 1;
-  return total + mod;
 }
 
 export function useIniciativa() {
@@ -156,13 +142,7 @@ export function useIniciativa() {
   };
 
   const usarAcaoNpc = (nome: string, acao: { nome: string; bonus: number; dano: string }) => {
-    const d20 = rolarD20();
-    const total = d20 + acao.bonus;
-    const dmg = acao.dano ? rolarDano(acao.dano) : 0;
-    const partes = [`${nome} · ${acao.nome}`];
-    partes.push(`teste d20${acao.bonus >= 0 ? '+' : ''}${acao.bonus} → ${d20}${acao.bonus >= 0 ? '+' : ''}${acao.bonus} = ${total}`);
-    if (acao.dano && dmg > 0) partes.push(`dano ${acao.dano} → ${dmg}`);
-    registrarLog('rolagem-livre', partes.join(' | '));
+    usarAcaoNpcCompartilhada(nome, acao, registrarLog);
   };
 
   return {

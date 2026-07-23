@@ -20,7 +20,7 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
     const pericias = { ...ficha.pericias };
     if (anterior) {
       for (const periciaId of anterior.pericias) {
-        if (pericias[periciaId] === 3) delete pericias[periciaId];
+        if (pericias[periciaId] !== undefined) delete pericias[periciaId];
       }
     }
     for (const periciaId of def.pericias) {

@@ -240,8 +240,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const sanidadeCritica = p.ficha
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
       : false;
-    const surtoAtivo = p.ficha ? personagemEstaEmSurto(p.ficha.surtoAtivo, { modoCombate, contadorCena, rodada }) : false;
-    const surtoEscolha = surtoAtivo ? p.ficha?.surtoEscolha ?? null : null;
+    const surtosAtivos = p.ficha?.surtosAtivos ?? [];
+    const surtoAtivo = personagemEstaEmSurto(surtosAtivos, { modoCombate, contadorCena, rodada });
+    const surtoEscolha = surtoAtivo ? surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
     const turnoAtivo = participanteNaVez === t.participanteId;
     const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome };

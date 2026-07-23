@@ -56,7 +56,6 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
   const rolarPreset = (faces: number) => setTermos([termoVazio(faces)]);
 
   const rolarCombinado = () => {
-    if (modo === 'nenhum') return;
     setRolando(true);
     setGrupos(null);
     const notacao: RollTermo[] = termos.map((t) => ({ sides: t.faces, qty: t.quantidade }));
@@ -91,6 +90,15 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           total,
           bruto: total,
           visibilidade,
+        });
+      } else if (modo === 'nenhum') {
+        registrarRoll({
+          origem: 'Rolagem livre',
+          personagemId: null,
+          formula: notacaoTexto,
+          total,
+          bruto: total,
+          visibilidade: privado ? 'privada' : 'publica',
         });
       }
     });
@@ -159,7 +167,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.75rem', marginBottom: '0.75rem' }}>
         {TODAS_AS_FACES.map((f) => (
-          <button key={f} onClick={() => rolarPreset(f)} disabled={!podeRolar || modo === 'nenhum'}>
+          <button key={f} onClick={() => rolarPreset(f)} disabled={!podeRolar}>
             1d{f}
           </button>
         ))}
@@ -194,7 +202,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
         <button className="acento" onClick={adicionarTermo}>
           + combinar outro dado
         </button>
-        <button disabled={!podeRolar || modo === 'nenhum' || rolando} onClick={rolarCombinado}>
+        <button disabled={!podeRolar || rolando} onClick={rolarCombinado}>
           rolar {notacaoTexto}
         </button>
         {modo === 'npc' && (

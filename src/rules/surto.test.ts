@@ -36,19 +36,27 @@ describe('personagemEstaEmSurto', () => {
   const sessaoFora: EstadoSessaoParaSurto = { modoCombate: false, contadorCena: 3, rodada: 1 };
   const sessaoCombate: EstadoSessaoParaSurto = { modoCombate: true, contadorCena: 3, rodada: 4 };
 
-  it('null nunca está em Surto', () => {
-    expect(personagemEstaEmSurto(null, sessaoFora)).toBe(false);
-    expect(personagemEstaEmSurto(null, sessaoCombate)).toBe(false);
+  it('array vazio nunca está em Surto', () => {
+    expect(personagemEstaEmSurto([], sessaoFora)).toBe(false);
+    expect(personagemEstaEmSurto([], sessaoCombate)).toBe(false);
   });
 
-  it('fora de combate: ativo quando === contadorCena', () => {
-    expect(personagemEstaEmSurto(3, sessaoFora)).toBe(true);
-    expect(personagemEstaEmSurto(2, sessaoFora)).toBe(false);
+  it('fora de combate: ativo quando algum expiraEm === contadorCena', () => {
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null }], sessaoFora)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 2, escolha: null }], sessaoFora)).toBe(false);
   });
 
-  it('em combate: ativo enquanto surtoAtivo >= rodada', () => {
-    expect(personagemEstaEmSurto(5, sessaoCombate)).toBe(true); // 5 >= 4
-    expect(personagemEstaEmSurto(4, sessaoCombate)).toBe(true); // 4 >= 4
-    expect(personagemEstaEmSurto(3, sessaoCombate)).toBe(false); // 3 < 4
+  it('em combate: ativo enquanto algum expiraEm >= rodada', () => {
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 5, escolha: null }], sessaoCombate)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 4, escolha: null }], sessaoCombate)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null }], sessaoCombate)).toBe(false);
+  });
+
+  it('múltiplos surtos: true se pelo menos um ativo', () => {
+    const surtos = [
+      { id: '1', expiraEm: 1, escolha: null },  // expirou
+      { id: '2', expiraEm: 3, escolha: 'Fuga cega' }, // ativo
+    ];
+    expect(personagemEstaEmSurto(surtos, sessaoFora)).toBe(true);
   });
 });

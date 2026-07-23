@@ -43,7 +43,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
 
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
-  const podeRolarSimples = quem === 'pc' || (quem === 'npc' && npc !== null);
+  const podeRolarSimples = (quem === 'pc' && ficha !== null) || (quem === 'npc' && npc !== null);
   const podeRolarPericia = quem === 'pc' ? ficha !== null : npc !== null;
   const podeRolar = modo === 'simples' ? podeRolarSimples : podeRolarPericia;
 
@@ -68,7 +68,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         bruto: valor,
         visibilidade,
       });
-    }, 'rede', ficha?.id ?? null);
+    }, 'rede', quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null));
   };
 
   const rolarPericia = () => {
@@ -147,8 +147,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
       pendenteRef.current = false;
       if (!rolando && podeRolar) rolarAtualRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, rolando]);
+  }, [ready, rolando, podeRolar]);
 
   if (abaAtual === 'dados') return null;
 

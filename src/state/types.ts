@@ -1,5 +1,6 @@
 import type { Atributo, GrauPericia } from '../rules/data/pericias';
 import type { BasePV, NivelDificuldade } from '../rules/data/dificuldades';
+import type { EntradaSurto } from '../rules/data/surto';
 
 export interface Vinculo {
   id: string;
@@ -14,6 +15,18 @@ export interface TraumaFicha {
   resposta: string;
   virouCicatriz: boolean;
   cicatrizUsadaNestaSessao: boolean;
+}
+
+export interface EscolhaSurtoPendente {
+  nomeFicha: string;
+  entradaA: EntradaSurto;
+  entradaB: EntradaSurto;
+}
+
+export interface SurtoAtivo {
+  id: string;
+  expiraEm: number;
+  escolha: string | null;
 }
 
 export interface ArmaFicha {
@@ -78,13 +91,7 @@ export interface Ficha {
 
   anotacoes: string;
 
-  /** nº da cena (sessaoPublica.contadorCena) em que o Surto disparou; null = sem Surto ativo.
-   *  Marcador válido enquanto === sessaoPublica.contadorCena — avançar cena invalida sozinho,
-   *  sem precisar limpar ficha por ficha (mesa-estatica-multiplayer-completo.md Parte II §2). */
-  surtoAtivo: number | null;
-  /** nome da entrada da Tabela de Surto em vigor (ex: "Fuga cega") — null enquanto não rolado/
-   *  escolhido, ou sem Surto ativo. correcoes-parte2.md item 11. */
-  surtoEscolha: string | null;
+  surtosAtivos: SurtoAtivo[];
 }
 
 export interface NpcAcao {

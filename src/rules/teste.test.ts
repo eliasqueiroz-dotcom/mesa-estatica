@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularDanoAtaque, ordenarIniciativa, resolverTeste } from './teste';
+import { calcularDanoAtaque, descricaoResultado, ordenarIniciativa, resolverTeste } from './teste';
 
 describe('resolverTeste', () => {
   it('sucesso normal quando total >= DT', () => {
@@ -81,5 +81,32 @@ describe('calcularDanoAtaque', () => {
 
   it('margem 10+ usa dano máximo do dado em vez da rolagem', () => {
     expect(calcularDanoAtaque({ rolagemDano: 1, danoMaximoDado: 8, vigor: 2, corpoACorpo: true, margem10Mais: true })).toBe(10);
+  });
+});
+
+describe('descricaoResultado', () => {
+  it('1 natural → complicação', () => {
+    const r = resolverTeste({ d20: 1, atributoId: 'percepcao', valorAtributo: 0, grauPericia: 0, personagemFerido: false, dt: 10 });
+    expect(descricaoResultado(r)).toBe('1 natural — complicação');
+  });
+
+  it('20 natural → margem garantida', () => {
+    const r = resolverTeste({ d20: 20, atributoId: 'percepcao', valorAtributo: 0, grauPericia: 0, personagemFerido: false, dt: 10 });
+    expect(descricaoResultado(r)).toBe('20 natural — margem garantida');
+  });
+
+  it('margem 10+ → efeito extra', () => {
+    const r = resolverTeste({ d20: 18, atributoId: 'percepcao', valorAtributo: 3, grauPericia: 3, personagemFerido: false, dt: 10 });
+    expect(descricaoResultado(r)).toBe('margem 10+ — efeito extra');
+  });
+
+  it('sucesso normal → "sucesso"', () => {
+    const r = resolverTeste({ d20: 12, atributoId: 'percepcao', valorAtributo: 2, grauPericia: 3, personagemFerido: false, dt: 15 });
+    expect(descricaoResultado(r)).toBe('sucesso');
+  });
+
+  it('falha normal → "falha"', () => {
+    const r = resolverTeste({ d20: 5, atributoId: 'percepcao', valorAtributo: 1, grauPericia: 0, personagemFerido: false, dt: 15 });
+    expect(descricaoResultado(r)).toBe('falha');
   });
 });

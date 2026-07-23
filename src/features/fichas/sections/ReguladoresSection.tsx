@@ -10,7 +10,7 @@ export const NOMES_TIPO_REGULADOR: Record<TipoRegulador, string> = {
 };
 
 export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps) {
-  const sessaoAtual = useStore((s) => s.sessaoPublica.numeroSessao);
+  const cenaAtual = useStore((s) => s.sessaoPublica.contadorCena);
 
   const ajustarAcessos = (delta: number) => {
     onChange({ acessos: Math.max(0, ficha.acessos + delta) });
@@ -20,7 +20,7 @@ export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps)
     const dose: DoseRegulador = {
       id: crypto.randomUUID(),
       data: new Date().toISOString(),
-      sessao: sessaoAtual,
+      sessao: cenaAtual,
       tipo,
     };
     onChange({
@@ -33,7 +33,7 @@ export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps)
     onChange({ reguladores: ficha.reguladores.filter((d) => d.id !== id) });
   };
 
-  const dependente = estaDependente(ficha.reguladores.map((d) => d.sessao), sessaoAtual);
+  const dependente = estaDependente(ficha.reguladores.map((d) => d.sessao), cenaAtual);
   const anestesiaAtiva = ficha.anestesiaAte !== null;
 
   return (
@@ -78,7 +78,7 @@ export default function ReguladoresSection({ ficha, onChange }: SecaoFichaProps)
         ficha.reguladores.map((d) => (
           <div key={d.id} className="reguladores-linha mono">
             <span>
-              sessão {d.sessao} · {NOMES_TIPO_REGULADOR[d.tipo]}
+              cena {d.sessao} · {NOMES_TIPO_REGULADOR[d.tipo]}
             </span>
             <button className="icone-botao perigo" onClick={() => removerDose(d.id)}>
               ×

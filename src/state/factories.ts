@@ -51,8 +51,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     dinheiroReal: 500,
     dinheiroPonto: 800,
     anotacoes: '',
-    surtoAtivo: null,
-    surtoEscolha: null,
+    surtosAtivos: [],
   };
 }
 
@@ -117,7 +116,7 @@ export function criarSessaoPrivada(): SessaoPrivada {
   };
 }
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 13;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

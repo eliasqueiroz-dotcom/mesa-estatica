@@ -66,6 +66,7 @@ export default function NpcsTab() {
   const atualizarNpc = useStore((s) => s.atualizarNpc);
   const removerNpc = useStore((s) => s.removerNpc);
 
+  const novaAcaoRef = useRef(criarNpcAcao());
   const categorias = [...new Set(npcs.map((n) => n.categoria ?? '').filter(Boolean))];
   const npcsFiltrados = filtroCategoria ? npcs.filter((n) => (n.categoria ?? '') === filtroCategoria) : npcs;
 
@@ -92,6 +93,7 @@ export default function NpcsTab() {
   };
 
   const fecharEditorAcao = (npcId: string) => {
+    novaAcaoRef.current = criarNpcAcao();
     setAcaoEditandoId((prev) => {
       const next = { ...prev };
       delete next[npcId];
@@ -103,14 +105,14 @@ export default function NpcsTab() {
     const npc = npcs.find((n) => n.id === npcId);
     if (!npc) return;
     const acao = criarNpcAcao();
-    atualizarNpc(npcId, { acoes: [...npc.acoes, { ...acao, ...patch }] });
+    atualizarNpc(npcId, { acoes: [...(npc.acoes ?? []), { ...acao, ...patch }] });
     fecharEditorAcao(npcId);
   };
 
   const salvarAcao = (npcId: string, acaoId: string, patch: Partial<NpcAcao>) => {
     const npc = npcs.find((n) => n.id === npcId);
     if (!npc) return;
-    atualizarNpc(npcId, { acoes: npc.acoes.map((a) => (a.id === acaoId ? { ...a, ...patch } : a)) });
+    atualizarNpc(npcId, { acoes: (npc.acoes ?? []).map((a) => (a.id === acaoId ? { ...a, ...patch } : a)) });
     fecharEditorAcao(npcId);
   };
 
@@ -154,7 +156,7 @@ export default function NpcsTab() {
         {npcsFiltrados.length === 0 ? (
           <p className="vazio">nenhum npc cadastrado ainda.</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.6rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.6rem' }}>
             {npcsFiltrados.map((n) => {
               const editando = editandoNpcs.has(n.id);
               return (
@@ -307,7 +309,7 @@ export default function NpcsTab() {
                             {acaoEditandoId[n.id] === '__new__' && (
                               <InlineAcaoEditor
                                 key="nova"
-                                acao={criarNpcAcao()}
+                                acao={novaAcaoRef.current}
                                 onSalvar={(patch) => salvarNovaAcao(n.id, patch)}
                                 onCancelar={() => fecharEditorAcao(n.id)}
                               />
@@ -420,6 +422,7 @@ export default function NpcsTab() {
       <div className="secao" style={{ display: 'flex', flexDirection: 'column', padding: '0.75rem 0.9rem' }}>
         <IniciativaPanel
           hook={iniciativa}
+          podeArrastar={true}
           header={
             <h3 style={{ margin: 0, marginBottom: '0.75rem' }}>iniciativa</h3>
           }

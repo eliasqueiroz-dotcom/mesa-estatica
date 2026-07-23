@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
+  const [arsenalSelect, setArsenalSelect] = useState('');
+  const [protecaoSelect, setProtecaoSelect] = useState('');
   const atualizar = (id: string, patch: Partial<ArmaFicha>) => {
     onChange({ armas: ficha.armas.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
   };
@@ -84,10 +87,11 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
           + arma livre
         </button>
         <select
-          defaultValue=""
+          value={arsenalSelect}
           onChange={(e) => {
-            if (e.target.value) adicionarDoArsenal(e.target.value);
-            e.target.value = '';
+            const val = e.target.value;
+            setArsenalSelect('');
+            if (val) adicionarDoArsenal(val);
           }}
         >
           <option value="">+ do arsenal…</option>
@@ -105,10 +109,11 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
         </h4>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select
-            defaultValue=""
+            value={protecaoSelect}
             onChange={(e) => {
-              if (e.target.value) aplicarProtecao(e.target.value);
-              e.target.value = '';
+              const val = e.target.value;
+              setProtecaoSelect('');
+              if (val) aplicarProtecao(val);
             }}
           >
             <option value="">+ proteção…</option>
