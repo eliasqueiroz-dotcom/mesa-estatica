@@ -1,5 +1,6 @@
 import { useStore } from '../../state/store';
 import FichaEditor from './FichaEditor';
+import LinkJogadorBotao from './LinkJogadorBotao';
 import './ficha.css';
 
 export default function FichasTab() {
@@ -33,6 +34,7 @@ export default function FichasTab() {
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {f.nome || 'sem nome'}
             </span>
+            <LinkJogadorBotao fichaId={f.id} fichaNome={f.nome} />
             <span
               className="icone-botao"
               role="button"
