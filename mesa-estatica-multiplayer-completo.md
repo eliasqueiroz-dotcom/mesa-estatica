@@ -1,9 +1,9 @@
 # Mesa de Estática — Multiplayer, Permissões e Melhorias
 
 > **Estado e restrições (ler antes de implementar qualquer parte):**
-> - O multiplayer (Partes I e II dependentes de Supabase) é trabalho **pós-sessão de 25/07** — o cronograma da Parte I (~7–9 dias) não cabe antes, e não se troca a arquitetura na semana da sessão.
-> - A **Parte III é implementável já, local-first** (Zustand, sem Supabase) — ver a seção "Implementação local primeiro" no início da Parte III. É o próximo passo.
-> - Adotar Supabase **revoga o requisito "nada depende de internet em runtime" do CLAUDE.md**. A partir da Fase A, esse requisito passa a valer só pro modo fallback GM-solo (risco "offline total", §13). Atualizar o CLAUDE.md quando a Fase A começar — não deixar os dois documentos se contradizendo.
+> - **Atualizado 23/07** — decisão original ("multiplayer é pós-sessão") foi revista pelo usuário: Fases A e B (§11) já estão implementadas, testadas contra o Supabase real e **em produção** (`main`, deploy automático). Fases C e D estão construídas e testadas isoladamente, mas **desligadas** — C não está religada em `useDiceBox.ts`; D existe atrás da flag `VITE_FASE_D_ROLAGEM_REMOTA` (off por padrão). Nenhuma delas exige teste com 2 aparelhos físicos reais ainda — não ativar a flag da Fase D em produção antes disso. Ver ROADMAP.md, seção "Multiplayer — Fases A–D".
+> - A **Parte III é implementável já, local-first** (Zustand, sem Supabase) — ver a seção "Implementação local primeiro" no início da Parte III.
+> - Adotar Supabase **revoga o requisito "nada depende de internet em runtime" do CLAUDE.md**. A partir da Fase A esse requisito passa a valer só pro modo fallback GM-solo (risco "offline total", §13) — **já atualizado no CLAUDE.md**.
 
 ---
 
@@ -132,10 +132,10 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 
 ## 11. Migração incremental
 
-- **Fase A — só tokens.** Sincronizar posição x/y via Realtime. Menor risco, maior valor imediato.
-- **Fase B — fichas.** Cada jogador edita a própria linha em `characters`; GM assina todas.
-- **Fase C — rolagens.** `resolver-rolagem` honesta primeiro, valida com dois dispositivos reais, depois liga `forced_queue` + `#controle` na função.
-- **Fase D — corte da janela `#controle`** pro novo transporte, com `BroadcastChannel` como fallback só pro GM sozinho sem internet.
+- **Fase A ✅ (em produção) — só tokens.** Sincronizar posição x/y via Realtime. Menor risco, maior valor imediato.
+- **Fase B ✅ (em produção) — fichas.** Cada jogador edita a própria linha (`characters_privado`); GM assina todas via `is_gm()`.
+- **Fase C ✅ (construída, não ligada) — rolagens.** `resolver-rolagem` honesta (crypto) + forçada via `forced_queue`, testada isolada contra o Supabase real. `useDiceBox.ts` ainda não chama essa função.
+- **Fase D ✅ (construída, atrás de flag desligada) — corte da janela `#controle`** pro novo transporte. `VITE_FASE_D_ROLAGEM_REMOTA` liga; `BroadcastChannel` continua o padrão (e o fallback GM-sozinho-sem-internet, mesmo depois de ativada).
 - **Fase E — Sessão pública/privada.** Criar as duas tabelas, migrar os campos do dashboard (Parte III), GM lendo ambas.
 - **Fase F — Permissões finas de Mapas/NPCs/Personagens.** RLS de 1 personagem por dono (`owner_token` vincula exatamente 1 linha em `characters`, sem insert adicional pelo jogador), insert/update/delete de `npcs` restrito ao GM, insert/delete de `tokens` restrito ao próprio `character_id`, `controlado_por` exposto na UI como "quem pode mover".
 - **Fase G — Mídia.** Tabela `media` + Storage, upload em `geral` liberado, `gm` restrito, ação "mover pra Geral".

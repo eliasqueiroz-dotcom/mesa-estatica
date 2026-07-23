@@ -53,6 +53,19 @@
 
 **Refatoração iniciativa 21/07 ✅**: lógica de combate/iniciativa extraída de `CombatOverlay.tsx` e `NpcsTab.tsx` para um hook compartilhado `src/hooks/useIniciativa.ts` + componente `src/features/iniciativa/IniciativaPanel.tsx`. Elimina duplicação de PV/Defesa/seleção/drag-and-drop/ações de NPC entre as duas abas. **ControlPanel** (`#controle`) agora também aceita NPCs como alvo de rolagem forçada (antes só PCs). DT da cena não aceita mais valor zero (`Math.max(1, ...)`). Fila de forçados usa `assinar`/`filaAtual` do módulo em vez de Zustand como fonte primária, com merge na sincronização BroadcastChannel (`fila = [...msg.fila, ...fila]`). `TokenOverlay` adiciona label `nível {n}` nos checkboxes de Determinação.
 
+## Multiplayer — Fases A–D (23/07)
+
+Implementação de `mesa-estatica-multiplayer-completo.md` (Supabase, RLS real, Edge Functions), decisão do usuário de adiantar pra antes do dia 25 apesar do aviso original do doc. Cada fase numa branch própria, testada contra o Supabase real (não mock) antes de ir pra `main`.
+
+- **Fase A ✅ em produção**: sincronização de posição de token via Realtime. `src/multiplayer/tokensSync.ts` + `tokensDiff.ts` (testado). RLS aberto nesta fase — aceitável só pra posição, não pra dado sensível.
+- **Fase B ✅ em produção**: fichas com dono real. Anonymous Auth + Edge Functions `vincular-jogador`/`vincular-mestre` + tabela `mestres`/`is_gm()`; `characters_publico`/`characters_privado` (Parte IV do doc — ficha dividida em superfície pública e resto privado). Validado: mestre vê/edita tudo, jogador vinculado só a própria ficha, jogador não cria ficha nem lê/escreve a de outro — bloqueado pelo RLS, não só escondido na UI.
+- **Fase C ✅ construída, não ligada**: Edge Function `resolver-rolagem` — honesta (`crypto`, não `Math.random`) e forçada via `forced_queue`, decisão sempre no servidor. Infra pronta e testada isoladamente (notação `1d20@N` confirmada); `useDiceBox.ts` continua no caminho local de sempre.
+- **Fase D ✅ construída, atrás de flag desligada**: `resolverRolagemRemota` religado em `montarNotacao`/`rolarFallback2D`/`ControlPanel` (via `useFilaForcada.ts`), atrás de `VITE_FASE_D_ROLAGEM_REMOTA` (off por padrão — comportamento local não muda). Validado ponta a ponta contra o Supabase real e confirmado visualmente (dado caindo na bandeja 3D com a flag ligada). Falta teste com 2 aparelhos físicos reais antes de ativar em produção.
+
+Doc `mesa-estatica-multiplayer-completo.md` ganhou **Parte IV** (separação de visualização mestre/jogador — bundle separado, sigilo em 3 camadas) e **Parte V** (operacional — como colocar no ar: config/segredos, seed, links, Storage, migrações, Realtime, fallback offline).
+
+**Extras da mesma sessão**: rolagem de NPC (chips de ação em `TokenOverlay`/`IniciativaPanel`/`NpcsTab`) agora sempre privada por padrão — só o `rollsLog` tem controle de privacidade de verdade, o log narrativo nunca teve. `QuickRollOverlay` no modo NPC não exige mais selecionar um NPC pra rolar (mesma flexibilidade que `RolagemLivre` já tinha). Corrigidos 6 bugs em `store.test.ts` que quebravam `npm run build` — alguns eram crash de verdade em runtime (`converterDinheiro` sem criar ficha antes), não só erro de tipo.
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
