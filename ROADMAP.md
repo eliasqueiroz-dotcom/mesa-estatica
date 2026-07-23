@@ -73,6 +73,9 @@ Branch `multiplayer/parte-iv-view-jogador`, sem prazo — decisão do usuário d
 - **`FichaPublicaView` ✅**: superfície de mesa de um PC alheio (nome, cor, PV, ferido, surto) a partir do tipo `FichaPublica` já existente (Fase B).
 - **`NpcPublicaView` ✅**: superfície de mesa de um NPC revelado (nome, cor, PV, Defesa, Agilidade, categoria, notas, lista de ações só-exibição). Nunca `notasMestre`; recusa renderizar se `visivel` for falso, mesmo que quem chama esqueça de filtrar.
 - **`SessaoPublicaView` ✅**: situação da sessão + parte pública da cena atual (atmosfera, "o que os jogadores veem") + mini log. Nunca `sessaoPrivada` (gauges, lembretes, "o que realmente acontece", próximo evento, dificuldade da cena) — nem chega como prop.
+- **Split de bundle Vite ✅**: `index.html`→`src/entries/mestre.tsx` (app completo) e `jogador.html`→`src/entries/jogador.tsx`→`PlayerApp` (só as `*View`, abas Sessão/Personagens/NPCs). `vite.config.ts` com `build.rollupOptions.input` nas duas entradas. Validado por build real: chunk do jogador (7,5kB) sem nenhuma string exclusiva de mestre (`#controle`, `forcarRolagem`, `forced_queue`, `resolver-rolagem`) presentes no chunk do mestre; confirmado ao vivo nos dois bundles. `PlayerApp` ainda lê do store local (mesma origem do app de mestre) — vira Realtime filtrado por RLS na próxima fase.
+
+Faltam: hidratação do `PlayerApp` via Realtime (RLS) no lugar do store local, a própria ficha do jogador editável + rolagem via `resolver-rolagem`, corte do `#controle`/forçado pro transporte novo, rota `?s=<session>&t=<owner_token>` pra identificar o jogador.
 
 Faltam: split de bundle Vite (`PlayerApp` de verdade, rota `?t=owner_token`), hidratação via Realtime no lugar de localStorage pro cliente do jogador.
 
