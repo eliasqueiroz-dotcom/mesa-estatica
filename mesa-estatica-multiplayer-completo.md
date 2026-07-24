@@ -472,7 +472,7 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 
 ## 4. Geração de links
 
-- Jogador: `https://eliasqueiroz-dotcom.github.io/mesa-estatica/?s=<session_id>&t=<owner_token>`. O `owner_token` (UUID não-adivinhável) resolve pra 1 ficha (§6).
+- Jogador: `https://queiroz-labs.github.io/mesa-estatica/?s=<session_id>&t=<owner_token>`. O `owner_token` (UUID não-adivinhável) resolve pra 1 ficha (§6).
 - GM: preferir **não** pôr o `gm_token` na URL (evita vazar em histórico/print) — tela que pede pra colar o token.
 - "Botão que gera todos os links" (§15): tela GM-only listando ficha→link, copiável. Vazou um → GM regenera só aquele `owner_token` (§13).
 
