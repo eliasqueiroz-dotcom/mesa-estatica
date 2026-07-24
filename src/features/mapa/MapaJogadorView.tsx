@@ -1,0 +1,185 @@
+import { useEffect, useRef, useState } from 'react';
+import type { FichaPublica } from '../../multiplayer/fichaSplit';
+import { calcularSanidadeMaxima } from '../../rules/derivados';
+import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import { personagemEstaEmSurto } from '../../rules/surto';
+import { COR_NPC_PADRAO } from '../../state/factories';
+import { useStore } from '../../state/store';
+import type { EntradaIniciativa, Ficha, Npc } from '../../state/types';
+import TokenScene from '../../tokens3d/TokenScene';
+import './mapa.css';
+import { getImgRenderRect, iniciaisToken } from './mapaUtils';
+
+interface Props {
+  minhaFicha: Ficha;
+  outrasFichas: FichaPublica[];
+  npcs: Omit<Npc, 'notasMestre'>[];
+  iniciativa: EntradaIniciativa[];
+}
+
+/**
+ * Aba Mapa do jogador (mesa-estatica-multiplayer-completo.md Parte IV §5): vê o tabuleiro
+ * (fundo + grade, via `useHidratarMapaPublico`/`mapa_publico`, read-only) e move só o
+ * próprio token — sem upload, sem grade editável, sem adicionar/remover token, sem
+ * `TokenOverlay` (essa é a superfície de edição de mestre). Tokens de NPC não `visivel` nunca
+ * chegam aqui pra começo de conversa (RLS de `npcs_publico`, filtrado antes de `npcs` virar
+ * prop) — ainda assim, um token cujo participante não resolve (nenhuma ficha/NPC público
+ * bate o id) não é desenhado, em vez de cair num "?" genérico como no `MapaTab` do mestre:
+ * um token fantasma sem nome ainda denunciaria "tem algo aqui", o que a Parte IV pede pra
+ * nunca vazar.
+ */
+export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, iniciativa }: Props) {
+  const mapa = useStore((s) => s.mapa);
+  const moverTokenMapa = useStore((s) => s.moverTokenMapa);
+  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
+  const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
+  const rodada = useStore((s) => s.sessaoPublica.rodada);
+  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
+  const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
+  const arrastandoRef = useRef(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setTamanho({ width, height });
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setImgNatural(null);
+  }, [mapa.imagemDataUrl]);
+
+  const meuToken = mapa.tokens.find((t) => t.participanteId === minhaFicha.id);
+  const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
+
+  const participantePorId = (id: string) => {
+    if (id === minhaFicha.id) {
+      const sanidadeCritica = minhaFicha.sanidadeAtual <= calcularSanidadeMaxima(minhaFicha.atributos.vontade) * 0.25;
+      return { nome: minhaFicha.nome || 'sem nome', cor: minhaFicha.corVisual, sanidadeCritica, surtosAtivos: minhaFicha.surtosAtivos };
+    }
+    const ficha = outrasFichas.find((f) => f.id === id);
+    if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, sanidadeCritica: false, surtosAtivos: ficha.surtosAtivos };
+    const npc = npcs.find((n) => n.id === id);
+    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, sanidadeCritica: false, surtosAtivos: [] };
+    return null;
+  };
+
+  const tokensVisuais = mapa.tokens
+    .map((t) => {
+      const p = participantePorId(t.participanteId);
+      if (!p) return null;
+      const surtoAtivo = personagemEstaEmSurto(p.surtosAtivos, { modoCombate, contadorCena, rodada });
+      const surtoEscolha = surtoAtivo ? p.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
+      const turnoAtivo = participanteNaVez === t.participanteId;
+      const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
+      const podeMover = t.participanteId === minhaFicha.id;
+      return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica: p.sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome, podeMover };
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
+
+  const imgRenderRect = imgNatural && tamanho.width > 0
+    ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
+    : null;
+
+  const posicaoDoPonteiro = (e: React.PointerEvent) => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    const imgEl = imgRef.current;
+    if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+      const imgR = getImgRenderRect(rect.width, rect.height, imgEl.naturalWidth, imgEl.naturalHeight);
+      return { x: (e.clientX - rect.left - imgR.offsetX) / imgR.renderW, y: (e.clientY - rect.top - imgR.offsetY) / imgR.renderH };
+    }
+    return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+  };
+
+  const iniciarArrasto = (e: React.PointerEvent) => {
+    if (!meuToken) return;
+    e.preventDefault();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    arrastandoRef.current = true;
+  };
+
+  const mover = (e: React.PointerEvent) => {
+    if (!arrastandoRef.current || !meuToken || !containerRef.current) return;
+    const { x, y } = posicaoDoPonteiro(e);
+    moverTokenMapa(meuToken.id, x, y);
+  };
+
+  const soltar = () => {
+    arrastandoRef.current = false;
+  };
+
+  return (
+    <div className="mapa-tab">
+      <div
+        ref={containerRef}
+        className="mapa-area"
+        onPointerMove={mover}
+        onPointerUp={soltar}
+        onPointerCancel={soltar}
+      >
+        {mapa.imagemDataUrl ? (
+          <img
+            ref={imgRef}
+            src={mapa.imagemDataUrl}
+            alt="mapa da cena"
+            className="mapa-imagem"
+            draggable={false}
+            onLoad={() => {
+              if (imgRef.current) setImgNatural({ w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight });
+            }}
+          />
+        ) : (
+          <p className="vazio mapa-vazio">o mestre ainda não carregou um mapa.</p>
+        )}
+
+        {mapa.grade.ativa && (
+          <div
+            className="mapa-grade-caixa"
+            style={{
+              left: `${mapa.grade.x}%`,
+              top: `${mapa.grade.y}%`,
+              width: `${mapa.grade.largura}%`,
+              height: `${mapa.grade.altura}%`,
+            }}
+          />
+        )}
+
+        {tamanho.width > 0 && (
+          <TokenScene tokens={tokensVisuais} width={tamanho.width} height={tamanho.height} active imgRenderRect={imgRenderRect} />
+        )}
+
+        {tokensVisuais.map((t) => {
+          const partesTitulo = [t.nome];
+          if (t.podeMover) partesTitulo.push('seu token — arraste pra mover');
+          if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
+          if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
+          const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
+          const topo = imgRenderRect ? `${imgRenderRect.offsetY + t.y * imgRenderRect.renderH}px` : `${t.y * 100}%`;
+          return (
+            <div
+              key={t.id}
+              className="mapa-token"
+              data-surto={t.surtoAtivo}
+              data-turno={t.turnoAtivo}
+              style={{ left: esq, top: topo, borderColor: t.cor, cursor: t.podeMover ? 'grab' : 'default' }}
+              onPointerDown={t.podeMover ? iniciarArrasto : undefined}
+              title={partesTitulo.join(' — ')}
+            >
+              <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
+              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

@@ -1,50 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  assinar,
-  enfileirarForcado,
-  filaAtual,
-  limparForcados,
-  pedirEstado,
-  removerForcado,
-  type EntradaForca,
-} from '../../dice/forcarRolagem';
+import { useMemo, useState } from 'react';
+import { useFilaForcada } from './useFilaForcada';
 import { useStore } from '../../state/store';
 import '../../styles/tokens.css';
 import '../../styles/base.css';
 
 /**
  * Janela de controle secreta do mestre. Abrir em janela separada (fora da que é compartilhada
- * no Discord). Fala com a janela principal via BroadcastChannel. Enfileira o VALOR BRUTO do(s)
- * dado(s) — a ficha soma os modificadores depois. Cada entrada da fila pode ser amarrada a um
- * personagem (só cai quando ELE rola) ou "qualquer" (cai na próxima rolagem de quem for).
+ * no Discord). Enfileira o VALOR BRUTO do(s) dado(s) — a ficha soma os modificadores depois.
+ * Cada entrada da fila pode ser amarrada a um personagem (só cai quando ELE rola) ou "qualquer"
+ * (cai na próxima rolagem de quem for). A fila em si fala com a rolagem por BroadcastChannel
+ * (padrão) ou pela Fase D remota (`useFilaForcada`, atrás de `VITE_FASE_D_ROLAGEM_REMOTA`) —
+ * esta tela não precisa saber qual das duas está ativa.
  */
 export default function ControlPanel() {
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
-  const [fila, setFila] = useState<EntradaForca[]>(filaAtual());
+  const { fila, remoto, adicionar: adicionarNaFila, remover, limpar } = useFilaForcada();
   const [alvo, setAlvo] = useState<string>('qualquer');
   const [valorUnico, setValorUnico] = useState(20);
   const [lista, setLista] = useState('');
   const [filtro, setFiltro] = useState<string>('todos');
 
-  useEffect(() => {
-    const desassinar = assinar(setFila);
-    pedirEstado();
-    return desassinar;
-  }, []);
-
-  const nomeDoAlvo = (personagemId: string | null) => {
-    if (personagemId === null) return 'qualquer';
-    const ficha = fichas.find((f) => f.id === personagemId);
-    if (ficha) return ficha.nome || 'sem nome';
-    const npc = npcs.find((n) => n.id === personagemId);
-    return npc?.nome || 'sem nome';
-  };
-
   const adicionar = (valores: number[]) => {
     if (valores.length === 0) return;
     const personagemId = alvo === 'qualquer' ? null : alvo;
-    enfileirarForcado(valores, personagemId, nomeDoAlvo(personagemId));
+    adicionarNaFila(valores, personagemId);
   };
 
   const adicionarLista = () => {
@@ -65,9 +45,12 @@ export default function ControlPanel() {
   return (
     <div style={{ maxWidth: 560, margin: '0 auto', padding: '1.5rem', minHeight: '100vh' }}>
       <h1 style={{ fontSize: 20, marginBottom: '0.25rem' }}>Controle — fila de rolagem forçada</h1>
-      <p className="vazio" style={{ marginBottom: '1.25rem' }}>
+      <p className="vazio" style={{ marginBottom: '0.4rem' }}>
         janela secreta do mestre. mantenha fora da tela compartilhada no discord. o padrão é honesto —
         só as rolagens abaixo caem forçadas, na ordem, quando o personagem certo rolar.
+      </p>
+      <p className="vazio mono" style={{ marginBottom: '1.25rem' }}>
+        transporte: <span className="badge">{remoto ? 'remoto (Fase D)' : 'local (BroadcastChannel)'}</span>
       </p>
 
       <section className="secao" style={{ marginBottom: '1rem' }}>
@@ -130,7 +113,7 @@ export default function ControlPanel() {
             Fila ({fila.length})
           </h3>
           {fila.length > 0 && (
-            <button className="icone-botao perigo" onClick={limparForcados}>
+            <button className="icone-botao perigo" onClick={limpar}>
               limpar tudo
             </button>
           )}
@@ -173,7 +156,7 @@ export default function ControlPanel() {
                   {i === 0 && filtro === 'todos' && <span className="vazio">próxima · </span>}
                   [{e.valores.join(', ')}]
                 </span>
-                <button className="icone-botao perigo" onClick={() => removerForcado(e.id)}>
+                <button className="icone-botao perigo" onClick={() => remover(e.id)}>
                   ×
                 </button>
               </div>

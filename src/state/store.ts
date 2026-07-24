@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
@@ -140,6 +140,24 @@ interface Acoes {
 }
 
 type Store = EstadoGlobal & Acoes & EstadoEfemero;
+
+/** Sem-op — usado no bundle do jogador (ver `ehBundleJogador` abaixo). `localStorage`
+ *  nunca é a origem no cliente do jogador (mesa-estatica-multiplayer-completo.md Parte IV
+ *  §4): sem isso, o `useStore` compartilhado (reusado por `FichaEditor`/`*View` nos dois
+ *  bundles) rehidrataria do MESMO localStorage do `GmApp` sempre que os dois rodarem na
+ *  mesma origem — inofensivo em dispositivos separados, mas ainda assim persistiria estado
+ *  do jogador em disco, contra o que a Parte IV pede. */
+const semPersistencia: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+/** `jogador.html`/`entries/jogador.tsx` (ver vite.config.ts) — checado por pathname porque
+ *  a decisão precisa existir antes de qualquer import estático rodar (ordem de avaliação de
+ *  módulos ES não garante que um "flag" setado em código no topo de jogador.tsx rode antes
+ *  das dependências transitivas de PlayerApp, que incluem este arquivo). */
+const ehBundleJogador = typeof window !== 'undefined' && window.location.pathname.includes('jogador.html');
 
 export const useStore = create<Store>()(
   persist(
@@ -715,6 +733,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'estatica-mesa',
+      storage: createJSONStorage(() => (ehBundleJogador ? semPersistencia : localStorage)),
       version: SCHEMA_VERSION,
       partialize: (state) => state,
       migrate: (persistedState, versaoAnterior) => {
