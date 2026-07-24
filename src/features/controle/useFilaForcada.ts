@@ -7,13 +7,8 @@ import {
   pedirEstado,
   removerForcado,
 } from '../../dice/forcarRolagem';
-import {
-  adicionarFilaRemota,
-  fasedAtiva,
-  limparFilaRemota,
-  listarFilaRemota,
-  removerFilaRemota,
-} from '../../multiplayer/rolagemRemota';
+import { adicionarFilaRemota, limparFilaRemota, listarFilaRemota, removerFilaRemota } from '../../multiplayer/filaRemota';
+import { fasedAtiva } from '../../multiplayer/rolagemRemota';
 import { useStore } from '../../state/store';
 
 export interface EntradaFila {

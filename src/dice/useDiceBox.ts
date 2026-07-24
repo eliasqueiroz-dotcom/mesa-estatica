@@ -47,12 +47,20 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  * ordem dos termos na notação (1º termo primeiro, etc.), então a ordem de `termos` aqui precisa
  * bater com a ordem que o valor forçado pretende atingir.
  */
-export async function montarNotacao(termos: RollTermo[], personagemId: string | null = null): Promise<string> {
+export type ResolverRemoto = (termos: RollTermo[], personagemId: string | null) => Promise<number[] | null>;
+
+export async function montarNotacao(
+  termos: RollTermo[],
+  personagemId: string | null = null,
+  resolverRemoto: ResolverRemoto = resolverRolagemRemota,
+): Promise<string> {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
   // Fase D (desligada por padrão — ver rolagemRemota.ts): tenta o servidor primeiro; null
   // cai pro caminho local de sempre (fila local via BroadcastChannel, honesto se vazia).
-  const forcados = (await resolverRolagemRemota(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
+  // `resolverRemoto` é injetável — o PlayerApp usa `resolverRolagemJogador` (sempre tenta o
+  // servidor, sem o gate da flag) em vez do padrão do mestre.
+  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -77,9 +85,10 @@ function paraGrupos(r: RollResults): GrupoResultado[] {
 export async function rolarFallback2D(
   termos: RollTermo[],
   personagemId: string | null = null,
+  resolverRemoto: ResolverRemoto = resolverRolagemRemota,
 ): Promise<GrupoResultado[]> {
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = (await resolverRolagemRemota(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
+  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
   let cursor = 0;
   return termos.map((t) => {
     const rolls: { value: number }[] = [];
@@ -99,7 +108,12 @@ interface PedidoRolagem {
   personagemId: string | null;
 }
 
-export function useDiceBox(containerId: string, enabled = true, baseScale = 100) {
+export function useDiceBox(
+  containerId: string,
+  enabled = true,
+  baseScale = 100,
+  resolverRemoto: ResolverRemoto = resolverRolagemRemota,
+) {
   const boxRef = useRef<DiceBox | null>(null);
   const [ready, setReady] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -191,7 +205,7 @@ export function useDiceBox(containerId: string, enabled = true, baseScale = 100)
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const notacao = await montarNotacao(pedido.termos, pedido.personagemId);
+      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto);
       const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
@@ -217,7 +231,7 @@ export function useDiceBox(containerId: string, enabled = true, baseScale = 100)
     if (modo2D) {
       // sem física rodando, então sem concorrência real pra proteger — resolve na hora (async
       // por dentro só pra poder tentar o servidor primeiro; onComplete dispara quando chegar).
-      void rolarFallback2D(termos, personagemId).then(onComplete);
+      void rolarFallback2D(termos, personagemId, resolverRemoto).then(onComplete);
       return;
     }
     if (!boxRef.current) return;

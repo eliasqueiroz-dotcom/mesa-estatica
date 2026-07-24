@@ -31,26 +31,25 @@ export async function resolverRolagemRemota(termos: Termo[], personagemId: strin
   return data.valores;
 }
 
-type AcaoFila = 'listar' | 'adicionar' | 'remover' | 'limpar';
+/**
+ * Fase 6 (Parte IV §6.5) — versão do jogador: sempre tenta o servidor, sem o gate de
+ * `VITE_FASE_D_ROLAGEM_REMOTA`. Diferente do mestre, o jogador não tem `#controle`/
+ * BroadcastChannel — sem o servidor, não existe "cair pro caminho local" que faça sentido
+ * pra rolagem forçada (só honesto de verdade). Se a chamada falhar, quem chamou cai pra
+ * `Math.random` puro (nunca trava a rolagem por rede fora, mas também nunca é forçável
+ * nesse caminho de erro).
+ */
+export async function resolverRolagemJogador(termos: Termo[], personagemId: string | null): Promise<number[] | null> {
+  if (!supabase) return null;
+  const { data: sessao } = await supabase.auth.getSession();
+  if (!sessao.session) return null;
 
-async function chamarFila<T>(acao: AcaoFila, extra: Record<string, unknown> = {}): Promise<T | null> {
-  if (!fasedAtiva() || !supabase) return null;
-  const { data, error } = await supabase.functions.invoke<T>('gerenciar-fila-forcada', { body: { acao, ...extra } });
-  if (error) {
-    console.error(`[fase-d] gerenciar-fila-forcada (${acao}) falhou`, error);
+  const { data, error } = await supabase.functions.invoke<{ valores: number[] }>('resolver-rolagem', {
+    body: { character_id: personagemId, termos },
+  });
+  if (error || !data) {
+    console.error('[jogador] resolver-rolagem falhou, rolando honesto localmente', error);
     return null;
   }
-  return data ?? null;
+  return data.valores;
 }
-
-export interface EntradaFilaRemota {
-  id: string;
-  character_id: string | null;
-  valores: number[];
-}
-
-export const listarFilaRemota = () => chamarFila<{ fila: EntradaFilaRemota[] }>('listar');
-export const adicionarFilaRemota = (characterId: string | null, valores: number[]) =>
-  chamarFila<{ entrada: EntradaFilaRemota }>('adicionar', { character_id: characterId, valores });
-export const removerFilaRemota = (id: string) => chamarFila<{ ok: true }>('remover', { id });
-export const limparFilaRemota = () => chamarFila<{ ok: true }>('limpar');
