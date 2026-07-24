@@ -89,6 +89,14 @@ Branch `multiplayer/parte-iv-view-jogador`, sem prazo — decisão do usuário d
 
 Faltam: corte do `#controle`/forçado pro transporte novo (Fase D ainda atrás da flag desligada no lado do mestre), tela GM-only pra colar o `gm_token` (hoje só a Edge Function `vincular-mestre` existe, sem UI).
 
+## Polimento — importar personagem via IA (24/07)
+
+Pedido do usuário: os jogadores mandam a ficha em `.docx`; o GM quer converter isso pra dentro da mesa sem redigitar tudo. `ImportarPersonagemBotao.tsx` (GM-only, aba Personagens) abre um modal com um prompt pronto pra colar numa IA qualquer junto do `.docx` — o prompt descreve o formato JSON esperado, a lista das 15 perícias e dos 8 antecedentes, geradas a partir de `PERICIAS`/`ANTECEDENTES` (nunca hardcoded solto, não desalinha se a tabela mudar). O GM cola o JSON que a IA devolver (ou carrega como arquivo) e `importarPersonagem.ts` converte pra `Partial<Ficha>`.
+
+O parser é tolerante de propósito — quem preenche o JSON é uma IA lendo um Word, não o nosso código: antecedente e perícia casam por nome ou id, sem acento/caixa (`ex-policial`/`Ex-policial` tanto faz); grau de perícia aceita "treinado"/"T"/3 e variantes; atributo fora de 0–5 é clampado; PV/Sanidade atuais são calculados a partir dos atributos quando a IA não mandar (`calcularPvMaximo`/`calcularSanidadeMaxima` — evita herdar o default genérico de ficha vazia, que ignora o Vigor/Vontade reais); vínculo/trauma excedente (>3) trunca. Nada disso lança erro — vira aviso, mostrado num resumo ao final da importação; o personagem entra mesmo com campos não reconhecidos, o GM ajusta manualmente pela ficha normal. Reusa `adicionarFicha`/`atualizarFicha` (store) sem action nova.
+
+Testado: 15 testes unitários (casamento de antecedente/perícia, clamp de atributo, truncamento, JSON inválido/formato inesperado) + fluxo completo ao vivo (colar JSON → ficha nova com antecedente/atributos/perícias/derivados corretos, perícia inventada ignorada sem quebrar o resto). Confirmado fora do chunk do jogador (é só GM).
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.

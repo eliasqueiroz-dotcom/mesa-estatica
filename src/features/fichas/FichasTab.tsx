@@ -1,5 +1,6 @@
 import { useStore } from '../../state/store';
 import FichaEditor from './FichaEditor';
+import ImportarPersonagemBotao from './ImportarPersonagemBotao';
 import LinkJogadorBotao from './LinkJogadorBotao';
 import './ficha.css';
 
@@ -23,6 +24,7 @@ export default function FichasTab() {
         <button className="acento" onClick={() => adicionarFicha()}>
           + novo personagem
         </button>
+        <ImportarPersonagemBotao />
         {fichas.map((f) => (
           <button
             key={f.id}
