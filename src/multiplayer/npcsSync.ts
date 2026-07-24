@@ -1,8 +1,12 @@
 import type { Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
+import { criarDebouncePorChave } from './debounce';
 
 type Cliente = NonNullable<typeof supabase>;
+
+/** Mesmo motivo/valor de `fichasSync.ts` — ver `ATRASO_PUSH_MS` lá. */
+const ATRASO_PUSH_MS = 400;
 
 export interface LinhaPublico {
   id: string;
@@ -113,6 +117,10 @@ export function iniciarSyncNpcs(): () => void {
   let aplicandoRemotoContagem = 0;
   let npcsAnteriores = useStore.getState().npcs;
 
+  const agendarPush = criarDebouncePorChave<Npc>(ATRASO_PUSH_MS, (_id, npc) => {
+    empurrarNpc(cliente, npc).catch((e) => console.error('[npcsSync] push falhou', e));
+  });
+
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0 || state.npcs === prevState.npcs) return;
 
@@ -121,9 +129,7 @@ export function iniciarSyncNpcs(): () => void {
 
     for (const npc of state.npcs) {
       const anterior = npcsAnteriores.find((n) => n.id === npc.id);
-      if (anterior !== npc) {
-        empurrarNpc(cliente, npc).catch((e) => console.error('[npcsSync] push falhou', e));
-      }
+      if (anterior !== npc) agendarPush(npc.id, npc);
     }
     for (const idAntigo of idsAnteriores) {
       if (!idsAtuais.has(idAntigo)) {

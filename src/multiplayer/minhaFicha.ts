@@ -13,9 +13,17 @@ interface LinhaPrivado {
 
 /**
  * Bootstrap da "minha ficha" no `PlayerApp` (mesa-estatica-multiplayer-completo.md Parte IV
- * §4, Fase 5 do plano §6.5). `characters_privado` sem filtro de `id` retorna só a linha do
- * jogador — a RLS (`auth_uid = auth.uid()`) já resolve "qual é a minha ficha", ele nunca
- * precisa saber o próprio `character_id` de antemão.
+ * §4, Fase 5 do plano §6.5). `characters_privado` filtrado por `auth_uid = <meu auth.uid()>`
+ * — nunca precisa saber o próprio `character_id` de antemão.
+ *
+ * **Bug real, achado em 24/07** (reproduzido direto contra o banco): a policy de select de
+ * `characters_privado` é `auth_uid = auth.uid() OR is_gm()` — pra uma sessão vinculada como
+ * mestre (a nova tela `VinculoMestre` tornou isso trivial e persistente), um `select` SEM
+ * filtro devolve TODAS as fichas, não só a própria. Com 2+ fichas no banco, `.maybeSingle()`
+ * lança `PGRST116` ("Cannot coerce the result to a single JSON object") em vez de devolver
+ * `null` — o jogador via "link inválido ou ficha ainda não vinculada" com um link
+ * perfeitamente válido, só porque o navegador também tava vinculado como mestre. O filtro
+ * explícito por `auth_uid` deixa a query determinística nos dois casos.
  *
  * Depois do bootstrap, popula o `useStore` compartilhado com essa ÚNICA ficha e liga
  * `iniciarSyncFichas` — o MESMO módulo que o `GmApp` usa. Não existe lógica "sou jogador,
@@ -57,7 +65,17 @@ export function useMinhaFicha(): { carregando: boolean; possuiFicha: boolean } {
       await iniciarAuthMultiplayer();
       if (cancelado) return;
 
-      const { data: privado } = await cliente.from('characters_privado').select('id, dados').maybeSingle();
+      const { data: userData } = await cliente.auth.getUser();
+      if (cancelado || !userData.user) {
+        setCarregando(false);
+        return;
+      }
+
+      const { data: privado } = await cliente
+        .from('characters_privado')
+        .select('id, dados')
+        .eq('auth_uid', userData.user.id)
+        .maybeSingle();
       if (cancelado) return;
       if (!privado) {
         setCarregando(false);

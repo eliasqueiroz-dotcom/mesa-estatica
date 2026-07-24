@@ -2,7 +2,14 @@ import type { BasePV } from '../rules/data/dificuldades';
 import type { Ficha } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
+import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
+
+/** Push debounçado — sem isso, cada tecla digitada numa ficha disparava uma escrita no
+ *  Supabase na hora (visto ao vivo: lag perceptível ao digitar, mais o eco do Realtime
+ *  voltando com um valor levemente atrasado por cima do que acabou de ser digitado). Só a
+ *  edição local (Zustand) continua instantânea; o push espera uma pausa de verdade. */
+const ATRASO_PUSH_MS = 400;
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -114,9 +121,8 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha, basePV: BasePV) {
  * no Supabase. Só adiciona o que falta local (união por id) — nunca sobrescreve uma ficha já
  * carregada, pra não perder uma edição em voo entre o boot e essa resposta.
  *
- * Conhecido: cada mudança de campo dispara um push (sem debounce) — aceitável
- * pro volume de uma mesa pequena, mas campo de texto editado tecla a tecla gera
- * uma escrita por tecla. Revisitar se isso incomodar na prática.
+ * Push debounçado por ficha (`ATRASO_PUSH_MS`, ver `agendarPush` abaixo) — incomodou na
+ * prática (lag ao digitar, visto ao vivo em 24/07) e foi corrigido.
  */
 export function iniciarSyncFichas(): () => void {
   const cliente = supabase;
@@ -133,6 +139,12 @@ export function iniciarSyncFichas(): () => void {
   let aplicandoRemotoContagem = 0;
   let fichasAnteriores = useStore.getState().fichas;
 
+  const agendarPush = criarDebouncePorChave<{ ficha: Ficha; basePV: BasePV }>(ATRASO_PUSH_MS, (_id, { ficha, basePV }) => {
+    empurrarFicha(cliente, ficha, basePV).catch((e) =>
+      console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
+    );
+  });
+
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0 || state.fichas === prevState.fichas) return;
 
@@ -142,11 +154,7 @@ export function iniciarSyncFichas(): () => void {
 
     for (const ficha of state.fichas) {
       const anterior = fichasAnteriores.find((f) => f.id === ficha.id);
-      if (anterior !== ficha) {
-        empurrarFicha(cliente, ficha, basePV).catch((e) =>
-          console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
-        );
-      }
+      if (anterior !== ficha) agendarPush(ficha.id, { ficha, basePV });
     }
     for (const idAntigo of idsAnteriores) {
       if (!idsAtuais.has(idAntigo)) {
