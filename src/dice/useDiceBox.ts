@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
 import { COLORSETS, type ColorsetId } from './colorsets';
 import { consumirForcados } from './forcarRolagem';
+import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
 
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
 export interface RollTermo {
@@ -46,10 +47,12 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  * ordem dos termos na notação (1º termo primeiro, etc.), então a ordem de `termos` aqui precisa
  * bater com a ordem que o valor forçado pretende atingir.
  */
-export function montarNotacao(termos: RollTermo[], personagemId: string | null = null): string {
+export async function montarNotacao(termos: RollTermo[], personagemId: string | null = null): Promise<string> {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = consumirForcados(totalDados, personagemId);
+  // Fase D (desligada por padrão — ver rolagemRemota.ts): tenta o servidor primeiro; null
+  // cai pro caminho local de sempre (fila local via BroadcastChannel, honesto se vazia).
+  const forcados = (await resolverRolagemRemota(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -67,11 +70,16 @@ function paraGrupos(r: RollResults): GrupoResultado[] {
  * Rolagem por matemática pura (Math.random), sem física nem visual 3D — usada quando o WebGL
  * não inicializa (GPU indisponível, driver bloqueado, etc.). Mantém o mesmo shape de resultado
  * dos roladores e ainda respeita valores forçados da janela de controle, pela mesma ordem
- * (1º termo primeiro) que a rolagem física usaria — só sem o dado caindo na tela.
+ * (1º termo primeiro) que a rolagem física usaria — só sem o dado caindo na tela. Async pelo
+ * mesmo motivo de `montarNotacao`: tenta o servidor primeiro (Fase D), cai pro local se a flag
+ * estiver desligada ou a chamada falhar.
  */
-export function rolarFallback2D(termos: RollTermo[], personagemId: string | null = null): GrupoResultado[] {
+export async function rolarFallback2D(
+  termos: RollTermo[],
+  personagemId: string | null = null,
+): Promise<GrupoResultado[]> {
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = consumirForcados(totalDados, personagemId);
+  const forcados = (await resolverRolagemRemota(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
   let cursor = 0;
   return termos.map((t) => {
     const rolls: { value: number }[] = [];
@@ -183,7 +191,8 @@ export function useDiceBox(containerId: string, enabled = true, baseScale = 100)
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const r = await box.roll(montarNotacao(pedido.termos, pedido.personagemId));
+      const notacao = await montarNotacao(pedido.termos, pedido.personagemId);
+      const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
       setErro(String(e));
@@ -206,8 +215,9 @@ export function useDiceBox(containerId: string, enabled = true, baseScale = 100)
   ) => {
     const termos = normalizarTermos(notacao);
     if (modo2D) {
-      // sem física rodando, então sem concorrência real pra proteger — resolve na hora.
-      onComplete(rolarFallback2D(termos, personagemId));
+      // sem física rodando, então sem concorrência real pra proteger — resolve na hora (async
+      // por dentro só pra poder tentar o servidor primeiro; onComplete dispara quando chegar).
+      void rolarFallback2D(termos, personagemId).then(onComplete);
       return;
     }
     if (!boxRef.current) return;
