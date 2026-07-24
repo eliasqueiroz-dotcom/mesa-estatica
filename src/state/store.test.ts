@@ -91,13 +91,19 @@ describe('ajustarSanidadeAtual', () => {
 
   it('dispara surto quando perde 5+ de uma vez', () => {
     const id = adicionarFicha(10);
+    // d20 diferentes (3 e 11) — sem travar, os dois rolamentos tinham 1/20 de chance de
+    // empatar e derrubar esse teste de vez em quando (flakou de verdade em CI em 24/07).
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.5);
     useStore.getState().ajustarSanidadeAtual(id, 4);
+    vi.restoreAllMocks();
     expect(useStore.getState().escolhasSurtoPendentes[id]).toBeDefined();
   });
 
   it('cria entrada com escolha pendente quando d20 diferem', () => {
     const id = adicionarFicha(10);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.5);
     useStore.getState().ajustarSanidadeAtual(id, 4);
+    vi.restoreAllMocks();
     const pendente = useStore.getState().escolhasSurtoPendentes[id];
     expect(pendente).toBeDefined();
     expect(pendente.entradaA).not.toEqual(pendente.entradaB);
