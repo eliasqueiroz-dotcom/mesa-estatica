@@ -102,6 +102,11 @@ export function iniciarSyncSessaoPublica(): () => void {
     }
   };
 
+  // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts): sem isso, uma sessão
+  // sem localStorage prévio pra essa origem só vê a sessão pública a partir da próxima
+  // mudança. Sem linha ainda (nunca sincronizado) é no-op — não pisa no default local.
+  void aplicarRemoto();
+
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('sessao-publica-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sessao_publica' }, () => {

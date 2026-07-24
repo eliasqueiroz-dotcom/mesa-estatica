@@ -60,6 +60,20 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Npc | null> 
   return { ...paraNpcSemNotasMestre(publico as LinhaPublico), notasMestre: (privado as LinhaPrivado | null)?.notas_mestre ?? '' };
 }
 
+/** Busca inicial (ver comentário em `iniciarSyncNpcs`/`fichasSync.ts`). */
+async function buscarTodos(cliente: Cliente): Promise<Npc[]> {
+  const [{ data: publicos }, { data: privados }] = await Promise.all([
+    cliente.from('npcs_publico').select('*'),
+    cliente.from('npcs_privado').select('*'),
+  ]);
+  if (!publicos) return [];
+  const privadosPorId = new Map(((privados ?? []) as LinhaPrivado[]).map((p) => [p.id, p]));
+  return (publicos as LinhaPublico[]).map((publico) => ({
+    ...paraNpcSemNotasMestre(publico),
+    notasMestre: privadosPorId.get(publico.id)?.notas_mestre ?? '',
+  }));
+}
+
 /** Cria as duas linhas (se novo) ou atualiza as existentes — sempre GM (§8: só o mestre
  *  cria/edita NPC), diferente de fichas onde o dono também escreve. */
 async function empurrarNpc(cliente: Cliente, npc: Npc) {
@@ -149,6 +163,21 @@ export function iniciarSyncNpcs(): () => void {
 
   const idDoPayload = (payload: { new: object; old: object }) =>
     (payload.new as { id?: string }).id ?? (payload.old as { id?: string }).id;
+
+  (async () => {
+    const remotos = await buscarTodos(cliente);
+    if (remotos.length === 0) return;
+    aplicandoRemotoContagem++;
+    try {
+      const s = useStore.getState();
+      const idsLocais = new Set(s.npcs.map((n) => n.id));
+      const faltando = remotos.filter((n) => !idsLocais.has(n.id));
+      if (faltando.length > 0) useStore.setState({ npcs: [...s.npcs, ...faltando] });
+    } finally {
+      npcsAnteriores = useStore.getState().npcs;
+      aplicandoRemotoContagem--;
+    }
+  })();
 
   const canalPublico = cliente
     .channel('npcs-publico-sync')

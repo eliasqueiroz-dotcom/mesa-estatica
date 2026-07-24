@@ -49,6 +49,9 @@ export function iniciarSyncMapaPublico(): () => void {
     }
   };
 
+  // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts) — sem linha ainda é no-op.
+  void aplicarRemoto();
+
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('mapa-publico-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, () => {
