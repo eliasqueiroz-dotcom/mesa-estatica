@@ -40,8 +40,18 @@ export function useMinhaFicha(): { carregando: boolean; possuiFicha: boolean } {
       return;
     }
 
+    // `iniciarSyncFichas()` liga SÍNCRONO, antes de qualquer await — StrictMode roda
+    // mount→cleanup→mount em dev, e cleanup1 dispara SÍNCRONO logo depois do mount1 (sem
+    // esperar nenhuma promise). Chamar isso depois de um `await` deixava uma janela onde o
+    // cleanup do primeiro mount já tinha rodado (com `pararSync` ainda no placeholder
+    // no-op) antes do `iniciarSyncFichas()` da PRIMEIRA instância terminar de subir —
+    // vazava uma assinatura órfã que nunca era parada. Sintoma real observado: duas
+    // assinaturas empurrando a mesma ficha em paralelo — a órfã, com seu próprio
+    // `aplicandoRemoto` nunca setado, reage ao eco Realtime da instância viva como se
+    // fosse edição local e reempurra dados velhos (centenas de requests, sem parar).
+    // Chamando aqui, síncrono, cleanup1 sempre alcança a instância certa: zero janela.
+    const pararSync = iniciarSyncFichas();
     let cancelado = false;
-    let pararSync = () => {};
 
     (async () => {
       await iniciarAuthMultiplayer();
@@ -75,20 +85,6 @@ export function useMinhaFicha(): { carregando: boolean; possuiFicha: boolean } {
       }));
       setPossuiFicha(true);
       setCarregando(false);
-
-      // StrictMode roda mount→cleanup→mount em dev — se o cleanup do primeiro mount já
-      // disparou enquanto este IIFE ainda estava em algum dos awaits acima, `cancelado`
-      // já é true aqui e o cleanup NUNCA vai chamar este `parar` (ele só conhece o
-      // `pararSync` do efeito que está rodando agora). Sem este checkpoint, a instância
-      // do primeiro mount vaza — duas assinaturas de `iniciarSyncFichas` ativas ao mesmo
-      // tempo tentam empurrar a mesma ficha em paralelo, e uma delas lê a linha antes da
-      // outra terminar de criá-la, tentando INSERT numa linha que já existe → RLS derruba.
-      const parar = iniciarSyncFichas();
-      if (cancelado) {
-        parar();
-      } else {
-        pararSync = parar;
-      }
     })();
 
     return () => {

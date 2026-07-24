@@ -75,10 +75,14 @@ export function iniciarSyncSessaoPublica(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
-  let aplicandoRemoto = false;
+  // Contador, não boolean — ver comentário equivalente em fichasSync.ts. Aqui a janela de
+  // corrida é mais estreita (só 1 tabela, sem await entre marcar a flag e o setState), mas
+  // edições rápidas em sequência (texto sem debounce, ROADMAP já documenta isso) ainda podem
+  // disparar `aplicarRemoto` concorrentes — mais seguro contar do que assumir que nunca sobrepõe.
+  let aplicandoRemotoContagem = 0;
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
-    if (aplicandoRemoto || state.sessaoPublica === prevState.sessaoPublica) return;
+    if (aplicandoRemotoContagem > 0 || state.sessaoPublica === prevState.sessaoPublica) return;
     cliente
       .from('sessao_publica')
       .upsert({ id: ID_SESSAO, ...paraLinha(state.sessaoPublica) })
@@ -90,11 +94,11 @@ export function iniciarSyncSessaoPublica(): () => void {
   const aplicarRemoto = async () => {
     const { data, error } = await cliente.from('sessao_publica').select('*').eq('id', ID_SESSAO).maybeSingle();
     if (error || !data) return;
-    aplicandoRemoto = true;
+    aplicandoRemotoContagem++;
     try {
       useStore.setState({ sessaoPublica: paraSessaoPublica(data as Linha) });
     } finally {
-      aplicandoRemoto = false;
+      aplicandoRemotoContagem--;
     }
   };
 

@@ -93,11 +93,14 @@ export function iniciarSyncNpcs(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
-  let aplicandoRemoto = false;
+  // Contador, não boolean — mesmo motivo de fichasSync.ts: npcs_publico/npcs_privado disparam
+  // dois eventos Realtime pra um push só, e um boolean simples deixa o primeiro `aplicarRemoto`
+  // a terminar zerar a flag enquanto o segundo ainda está em voo (loop exponencial de eco).
+  let aplicandoRemotoContagem = 0;
   let npcsAnteriores = useStore.getState().npcs;
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
-    if (aplicandoRemoto || state.npcs === prevState.npcs) return;
+    if (aplicandoRemotoContagem > 0 || state.npcs === prevState.npcs) return;
 
     const idsAnteriores = new Set(npcsAnteriores.map((n) => n.id));
     const idsAtuais = new Set(state.npcs.map((n) => n.id));
@@ -130,7 +133,7 @@ export function iniciarSyncNpcs(): () => void {
   });
 
   const aplicarRemoto = async (id: string) => {
-    aplicandoRemoto = true;
+    aplicandoRemotoContagem++;
     try {
       const npcRemoto = await buscarEMontar(cliente, id);
       if (!npcRemoto) return;
@@ -140,7 +143,7 @@ export function iniciarSyncNpcs(): () => void {
       useStore.setState({ npcs });
     } finally {
       npcsAnteriores = useStore.getState().npcs;
-      aplicandoRemoto = false;
+      aplicandoRemotoContagem--;
     }
   };
 

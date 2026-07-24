@@ -101,11 +101,19 @@ export function iniciarSyncFichas(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
-  let aplicandoRemoto = false;
+  // Contador, não boolean: characters_publico e characters_privado disparam DOIS eventos
+  // Realtime separados pra um único push local (empurrarFicha escreve nas duas tabelas em
+  // sequência), cada um com seu próprio `aplicarRemoto` assíncrono. Com um boolean simples,
+  // o primeiro a terminar (finally) zera a flag ENQUANTO o segundo ainda está em voo — o
+  // setState do segundo passa pelo guard como se fosse edição local de verdade e reempurra
+  // pro servidor, que ecoa de novo, que reempurra nulo... loop exponencial (visto ao vivo:
+  // uma escolha de Surto virou milhares de requests em menos de um minuto). Contador só
+  // libera quando TODAS as aplicações remotas em voo terminarem.
+  let aplicandoRemotoContagem = 0;
   let fichasAnteriores = useStore.getState().fichas;
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
-    if (aplicandoRemoto || state.fichas === prevState.fichas) return;
+    if (aplicandoRemotoContagem > 0 || state.fichas === prevState.fichas) return;
 
     const basePV = state.config.basePV;
     const idsAnteriores = new Set(fichasAnteriores.map((f) => f.id));
@@ -141,7 +149,7 @@ export function iniciarSyncFichas(): () => void {
   });
 
   const aplicarRemoto = async (id: string) => {
-    aplicandoRemoto = true;
+    aplicandoRemotoContagem++;
     try {
       const fichaRemota = await buscarEMontar(cliente, id);
       if (!fichaRemota) return;
@@ -151,7 +159,7 @@ export function iniciarSyncFichas(): () => void {
       useStore.setState({ fichas });
     } finally {
       fichasAnteriores = useStore.getState().fichas;
-      aplicandoRemoto = false;
+      aplicandoRemotoContagem--;
     }
   };
 
