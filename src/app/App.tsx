@@ -3,6 +3,7 @@ import DadosTab from '../features/dados/DadosTab';
 import QuickRollOverlay from '../features/dados/QuickRollOverlay';
 import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
+import VinculoMestre from '../features/multiplayer/VinculoMestre';
 import NpcsTab from '../features/npcs/NpcsTab';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlay from '../features/sessao/AlertaOverlay';
@@ -202,7 +203,10 @@ export default function App() {
             })}
           </nav>
         </div>
-        <ExportarImportar abrirControle={abrirControle} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <VinculoMestre />
+          <ExportarImportar abrirControle={abrirControle} />
+        </div>
       </header>
       <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>

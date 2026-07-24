@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
 // Memoiza a execução em voo — `PlayerApp` chama `iniciarAuthMultiplayer()` de mais de um
@@ -47,4 +48,42 @@ async function executar(): Promise<void> {
     const { error } = await cliente.functions.invoke('vincular-mestre', { body: { gm_token: gmToken } });
     if (error) console.error('[multiplayer] vincular-mestre falhou', error);
   }
+}
+
+async function extrairErroFuncao(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const corpo = await error.context.json();
+      if (typeof corpo?.erro === 'string') return corpo.erro;
+    } catch {
+      // corpo não era JSON — cai no fallback abaixo
+    }
+  }
+  return 'falha de rede — confira a conexão';
+}
+
+export type ResultadoVinculo = { ok: true } | { ok: false; erro: string };
+
+/**
+ * Vínculo de mestre disparado pela UI (`VinculoMestre.tsx`), não pela URL — mesma Edge
+ * Function que `?gm=` já usa dentro de `executar()` acima, sem duplicar o bootstrap de
+ * sessão anônima (reusa `iniciarAuthMultiplayer()`, já memoizado).
+ */
+export async function vincularComoMestre(gmToken: string): Promise<ResultadoVinculo> {
+  const cliente = supabase;
+  if (!cliente) return { ok: false, erro: 'multiplayer não configurado nesta máquina' };
+  await iniciarAuthMultiplayer();
+  const { error } = await cliente.functions.invoke('vincular-mestre', { body: { gm_token: gmToken } });
+  if (!error) return { ok: true };
+  return { ok: false, erro: await extrairErroFuncao(error) };
+}
+
+/** Consulta a função SQL `is_gm()` (migração 0002) via RPC — um boolean literal, sem os
+ *  falsos positivos/negativos de tentar inferir o vínculo lendo uma tabela GM-only (uma
+ *  linha vazia por RLS e uma tabela genuinamente vazia parecem a mesma coisa). */
+export async function consultarIsGm(): Promise<boolean> {
+  const cliente = supabase;
+  if (!cliente) return false;
+  const { data, error } = await cliente.rpc('is_gm');
+  return !error && data === true;
 }
