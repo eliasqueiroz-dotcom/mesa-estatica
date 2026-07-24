@@ -4,19 +4,29 @@ import QuickRollOverlayJogador from '../features/dados/QuickRollOverlayJogador';
 import FichaEditor from '../features/fichas/FichaEditor';
 import FichaPublicaView from '../features/fichas/FichaPublicaView';
 import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
+import MapaJogadorView from '../features/mapa/MapaJogadorView';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
-import { useFichasPublicas, useHidratarSessaoPublica, useIniciativaPublica, useNpcsPublicos } from '../multiplayer/hidratacaoJogador';
+import { iniciarAuthMultiplayer } from '../multiplayer/auth';
+import {
+  useFichasPublicas,
+  useHidratarMapaPublico,
+  useHidratarSessaoPublica,
+  useIniciativaPublica,
+  useNpcsPublicos,
+} from '../multiplayer/hidratacaoJogador';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
+import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
 
-type AbaId = 'sessao' | 'personagens' | 'dados' | 'npcs';
+type AbaId = 'sessao' | 'personagens' | 'dados' | 'npcs' | 'mapa';
 
 const ABAS: { id: AbaId; label: string }[] = [
   { id: 'sessao', label: 'Sessão' },
   { id: 'personagens', label: 'Personagens' },
   { id: 'dados', label: 'Dados' },
   { id: 'npcs', label: 'NPCs & Combate' },
+  { id: 'mapa', label: 'Mapa' },
 ];
 
 /**
@@ -37,13 +47,29 @@ export default function PlayerApp() {
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
 
   useHidratarSessaoPublica();
+  useHidratarMapaPublico();
   const { carregando, possuiFicha } = useMinhaFicha();
   const minhaFicha = useStore((s) => s.fichas.find((f) => f.id === s.fichaAtivaId) ?? null);
   const outrasFichas = useFichasPublicas().filter((f) => f.id !== minhaFicha?.id);
   const npcs = useNpcsPublicos();
   const iniciativa = useIniciativaPublica();
 
-  // atalhos: 1-4 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel —
+  // sync de tokens (posição no mapa) — mesmo módulo do GmApp (App.tsx), RLS ainda aberta
+  // pra `tokens` desde a Fase A; gated pela mesma auth anônima que `useMinhaFicha` já dispara.
+  useEffect(() => {
+    let pararTokens = () => {};
+    let cancelado = false;
+    iniciarAuthMultiplayer().then(() => {
+      if (cancelado) return;
+      pararTokens = iniciarSyncTokens();
+    });
+    return () => {
+      cancelado = true;
+      pararTokens();
+    };
+  }, []);
+
+  // atalhos: 1-5 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel —
   // mesmo padrão de App.tsx, ignorado enquanto o foco está num campo de texto.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -52,7 +78,7 @@ export default function PlayerApp() {
         alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
       if (digitando || e.ctrlKey || e.altKey || e.metaKey) return;
 
-      const indiceAba = '1234'.indexOf(e.key);
+      const indiceAba = '12345'.indexOf(e.key);
       if (indiceAba !== -1) {
         setAba(ABAS[indiceAba].id);
         return;
@@ -162,6 +188,23 @@ export default function PlayerApp() {
             <DadosTabJogador ficha={minhaFicha} active={aba === 'dados'} />
           ) : (
             <p className="vazio">sem ficha vinculada — nada pra rolar.</p>
+          )}
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'mapa' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'mapa' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          {possuiFicha && minhaFicha ? (
+            <MapaJogadorView minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} iniciativa={iniciativa} />
+          ) : (
+            <p className="vazio" style={{ padding: '1.5rem' }}>
+              sem ficha vinculada — sem token pra mostrar no mapa.
+            </p>
           )}
         </div>
         <div

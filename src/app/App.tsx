@@ -12,6 +12,7 @@ import { useStore } from '../state/store';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
+import { iniciarSyncMapaPublico } from '../multiplayer/mapaPublicoSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
@@ -108,6 +109,7 @@ export default function App() {
     let pararNpcs = () => {};
     let pararSessaoPublica = () => {};
     let pararIniciativa = () => {};
+    let pararMapaPublico = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -116,6 +118,7 @@ export default function App() {
       pararNpcs = iniciarSyncNpcs();
       pararSessaoPublica = iniciarSyncSessaoPublica();
       pararIniciativa = iniciarSyncIniciativa();
+      pararMapaPublico = iniciarSyncMapaPublico();
     });
     return () => {
       cancelado = true;
@@ -124,6 +127,7 @@ export default function App() {
       pararNpcs();
       pararSessaoPublica();
       pararIniciativa();
+      pararMapaPublico();
     };
   }, []);
 

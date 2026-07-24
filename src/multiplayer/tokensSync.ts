@@ -43,6 +43,23 @@ export function iniciarSyncTokens(): () => void {
   let aplicandoRemoto = false;
   let tokensAnteriores = useStore.getState().mapa.tokens;
 
+  // busca inicial — sem isso, uma sessão sem localStorage (bundle do jogador; ou o GM numa
+  // máquina limpa, ver CLAUDE.md "portabilidade") só veria tokens a partir da próxima
+  // mudança, nunca os que já existiam. `aplicandoRemoto` evita ecoar de volta pro servidor.
+  cliente
+    .from('tokens')
+    .select('*')
+    .then(({ data, error }) => {
+      if (error || !data) return;
+      aplicandoRemoto = true;
+      try {
+        useStore.setState((s) => ({ mapa: { ...s.mapa, tokens: (data as LinhaTokenSupabase[]).map(paraToken) } }));
+      } finally {
+        tokensAnteriores = useStore.getState().mapa.tokens;
+        aplicandoRemoto = false;
+      }
+    });
+
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemoto || state.mapa.tokens === prevState.mapa.tokens) return;
 

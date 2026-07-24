@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EntradaIniciativa, Npc } from '../state/types';
+import type { EntradaIniciativa, GradeMapa, Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
@@ -45,6 +45,46 @@ export function useHidratarSessaoPublica(): void {
         if (payload.eventType !== 'DELETE') {
           useStore.setState({ sessaoPublica: paraSessaoPublica(payload.new as LinhaSessaoPublica) });
         }
+      })
+      .subscribe();
+
+    return () => {
+      cancelado = true;
+      cliente.removeChannel(canal);
+    };
+  }, []);
+}
+
+/**
+ * Fundo do mapa (`imagemDataUrl`/`grade`) — mesmo padrão de `useHidratarSessaoPublica`: vai
+ * pro `useStore` compartilhado porque `MapaJogadorView` reusa a mesma leitura `s.mapa` que o
+ * `MapaTab` do mestre. `mapa.tokens` fica de fora — isso é `tokensSync.ts` (tabela própria),
+ * ligado direto no `PlayerApp` igual ao `GmApp`, RLS já aberta pra tokens desde a Fase A.
+ */
+export function useHidratarMapaPublico(): void {
+  useEffect(() => {
+    const cliente = supabase;
+    if (!cliente) return;
+
+    let cancelado = false;
+
+    cliente
+      .from('mapa_publico')
+      .select('*')
+      .eq('id', 'mapa')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelado || !data) return;
+        const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
+        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: linha.grade } }));
+      });
+
+    const canal = cliente
+      .channel('jogador-mapa-publico')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, (payload) => {
+        if (payload.eventType === 'DELETE') return;
+        const linha = payload.new as { imagem_data_url: string | null; grade: GradeMapa };
+        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: linha.grade } }));
       })
       .subscribe();
 
