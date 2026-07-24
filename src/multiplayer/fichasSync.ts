@@ -114,7 +114,9 @@ export function iniciarSyncFichas(): () => void {
     for (const ficha of state.fichas) {
       const anterior = fichasAnteriores.find((f) => f.id === ficha.id);
       if (anterior !== ficha) {
-        empurrarFicha(cliente, ficha, basePV).catch((e) => console.error('[fichasSync] push falhou', e));
+        empurrarFicha(cliente, ficha, basePV).catch((e) =>
+          console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
+        );
       }
     }
     for (const idAntigo of idsAnteriores) {

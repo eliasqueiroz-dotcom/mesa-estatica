@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import FichaEditor from '../features/fichas/FichaEditor';
 import FichaPublicaView from '../features/fichas/FichaPublicaView';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
-import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { useFichasPublicas, useHidratarSessaoPublica, useNpcsPublicos } from '../multiplayer/hidratacaoJogador';
+import { useMinhaFicha } from '../multiplayer/minhaFicha';
+import { useStore } from '../state/store';
 
 type AbaId = 'sessao' | 'personagens' | 'npcs';
 
@@ -15,22 +17,21 @@ const ABAS: { id: AbaId; label: string }[] = [
 
 /**
  * App reduzido do jogador (mesa-estatica-multiplayer-completo.md Parte IV §2, §5) — monta só as
- * `*View` de leitura. Sem `ControlPanel`, `FichaEditor`, `NpcsTab`, `MapaTab`, `DadosTab`,
- * `LogTab` de mestre; sem `#controle`. Hidratado via Realtime (§6.4) — `fichas`/`npcs` vêm de
- * `characters_publico`/`npcs_publico` (RLS já filtra `visivel`), `sessaoPublica` do store
- * compartilhado (`FichaPublicaView`/`SessaoPublicaView` leem de lá diretamente). Sem
- * Supabase configurado, as listas ficam vazias — não há fallback pro store local do GM
- * (esse é só do `GmApp`, §13). A própria ficha do jogador (editável) e o rolador próprio
- * (`resolver-rolagem`) ainda não entram aqui — Fase 5 do plano.
+ * `*View` de leitura + `FichaEditor` pra própria ficha. Sem `ControlPanel`, `FichasTab`,
+ * `NpcsTab`, `MapaTab`, `DadosTab`, `LogTab` de mestre; sem `#controle`. Hidratado via Realtime
+ * (§6.4) — `fichas` (dos outros)/`npcs` vêm de `characters_publico`/`npcs_publico` em estado
+ * local (RLS já filtra `visivel`), `sessaoPublica` e a própria ficha vão pro `useStore`
+ * compartilhado (`useMinhaFicha` — `FichaEditor`/`AtributosDerivadosSection`/`DinheiroSection`
+ * já leem/escrevem via esse store, reuso sem modificação). Rolador próprio
+ * (`resolver-rolagem`) ainda não entra aqui — Fase 6 do plano.
  */
 export default function PlayerApp() {
   const [aba, setAba] = useState<AbaId>('sessao');
 
-  useEffect(() => {
-    void iniciarAuthMultiplayer();
-  }, []);
   useHidratarSessaoPublica();
-  const fichas = useFichasPublicas();
+  const { carregando, possuiFicha } = useMinhaFicha();
+  const minhaFicha = useStore((s) => s.fichas.find((f) => f.id === s.fichaAtivaId) ?? null);
+  const outrasFichas = useFichasPublicas().filter((f) => f.id !== minhaFicha?.id);
   const npcs = useNpcsPublicos();
 
   return (
@@ -69,11 +70,20 @@ export default function PlayerApp() {
       <main style={{ flex: 1, overflow: 'auto', padding: '1.5rem' }}>
         {aba === 'sessao' && <SessaoPublicaView />}
         {aba === 'personagens' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {fichas.length === 0 ? (
-              <p className="vazio">nenhum personagem na mesa ainda.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {carregando ? (
+              <p className="vazio">sintonizando...</p>
+            ) : possuiFicha && minhaFicha ? (
+              <FichaEditor ficha={minhaFicha} />
             ) : (
-              fichas.map((f) => <FichaPublicaView key={f.id} ficha={f} />)
+              <p className="vazio">link inválido ou ficha ainda não vinculada — confira com o mestre.</p>
+            )}
+            {outrasFichas.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {outrasFichas.map((f) => (
+                  <FichaPublicaView key={f.id} ficha={f} />
+                ))}
+              </div>
             )}
           </div>
         )}
