@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DadosTabJogador from '../features/dados/DadosTabJogador';
+import QuickRollOverlayJogador from '../features/dados/QuickRollOverlayJogador';
 import FichaEditor from '../features/fichas/FichaEditor';
 import FichaPublicaView from '../features/fichas/FichaPublicaView';
+import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
-import { useFichasPublicas, useHidratarSessaoPublica, useNpcsPublicos } from '../multiplayer/hidratacaoJogador';
+import { useFichasPublicas, useHidratarSessaoPublica, useIniciativaPublica, useNpcsPublicos } from '../multiplayer/hidratacaoJogador';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { useStore } from '../state/store';
 
@@ -14,28 +16,61 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'sessao', label: 'Sessão' },
   { id: 'personagens', label: 'Personagens' },
   { id: 'dados', label: 'Dados' },
-  { id: 'npcs', label: 'NPCs' },
+  { id: 'npcs', label: 'NPCs & Combate' },
 ];
 
 /**
  * App reduzido do jogador (mesa-estatica-multiplayer-completo.md Parte IV §2, §5, Fase 6) —
- * monta só as `*View` de leitura + `FichaEditor`/rolador pra própria ficha. Sem `ControlPanel`,
- * `FichasTab`, `NpcsTab`, `MapaTab`, `DadosTab`/roladores de mestre, `LogTab`; sem `#controle`.
- * Hidratado via Realtime (§6.4) — `fichas` (dos outros)/`npcs` vêm de
- * `characters_publico`/`npcs_publico` em estado local (RLS já filtra `visivel`), `sessaoPublica`
- * e a própria ficha vão pro `useStore` compartilhado (`useMinhaFicha` — `FichaEditor` já
- * lê/escreve via esse store, reuso sem modificação). Abas por `visibility`/`pointer-events`
- * (não renderização condicional) — mesmo padrão de `App.tsx`, importante aqui porque
- * desmontar `DadosTabJogador` reinicializaria a física 3D do zero a cada troca de aba.
+ * monta só as `*View` de leitura + `FichaEditor`/roladores/`QuickRollOverlayJogador` pra
+ * própria ficha. Sem `ControlPanel`, `FichasTab`, `NpcsTab`, `MapaTab`, `DadosTab`/roladores de
+ * mestre, `LogTab`; sem `#controle`. Hidratado via Realtime (§6.4) — `fichas` (dos
+ * outros)/`npcs` vêm de `characters_publico`/`npcs_publico` em estado local (RLS já filtra
+ * `visivel`), `sessaoPublica` e a própria ficha vão pro `useStore` compartilhado
+ * (`useMinhaFicha` — `FichaEditor` já lê/escreve via esse store, reuso sem modificação). Abas
+ * por `visibility`/`pointer-events` (não renderização condicional) — mesmo padrão de
+ * `App.tsx`, importante aqui porque desmontar `DadosTabJogador` reinicializaria a física 3D
+ * do zero a cada troca de aba.
  */
 export default function PlayerApp() {
   const [aba, setAba] = useState<AbaId>('sessao');
+  const [overlayAberto, setOverlayAberto] = useState(false);
+  const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
 
   useHidratarSessaoPublica();
   const { carregando, possuiFicha } = useMinhaFicha();
   const minhaFicha = useStore((s) => s.fichas.find((f) => f.id === s.fichaAtivaId) ?? null);
   const outrasFichas = useFichasPublicas().filter((f) => f.id !== minhaFicha?.id);
   const npcs = useNpcsPublicos();
+  const iniciativa = useIniciativaPublica();
+
+  // atalhos: 1-4 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel —
+  // mesmo padrão de App.tsx, ignorado enquanto o foco está num campo de texto.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null;
+      const digitando =
+        alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
+      if (digitando || e.ctrlKey || e.altKey || e.metaKey) return;
+
+      const indiceAba = '1234'.indexOf(e.key);
+      if (indiceAba !== -1) {
+        setAba(ABAS[indiceAba].id);
+        return;
+      }
+      const tecla = e.key.toLowerCase();
+      if (tecla === 'r') {
+        setOverlayAberto((prev) => {
+          if (!prev) return true;
+          setPedidosRolagemRapida((n) => n + 1);
+          return true;
+        });
+      } else if (tecla === 'x') {
+        setOverlayAberto(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -141,6 +176,7 @@ export default function PlayerApp() {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {minhaFicha && <CombateJogadorView iniciativa={iniciativa} minhaFichaId={minhaFicha.id} />}
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>
             ) : (
@@ -149,6 +185,15 @@ export default function PlayerApp() {
           </div>
         </div>
       </main>
+      {possuiFicha && minhaFicha && (
+        <QuickRollOverlayJogador
+          ficha={minhaFicha}
+          abaAtual={aba}
+          aberto={overlayAberto}
+          onAbertoChange={setOverlayAberto}
+          pedidoRolagem={pedidosRolagemRapida}
+        />
+      )}
     </div>
   );
 }

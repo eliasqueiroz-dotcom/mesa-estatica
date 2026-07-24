@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { Npc } from '../state/types';
+import type { EntradaIniciativa, Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
 import type { FichaPublica } from './fichaSplit';
+import { paraEntrada, type LinhaIniciativa } from './iniciativaSync';
 import { paraNpcSemNotasMestre, type LinhaPublico as LinhaNpcPublico } from './npcsSync';
 import { paraSessaoPublica, type Linha as LinhaSessaoPublica } from './sessaoPublicaSync';
 
@@ -130,4 +131,42 @@ export function useNpcsPublicos(): Omit<Npc, 'notasMestre'>[] {
   }, []);
 
   return npcs;
+}
+
+export function useIniciativaPublica(): EntradaIniciativa[] {
+  const [iniciativa, setIniciativa] = useState<EntradaIniciativa[]>([]);
+
+  useEffect(() => {
+    const cliente = supabase;
+    if (!cliente) return;
+
+    let cancelado = false;
+
+    // Ordem importa (quem joga antes de quem) — refaz o fetch completo, ordenado por
+    // `posicao`, em qualquer mudança, em vez de tentar remendar o array localmente. Mesmo
+    // padrão de `iniciativaSync.ts` (GM), só que sem o lado de escrita.
+    const buscar = () => {
+      cliente
+        .from('iniciativa')
+        .select('*')
+        .order('posicao', { ascending: true })
+        .then(({ data }) => {
+          if (!cancelado && data) setIniciativa((data as LinhaIniciativa[]).map(paraEntrada));
+        });
+    };
+
+    buscar();
+
+    const canal = cliente
+      .channel('jogador-iniciativa')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iniciativa' }, buscar)
+      .subscribe();
+
+    return () => {
+      cancelado = true;
+      cliente.removeChannel(canal);
+    };
+  }, []);
+
+  return iniciativa;
 }

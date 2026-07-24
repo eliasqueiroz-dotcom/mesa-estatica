@@ -1,7 +1,10 @@
 import { useDiceBox } from '../../dice/useDiceBox';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import type { Ficha } from '../../state/types';
+import RoladorSanidadeJogador from './RoladorSanidadeJogador';
+import RoladorSurtoJogador from './RoladorSurtoJogador';
 import RoladorTesteJogador from './RoladorTesteJogador';
+import RoladorTraumaJogador from './RoladorTraumaJogador';
 
 interface Props {
   ficha: Ficha;
@@ -12,9 +15,10 @@ interface Props {
  * Aba de dados do jogador (Fase 6, mesa-estatica-multiplayer-completo.md §6.5) — mesma
  * bandeja física de `DadosTab.tsx`, mas `useDiceBox` recebe `resolverRolagemJogador` em vez
  * do padrão do mestre: sempre tenta `resolver-rolagem` (sem o gate de
- * `VITE_FASE_D_ROLAGEM_REMOTA`, que só existe pra validação incremental do mestre). Só o
- * rolador de teste da própria ficha — sem Sanidade/Surto/Trauma/rolagem livre, que são
- * fluxos do mestre.
+ * `VITE_FASE_D_ROLAGEM_REMOTA`, que só existe pra validação incremental do mestre). Os 4
+ * roladores da própria ficha (Teste/Sanidade/Surto/Trauma) — sem rolagem livre nem seletor
+ * de PC/NPC, que são fluxos do mestre. Sanidade só mostra os dados brutos (não aplica a
+ * perda) — ver comentário em `RoladorSanidadeJogador.tsx`.
  */
 export default function DadosTabJogador({ ficha, active = true }: Props) {
   const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja-jogador', active, 100, resolverRolagemJogador);
@@ -45,6 +49,9 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
       <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
+      <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
+      <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
+      <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
     </div>
   );
 }

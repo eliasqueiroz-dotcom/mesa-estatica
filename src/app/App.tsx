@@ -11,6 +11,7 @@ import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
+import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
@@ -98,13 +99,15 @@ export default function App() {
   };
 
   // Multiplayer Fases A+B (mesa-estatica-multiplayer-completo.md §11): sessão anônima +
-  // vínculo por URL primeiro, sync de tokens/fichas/npcs/sessão via Supabase Realtime depois
-  // — nessa ordem, pra RLS já enxergar auth.uid() na primeira assinatura. Vira no-op sem env vars.
+  // vínculo por URL primeiro, sync de tokens/fichas/npcs/sessão/iniciativa via Supabase
+  // Realtime depois — nessa ordem, pra RLS já enxergar auth.uid() na primeira assinatura.
+  // Vira no-op sem env vars.
   useEffect(() => {
     let pararTokens = () => {};
     let pararFichas = () => {};
     let pararNpcs = () => {};
     let pararSessaoPublica = () => {};
+    let pararIniciativa = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -112,6 +115,7 @@ export default function App() {
       pararFichas = iniciarSyncFichas();
       pararNpcs = iniciarSyncNpcs();
       pararSessaoPublica = iniciarSyncSessaoPublica();
+      pararIniciativa = iniciarSyncIniciativa();
     });
     return () => {
       cancelado = true;
@@ -119,6 +123,7 @@ export default function App() {
       pararFichas();
       pararNpcs();
       pararSessaoPublica();
+      pararIniciativa();
     };
   }, []);
 
