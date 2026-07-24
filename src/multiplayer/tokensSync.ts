@@ -1,7 +1,14 @@
 import type { TokenMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
+import { criarDebouncePorChave } from './debounce';
 import { computarDiffTokens } from './tokensDiff';
+
+/** Mais curto que o de fichas/npcs (`ATRASO_PUSH_MS` em `fichasSync.ts`) — posição de token
+ *  no mapa quer parecer "ao vivo" pros outros participantes; ainda assim, junta a rajada de
+ *  `pointermove` de um arrasto (dezenas por segundo) numa escrita só, em vez de uma por
+ *  evento — era a causa do lag ao arrastar token (visto ao vivo em 24/07). */
+const ATRASO_PUSH_MS = 150;
 
 interface LinhaTokenSupabase {
   id: string;
@@ -60,20 +67,22 @@ export function iniciarSyncTokens(): () => void {
       }
     });
 
+  const agendarUpsert = criarDebouncePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
+    cliente
+      .from('tokens')
+      .upsert(paraLinha(token))
+      .then(({ error }) => {
+        if (error) console.error('[tokensSync] upsert falhou', error);
+      });
+  });
+
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemoto || state.mapa.tokens === prevState.mapa.tokens) return;
 
     const { upserts, removidos } = computarDiffTokens(tokensAnteriores, state.mapa.tokens);
     tokensAnteriores = state.mapa.tokens;
 
-    if (upserts.length > 0) {
-      cliente
-        .from('tokens')
-        .upsert(upserts.map(paraLinha))
-        .then(({ error }) => {
-          if (error) console.error('[tokensSync] upsert falhou', error);
-        });
-    }
+    for (const token of upserts) agendarUpsert(token.id, token);
     for (const id of removidos) {
       cliente
         .from('tokens')

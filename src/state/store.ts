@@ -159,6 +159,45 @@ const semPersistencia: StateStorage = {
  *  das dependências transitivas de PlayerApp, que incluem este arquivo). */
 const ehBundleJogador = typeof window !== 'undefined' && window.location.pathname.includes('jogador.html');
 
+/** `localStorage.setItem` do estado inteiro rodava em CADA `set()` — uma tecla digitada
+ *  numa ficha, um `pointermove` arrastando um token no mapa, cada um serializando e gravando
+ *  a mesa inteira em disco. Debounça só a ESCRITA (a atualização local do Zustand continua
+ *  instantânea — teclar/arrastar não fica menos responsivo); grava a última versão até
+ *  `ATRASO_STORAGE_MS` depois da última mudança. `pagehide`/`visibilitychange` forçam a
+ *  gravação pendente antes de fechar a aba — sem isso, a última tecla digitada bem antes de
+ *  fechar podia nunca chegar no disco. */
+const ATRASO_STORAGE_MS = 400;
+
+function criarStorageComDebounce(bruto: Storage): StateStorage {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pendente: { chave: string; valor: string } | null = null;
+
+  const gravarAgora = () => {
+    if (!pendente) return;
+    bruto.setItem(pendente.chave, pendente.valor);
+    pendente = null;
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pagehide', gravarAgora);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') gravarAgora();
+    });
+  }
+
+  return {
+    getItem: (chave) => bruto.getItem(chave),
+    removeItem: (chave) => bruto.removeItem(chave),
+    setItem: (chave, valor) => {
+      pendente = { chave, valor };
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(gravarAgora, ATRASO_STORAGE_MS);
+    },
+  };
+}
+
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
@@ -733,7 +772,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: 'estatica-mesa',
-      storage: createJSONStorage(() => (ehBundleJogador ? semPersistencia : localStorage)),
+      storage: createJSONStorage(() => (ehBundleJogador ? semPersistencia : criarStorageComDebounce(localStorage))),
       version: SCHEMA_VERSION,
       partialize: (state) => state,
       migrate: (persistedState, versaoAnterior) => {
