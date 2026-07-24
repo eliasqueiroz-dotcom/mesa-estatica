@@ -49,6 +49,24 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null
   return montarFicha(paraFichaPublica(publico as LinhaPublico), (privado as LinhaPrivado).dados);
 }
 
+/** Busca inicial (ver comentário em `iniciarSyncFichas`) — só monta fichas que existirem nas
+ *  duas tabelas (mesmo critério de `buscarEMontar`); a RLS de `characters_privado` já decide
+ *  quantas linhas voltam (dono só a própria, GM todas). */
+async function buscarTodas(cliente: Cliente): Promise<Ficha[]> {
+  const [{ data: publicos }, { data: privados }] = await Promise.all([
+    cliente.from('characters_publico').select('*'),
+    cliente.from('characters_privado').select('*'),
+  ]);
+  if (!publicos || !privados) return [];
+  const privadosPorId = new Map((privados as LinhaPrivado[]).map((p) => [p.id, p]));
+  const fichas: Ficha[] = [];
+  for (const publico of publicos as LinhaPublico[]) {
+    const privado = privadosPorId.get(publico.id);
+    if (privado) fichas.push(montarFicha(paraFichaPublica(publico), privado.dados));
+  }
+  return fichas;
+}
+
 /**
  * Cria a linha nova (com owner_token fresco, só GM pode) ou atualiza uma existente.
  * Nunca escreve owner_token/auth_uid numa linha já existente — isso é exclusivo
@@ -89,9 +107,12 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha, basePV: BasePV) {
  * diretamente contra o banco; o cliente do jogador propriamente dito (bundle
  * separado, sem código de mestre) é a Parte IV, ainda não implementada.
  *
- * Conhecido: uma ficha só sincroniza pela primeira vez quando é editada depois
- * que esta sync liga — fichas locais pré-existentes não fazem "seed" automático
- * (isso é a Parte V §3, passo separado). Mesmo comportamento da Fase A com tokens.
+ * Busca inicial na primeira assinatura (mesmo motivo do fix em `tokensSync.ts`): sem isso,
+ * uma sessão sem `localStorage` prévio pra essa origem (máquina nova, ou — caso real que
+ * expôs isso — o domínio do GitHub Pages mudando de dono, que troca a origem e zera o
+ * `localStorage` do navegador) mostra a lista de fichas vazia mesmo com fichas já existindo
+ * no Supabase. Só adiciona o que falta local (união por id) — nunca sobrescreve uma ficha já
+ * carregada, pra não perder uma edição em voo entre o boot e essa resposta.
  *
  * Conhecido: cada mudança de campo dispara um push (sem debounce) — aceitável
  * pro volume de uma mesa pequena, mas campo de texto editado tecla a tecla gera
@@ -165,6 +186,21 @@ export function iniciarSyncFichas(): () => void {
 
   const idDoPayload = (payload: { new: object; old: object }) =>
     (payload.new as { id?: string }).id ?? (payload.old as { id?: string }).id;
+
+  (async () => {
+    const remotas = await buscarTodas(cliente);
+    if (remotas.length === 0) return;
+    aplicandoRemotoContagem++;
+    try {
+      const s = useStore.getState();
+      const idsLocais = new Set(s.fichas.map((f) => f.id));
+      const faltando = remotas.filter((f) => !idsLocais.has(f.id));
+      if (faltando.length > 0) useStore.setState({ fichas: [...s.fichas, ...faltando] });
+    } finally {
+      fichasAnteriores = useStore.getState().fichas;
+      aplicandoRemotoContagem--;
+    }
+  })();
 
   const canalPublico = cliente
     .channel('fichas-publico-sync')
