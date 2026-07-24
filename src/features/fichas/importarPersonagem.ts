@@ -206,7 +206,11 @@ export function importarFichasDeJSON(texto: string, basePV: BasePV): ResultadoIm
   try {
     dados = JSON.parse(texto);
   } catch {
-    return { resultados: [], erroGeral: 'JSON inválido — confira se copiou a resposta inteira, sem texto antes/depois.' };
+    return {
+      resultados: [],
+      erroGeral:
+        'JSON inválido — confira se copiou a resposta inteira, sem texto antes/depois, e se não sobrou aspas duplas (") sem escapar dentro de um texto (apelido, citação — ex.: "Arthur "Ghost" Santiago" precisa virar "Arthur \\"Ghost\\" Santiago" ou usar aspas simples).',
+    };
   }
   const lista = Array.isArray(dados) ? dados : [dados];
   if (lista.length === 0 || !lista.every((d) => d && typeof d === 'object')) {

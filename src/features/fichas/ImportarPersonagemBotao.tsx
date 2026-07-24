@@ -5,7 +5,7 @@ import { useStore } from '../../state/store';
 import { importarFichasDeJSON, type ResultadoImportacao } from './importarPersonagem';
 
 const EXEMPLO = {
-  nome: 'Marta Andrade',
+  nome: "Marta 'Sombra' Andrade",
   jogador: 'nome de quem joga',
   antecedente: 'Jornalista independente',
   motivo: 'perdeu a fonte que ia provar o Incidente',
@@ -38,6 +38,7 @@ Regras de preenchimento:
 - "pericias": chave é o id ou nome da perícia (${perícias}); valor é "nenhum", "treinado" ou "veterano".
 - "vinculos" e "traumas": no máximo 3 cada.
 - "corVisual" (opcional): só se a ficha tiver uma cor definida, em hex tipo "#4fc1d4" — senão omita.
+- apelido ou citação dentro de um texto: use aspas simples ('assim'), nunca aspas duplas sem escapar — aspas duplas cruas dentro de um valor quebram o JSON (veja "nome" no exemplo acima).
 - Responda só com o JSON, sem markdown, sem comentário antes ou depois.
 
 Aqui está a ficha:
