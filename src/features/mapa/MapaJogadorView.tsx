@@ -6,10 +6,11 @@ import { personagemEstaEmSurto } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha, Npc } from '../../state/types';
+import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
 import TokenOverlayJogador from './TokenOverlayJogador';
 import './mapa.css';
-import { getImgRenderRect, iniciaisToken } from './mapaUtils';
+import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
 
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup no próprio token conta como clique, não arrasto
 
@@ -120,7 +121,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     : null;
 
   const posicaoDoPonteiro = (e: React.PointerEvent) => {
-    const rect = containerRef.current!.getBoundingClientRect();
+    const rect = retanguloConteudo(containerRef.current!);
     const imgEl = imgRef.current;
     if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
       const imgR = getImgRenderRect(rect.width, rect.height, imgEl.naturalWidth, imgEl.naturalHeight);
@@ -135,6 +136,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     arrastandoRef.current = true;
     inicioCliqueRef.current = { x: e.clientX, y: e.clientY };
+    marcarTokenEmArrasto(meuToken.id);
   };
 
   const mover = (e: React.PointerEvent) => {
@@ -149,6 +151,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
       const dist = Math.hypot(e.clientX - inicioClique.x, e.clientY - inicioClique.y);
       if (dist < LIMIAR_CLIQUE) setOverlay({ tipo: 'pc', participanteId: minhaFicha.id });
     }
+    if (meuToken) desmarcarTokenEmArrasto(meuToken.id);
     arrastandoRef.current = false;
     inicioCliqueRef.current = null;
   };
@@ -183,24 +186,13 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
               className="mapa-grade"
               style={
                 {
-                  left: `${mapa.grade.x}%`,
-                  top: `${mapa.grade.y}%`,
-                  width: `${mapa.grade.largura}%`,
-                  height: `${mapa.grade.altura}%`,
+                  ...retanguloGradeEmPx(imgRenderRect, mapa.grade),
                   '--grade-colunas': mapa.grade.colunas,
                   '--grade-linhas': mapa.grade.linhas,
                 } as React.CSSProperties
               }
             />
-            <div
-              className="mapa-grade-caixa"
-              style={{
-                left: `${mapa.grade.x}%`,
-                top: `${mapa.grade.y}%`,
-                width: `${mapa.grade.largura}%`,
-                height: `${mapa.grade.altura}%`,
-              }}
-            />
+            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, mapa.grade)} />
           </>
         )}
 

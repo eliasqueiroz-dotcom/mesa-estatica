@@ -120,7 +120,7 @@ interface Acoes {
     patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop'>>,
   ) => void;
 
-  registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
+  registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
   limparLog: () => void;
 
   registrarRoll: (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
@@ -619,13 +619,14 @@ export const useStore = create<Store>()(
       atualizarEstadoMidia: (patch) =>
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
 
-      registrarLog: (tipo, texto, personagemId = null) => {
+      registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
         const entrada: EntradaLog = {
           id: crypto.randomUUID(),
           timestamp: new Date().toISOString(),
           tipo,
           personagemId,
           texto,
+          ...(visibilidade ? { visibilidade } : {}),
         };
         set((s) => ({ log: [entrada, ...s.log] }));
         if (TIPOS_ROLAGEM.includes(tipo)) {

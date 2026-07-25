@@ -151,6 +151,9 @@ export interface EntradaLog {
   tipo: TipoLog;
   personagemId: string | null;
   texto: string;
+  /** Só setado quando a rolagem associada é privada (mesma semântica de `EntradaRoll.visibilidade`)
+   *  — ausente/undefined trata como pública. Sem migração de schema: campo aditivo opcional. */
+  visibilidade?: 'publica' | 'privada';
 }
 
 export interface EntradaRoll {

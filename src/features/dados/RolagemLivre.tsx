@@ -68,7 +68,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
         .join(' · ');
       const total = resultados.reduce((soma, g) => soma + g.value, 0);
       const texto = `Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
-      registrarLog('rolagem-livre', texto, null);
+      registrarLog('rolagem-livre', texto, null, visibilidade);
 
       if (modo === 'npc' && npc) {
         const origem = npc.nome || 'NPC';

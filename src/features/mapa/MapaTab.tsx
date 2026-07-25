@@ -10,8 +10,9 @@ import { comprimirImagem } from './comprimirImagem';
 import CombatOverlay from './CombatOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
-import { getImgRenderRect, iniciaisToken } from './mapaUtils';
+import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
 import TokenOverlay from './TokenOverlay';
+import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 
 const LARGURA_ALTURA_MINIMA = 2; // % — evita a caixa do grid colapsar a zero arrastando uma alça
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup em um token conta como clique, não arrasto
@@ -106,9 +107,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     }
   };
 
-  /** posição do ponteiro em % de .mapa-area — mesma conversão usada por token, mover e alças. */
+  /** posição do ponteiro em % de .mapa-area (caixa de conteúdo, sem a borda) — mesma
+   *  conversão usada por token, mover e alças. */
   const posPercentual = (e: React.PointerEvent) => {
-    const rect = containerRef.current!.getBoundingClientRect();
+    const rect = retanguloConteudo(containerRef.current!);
     return { px: ((e.clientX - rect.left) / rect.width) * 100, py: ((e.clientY - rect.top) / rect.height) * 100 };
   };
 
@@ -117,6 +119,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     arrastoRef.current = { tipo: 'token', id };
     inicioCliqueRef.current = { x: e.clientX, y: e.clientY };
+    marcarTokenEmArrasto(id);
   };
 
   const iniciarMoverGrade = (e: React.PointerEvent) => {
@@ -143,7 +146,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     if (!estado || !container) return;
 
     if (estado.tipo === 'token') {
-      const rect = container.getBoundingClientRect();
+      const rect = retanguloConteudo(container);
       const imgEl = imgRef.current;
       let x: number, y: number;
       if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
@@ -196,11 +199,14 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const soltarArrasto = (e: React.PointerEvent) => {
     const estado = arrastoRef.current;
     const inicioClique = inicioCliqueRef.current;
-    if (estado?.tipo === 'token' && inicioClique) {
-      const dist = Math.hypot(e.clientX - inicioClique.x, e.clientY - inicioClique.y);
-      if (dist < LIMIAR_CLIQUE) {
-        const token = mapa.tokens.find((t) => t.id === estado.id);
-        if (token) setTokenOverlay({ tipo: token.tipo, id: token.participanteId });
+    if (estado?.tipo === 'token') {
+      desmarcarTokenEmArrasto(estado.id);
+      if (inicioClique) {
+        const dist = Math.hypot(e.clientX - inicioClique.x, e.clientY - inicioClique.y);
+        if (dist < LIMIAR_CLIQUE) {
+          const token = mapa.tokens.find((t) => t.id === estado.id);
+          if (token) setTokenOverlay({ tipo: token.tipo, id: token.participanteId });
+        }
       }
     }
     arrastoRef.current = null;
@@ -278,24 +284,13 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
               className="mapa-grade"
               style={
                 {
-                  left: `${mapa.grade.x}%`,
-                  top: `${mapa.grade.y}%`,
-                  width: `${mapa.grade.largura}%`,
-                  height: `${mapa.grade.altura}%`,
+                  ...retanguloGradeEmPx(imgRenderRect, mapa.grade),
                   '--grade-colunas': mapa.grade.colunas,
                   '--grade-linhas': mapa.grade.linhas,
                 } as React.CSSProperties
               }
             />
-            <div
-              className="mapa-grade-caixa"
-              style={{
-                left: `${mapa.grade.x}%`,
-                top: `${mapa.grade.y}%`,
-                width: `${mapa.grade.largura}%`,
-                height: `${mapa.grade.altura}%`,
-              }}
-            >
+            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, mapa.grade)}>
               <div
                 className="mapa-grade-mover"
                 onPointerDown={iniciarMoverGrade}

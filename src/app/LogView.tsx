@@ -81,12 +81,15 @@ export default function LogView({ podeLimpar }: { podeLimpar: boolean }) {
 
   const logFiltrado = useMemo(() => {
     return log.filter((e) => {
+      // defesa em profundidade — igual RolsSection: rolagem privada só aparece pra quem pode limpar
+      // (mestre). registrarLog embute o resultado no texto livre, então filtra aqui também.
+      const passaPrivacidade = podeLimpar || e.visibilidade !== 'privada';
       const passaPersonagem = filtroPersonagem === 'todos' || e.personagemId === filtroPersonagem;
       const passaTipo = filtroTipo === 'todos' || e.tipo === filtroTipo;
       const passaTexto = filtroTexto.trim() === '' || e.texto.toLowerCase().includes(filtroTexto.toLowerCase());
-      return passaPersonagem && passaTipo && passaTexto;
+      return passaPrivacidade && passaPersonagem && passaTipo && passaTexto;
     });
-  }, [filtroPersonagem, filtroTexto, filtroTipo, log]);
+  }, [filtroPersonagem, filtroTexto, filtroTipo, log, podeLimpar]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
