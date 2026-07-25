@@ -8,6 +8,7 @@ import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha, Npc } from '../../state/types';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
+import CombatOverlayJogador from './CombatOverlayJogador';
 import TokenOverlayJogador from './TokenOverlayJogador';
 import './mapa.css';
 import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
@@ -223,6 +224,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             </div>
           );
         })}
+        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} />
       </div>
 
       {overlay && (
