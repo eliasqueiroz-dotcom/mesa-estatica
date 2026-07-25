@@ -142,15 +142,30 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         )}
 
         {mapa.grade.ativa && (
-          <div
-            className="mapa-grade-caixa"
-            style={{
-              left: `${mapa.grade.x}%`,
-              top: `${mapa.grade.y}%`,
-              width: `${mapa.grade.largura}%`,
-              height: `${mapa.grade.altura}%`,
-            }}
-          />
+          <>
+            <div
+              className="mapa-grade"
+              style={
+                {
+                  left: `${mapa.grade.x}%`,
+                  top: `${mapa.grade.y}%`,
+                  width: `${mapa.grade.largura}%`,
+                  height: `${mapa.grade.altura}%`,
+                  '--grade-colunas': mapa.grade.colunas,
+                  '--grade-linhas': mapa.grade.linhas,
+                } as React.CSSProperties
+              }
+            />
+            <div
+              className="mapa-grade-caixa"
+              style={{
+                left: `${mapa.grade.x}%`,
+                top: `${mapa.grade.y}%`,
+                width: `${mapa.grade.largura}%`,
+                height: `${mapa.grade.altura}%`,
+              }}
+            />
+          </>
         )}
 
         {tamanho.width > 0 && (
