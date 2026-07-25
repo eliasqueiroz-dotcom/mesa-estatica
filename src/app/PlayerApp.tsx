@@ -244,7 +244,9 @@ export default function PlayerApp() {
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {minhaFicha && <CombateJogadorView iniciativa={iniciativa} minhaFichaId={minhaFicha.id} />}
+            {minhaFicha && (
+              <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} />
+            )}
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>
             ) : (

@@ -19,6 +19,7 @@ export interface LinhaPublico {
   cor_visual: string;
   pv_atual: number;
   pv_maximo: number;
+  defesa: number;
   surtos_ativos: Ficha['surtosAtivos'];
 }
 
@@ -35,6 +36,7 @@ const paraLinhaPublico = (p: FichaPublica): LinhaPublico => ({
   cor_visual: p.corVisual,
   pv_atual: p.pvAtual,
   pv_maximo: p.pvMaximo,
+  defesa: p.defesa,
   surtos_ativos: p.surtosAtivos,
 });
 
@@ -44,6 +46,7 @@ export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
   corVisual: r.cor_visual,
   pvAtual: r.pv_atual,
   pvMaximo: r.pv_maximo,
+  defesa: r.defesa,
   surtosAtivos: r.surtos_ativos,
 });
 
