@@ -13,6 +13,7 @@ describe('dividirFicha / montarFicha', () => {
       corVisual: ficha.corVisual,
       pvAtual: 15,
       pvMaximo: 30, // 20 + 5*2
+      defesa: 10, // 10 + agilidade 0 + equipamentoModificadorDefesa 0 (padrão de criarFichaVazia)
       surtosAtivos: ficha.surtosAtivos,
     });
     expect(privado).not.toHaveProperty('nome');

@@ -1,0 +1,107 @@
+import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import { descricaoSurto } from '../../rules/data/surto';
+import BarraSegmentada from '../fichas/BarraSegmentada';
+
+interface Props {
+  nome: string;
+  cor: string;
+  pvAtual: number;
+  pvMaximo: number;
+  defesa: number;
+  condicoes?: string[];
+  surtoAtivo?: boolean;
+  surtoEscolha?: string | null;
+  /** Sem PV/Sanidade editável por padrão — jogador só ajusta a própria ficha (ver `TokenOverlayJogador`). */
+  editavel?: boolean;
+  sanidadeAtual?: number;
+  sanidadeMaxima?: number;
+  /** Deltas, não valor absoluto — quem chama soma no valor atual antes de despachar pro store
+   *  (mesmo padrão de `StepperLinha` em `TokenOverlay.tsx`). */
+  onAjustarPv?: (delta: number) => void;
+  onAjustarSanidade?: (delta: number) => void;
+}
+
+function Stepper({ label, atual, maximo, onAjustar }: { label: string; atual: number; maximo: number; onAjustar: (delta: number) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+      <span className="vazio" style={{ fontSize: 12 }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <button className="icone-botao" onClick={() => onAjustar(-1)}>−</button>
+        <span className="mono">{atual} / {maximo}</span>
+        <button className="icone-botao" onClick={() => onAjustar(1)}>+</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Resumo de combatente (mesa-estatica-multiplayer-completo.md Parte IV §4) — nome/cor, PV,
+ * Defesa, condições e surto ativo, num shape normalizado (não preso a `Ficha`/`Npc`/`FichaPublica`)
+ * pra servir de célula em 3 lugares: linha de `CombateJogadorView` (sempre read-only), overlay do
+ * próprio token (`editavel`), overlay de PC alheio/NPC no mapa (read-only). Read-only por padrão —
+ * `editavel` só liga steppers de PV/Sanidade; condições continuam sempre read-only aqui (quem
+ * controla é o mestre, ver `TokenOverlay.tsx`).
+ */
+export default function CombatenteResumo({
+  nome,
+  cor,
+  pvAtual,
+  pvMaximo,
+  defesa,
+  condicoes = [],
+  surtoAtivo = false,
+  surtoEscolha = null,
+  editavel = false,
+  sanidadeAtual,
+  sanidadeMaxima,
+  onAjustarPv,
+  onAjustarSanidade,
+}: Props) {
+  return (
+    <div className="combatente-resumo">
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+        <span
+          aria-hidden
+          style={{ background: cor, width: 12, height: 12, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }}
+        />
+        <span className="mono" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {nome || 'sem nome'}
+        </span>
+        <span className="vazio" style={{ fontSize: 12 }}>
+          🛡 <span className="mono">{defesa}</span>
+        </span>
+      </div>
+
+      {editavel && onAjustarPv ? (
+        <Stepper label="PV" atual={pvAtual} maximo={pvMaximo} onAjustar={onAjustarPv} />
+      ) : (
+        <BarraSegmentada atual={pvAtual} maximo={pvMaximo} variante="pv" />
+      )}
+
+      {editavel && onAjustarSanidade && sanidadeAtual !== undefined && sanidadeMaxima !== undefined && (
+        <div style={{ marginTop: '0.4rem' }}>
+          <Stepper label="Sanidade" atual={sanidadeAtual} maximo={sanidadeMaxima} onAjustar={onAjustarSanidade} />
+        </div>
+      )}
+
+      {(surtoAtivo || condicoes.length > 0) && (
+        <div className="combate-condicoes" style={{ marginTop: '0.5rem' }}>
+          {surtoAtivo && (
+            <span
+              className="badge"
+              style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}
+              title={surtoEscolha ? descricaoSurto(surtoEscolha) : undefined}
+            >
+              surto{surtoEscolha ? `: ${surtoEscolha}` : ' ativo'}
+            </span>
+          )}
+          {condicoes.map((c) => (
+            <span key={c} className="combate-chip" title={c}>
+              {nomeCondicao(c)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

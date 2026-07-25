@@ -1,14 +1,17 @@
 import type { BasePV } from '../rules/data/dificuldades';
-import { calcularPvMaximo } from '../rules/derivados';
+import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
 import type { Ficha } from '../state/types';
 
-/** Superfície de mesa (mesa-estatica-multiplayer-completo.md Parte IV §3): o que qualquer participante vê de um PC. */
+/** Superfície de mesa (mesa-estatica-multiplayer-completo.md Parte IV §3): o que qualquer participante vê de um PC.
+ *  `defesa` é derivada (agilidade/equipamentoModificadorDefesa continuam privados) — recomputada
+ *  a cada push, mesma cadência de `pvMaximo`. */
 export interface FichaPublica {
   id: string;
   nome: string;
   corVisual: string;
   pvAtual: number;
   pvMaximo: number;
+  defesa: number;
   surtosAtivos: Ficha['surtosAtivos'];
 }
 
@@ -24,6 +27,7 @@ export function dividirFicha(ficha: Ficha, basePV: BasePV): { publico: FichaPubl
       corVisual,
       pvAtual,
       pvMaximo: calcularPvMaximo(basePV, ficha.atributos.vigor),
+      defesa: calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa),
       surtosAtivos,
     },
     privado,
