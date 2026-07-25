@@ -493,3 +493,58 @@ describe('converterDinheiro', () => {
     });
   });
 });
+
+describe('midia', () => {
+  describe('adicionarFaixaMidia/removerFaixaMidia/moverFaixaMidia', () => {
+    it('adiciona faixa com ordem incremental e retorna o id', () => {
+      const id1 = useStore.getState().adicionarFaixaMidia('faixa 1', 'p1.mp3', 'https://x.test/p1.mp3');
+      const id2 = useStore.getState().adicionarFaixaMidia('faixa 2', 'p2.mp3', 'https://x.test/p2.mp3');
+      const faixas = useStore.getState().midia.faixas;
+      expect(faixas.map((f) => f.id)).toEqual([id1, id2]);
+      expect(faixas.map((f) => f.ordem)).toEqual([0, 1]);
+    });
+
+    it('remover a faixa atual limpa faixaAtualId e para o playback', () => {
+      const id = useStore.getState().adicionarFaixaMidia('faixa 1', 'p1.mp3', 'https://x.test/p1.mp3');
+      useStore.getState().atualizarEstadoMidia({ faixaAtualId: id, tocando: true });
+      useStore.getState().removerFaixaMidia(id);
+      expect(useStore.getState().midia.faixaAtualId).toBeNull();
+      expect(useStore.getState().midia.tocando).toBe(false);
+    });
+
+    it('remover uma faixa que não é a atual não mexe no playback', () => {
+      const idAtual = useStore.getState().adicionarFaixaMidia('atual', 'p1.mp3', 'https://x.test/p1.mp3');
+      const idOutra = useStore.getState().adicionarFaixaMidia('outra', 'p2.mp3', 'https://x.test/p2.mp3');
+      useStore.getState().atualizarEstadoMidia({ faixaAtualId: idAtual, tocando: true });
+      useStore.getState().removerFaixaMidia(idOutra);
+      expect(useStore.getState().midia.faixaAtualId).toBe(idAtual);
+      expect(useStore.getState().midia.tocando).toBe(true);
+    });
+
+    it('moverFaixaMidia troca ordem com o vizinho', () => {
+      const idA = useStore.getState().adicionarFaixaMidia('a', 'pa.mp3', 'https://x.test/pa.mp3');
+      const idB = useStore.getState().adicionarFaixaMidia('b', 'pb.mp3', 'https://x.test/pb.mp3');
+      useStore.getState().moverFaixaMidia(idB, 'cima');
+      const ordenadas = [...useStore.getState().midia.faixas].sort((f1, f2) => f1.ordem - f2.ordem);
+      expect(ordenadas.map((f) => f.id)).toEqual([idB, idA]);
+    });
+
+    it('moverFaixaMidia nas bordas é no-op', () => {
+      const idA = useStore.getState().adicionarFaixaMidia('a', 'pa.mp3', 'https://x.test/pa.mp3');
+      const antes = useStore.getState().midia.faixas;
+      useStore.getState().moverFaixaMidia(idA, 'cima');
+      expect(useStore.getState().midia.faixas).toBe(antes);
+    });
+  });
+
+  describe('atualizarEstadoMidia', () => {
+    it('aplica o patch e recarimba atualizadoEm', () => {
+      const antes = useStore.getState().midia.atualizadoEm;
+      useStore.getState().atualizarEstadoMidia({ tocando: true, posicaoSegundos: 12 });
+      const midia = useStore.getState().midia;
+      expect(midia.tocando).toBe(true);
+      expect(midia.posicaoSegundos).toBe(12);
+      expect(midia.atualizadoEm).not.toBe(antes);
+    });
+  });
+});

@@ -250,6 +250,30 @@ export interface EstadoMapa {
   grade: GradeMapa;
 }
 
+export type ModoLoopMidia = 'nenhum' | 'faixa' | 'lista';
+
+export interface FaixaMidia {
+  id: string;
+  nome: string;
+  /** caminho do objeto dentro do bucket 'midia' do Supabase Storage. */
+  path: string;
+  /** URL pública já resolvida no upload (bucket público — sem expiração). */
+  url: string;
+  ordem: number;
+  criadoEm: string; // ISO
+}
+
+export interface EstadoMidia {
+  faixas: FaixaMidia[];
+  faixaAtualId: string | null;
+  tocando: boolean;
+  posicaoSegundos: number;
+  /** ISO — timestamp do último push do GM; base do cálculo de posição esperada nos outros
+   *  clientes (ver src/multiplayer/posicaoMidia.ts). */
+  atualizadoEm: string;
+  modoLoop: ModoLoopMidia;
+}
+
 export interface EstadoGlobal {
   schemaVersion: number;
   sessaoPublica: SessaoPublica;
@@ -259,6 +283,7 @@ export interface EstadoGlobal {
   npcs: Npc[];
   iniciativa: EntradaIniciativa[];
   mapa: EstadoMapa;
+  midia: EstadoMidia;
   log: EntradaLog[];
   rollsLog: EntradaRoll[];
   config: EstadoConfig;
