@@ -282,6 +282,9 @@ export interface EstadoMidia {
    *  clientes (ver src/multiplayer/posicaoMidia.ts). */
   atualizadoEm: string;
   modoLoop: ModoLoopMidia;
+  /** Só o GM ajusta (slider em MidiaTab.tsx) — sincronizado pra todo mundo ouvir no mesmo
+   *  nível. Mudo continua local a cada jogador (MidiaPlayerJogador.tsx), não faz parte disso. */
+  volume: number;
 }
 
 export interface EstadoGlobal {

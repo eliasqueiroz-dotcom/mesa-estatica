@@ -18,9 +18,10 @@ export interface Linha {
   posicao_segundos: number;
   modo_loop: ModoLoopMidia;
   atualizado_em: string;
+  volume: number;
 }
 
-export type PatchEstadoMidia = Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'atualizadoEm'>;
+export type PatchEstadoMidia = Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'atualizadoEm' | 'volume'>;
 
 const paraLinha = (m: PatchEstadoMidia): Omit<Linha, 'id'> => ({
   faixa_atual_id: m.faixaAtualId,
@@ -28,6 +29,7 @@ const paraLinha = (m: PatchEstadoMidia): Omit<Linha, 'id'> => ({
   posicao_segundos: m.posicaoSegundos,
   modo_loop: m.modoLoop,
   atualizado_em: m.atualizadoEm,
+  volume: m.volume,
 });
 
 export const paraEstadoMidia = (r: Linha): PatchEstadoMidia => ({
@@ -36,6 +38,7 @@ export const paraEstadoMidia = (r: Linha): PatchEstadoMidia => ({
   posicaoSegundos: r.posicao_segundos,
   modoLoop: r.modo_loop,
   atualizadoEm: r.atualizado_em,
+  volume: r.volume,
 });
 
 let aplicandoRemotoContagem = 0;
@@ -67,17 +70,18 @@ export function iniciarSyncMidiaEstado(): () => void {
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0) return;
-    const { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm } = state.midia;
+    const { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume } = state.midia;
     const anterior = prevState.midia;
     if (
       faixaAtualId === anterior.faixaAtualId &&
       tocando === anterior.tocando &&
       posicaoSegundos === anterior.posicaoSegundos &&
-      modoLoop === anterior.modoLoop
+      modoLoop === anterior.modoLoop &&
+      volume === anterior.volume
     ) {
       return;
     }
-    agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm });
+    agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume });
   });
 
   const aplicarRemoto = async () => {

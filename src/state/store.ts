@@ -117,7 +117,7 @@ interface Acoes {
   /** Patch genérico de playback — sempre recarimba `atualizadoEm`. Todo transporte
    *  (play/pause/seek/próxima/anterior/loop/fim-de-faixa) passa por aqui. */
   atualizarEstadoMidia: (
-    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop'>>,
+    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'volume'>>,
   ) => void;
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
@@ -837,6 +837,7 @@ export const useStore = create<Store>()(
             posicaoSegundos: 0,
             atualizadoEm: new Date(0).toISOString(),
             modoLoop: d.midia?.modoLoop ?? 'nenhum',
+            volume: typeof d.midia?.volume === 'number' ? d.midia.volume : 0.8,
           },
           log: d.log ?? [],
           rollsLog: d.rollsLog ?? [],
@@ -959,6 +960,10 @@ export const useStore = create<Store>()(
         // nunca o número — ver AlertaOverlayJogador.tsx).
         if (versaoAnterior < 15) {
           estado.sessaoPublica = { ameaca: 0, ruidoNarrativo: 0, ...(estado.sessaoPublica ?? {}) };
+        }
+        // v15 → v16: volume da música sincronizado (só o GM ajusta).
+        if (versaoAnterior < 16) {
+          estado.midia = { volume: 0.8, ...(estado.midia ?? {}) };
         }
         return estado as Store;
       },

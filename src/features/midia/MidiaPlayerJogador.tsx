@@ -8,13 +8,14 @@ import { useStore } from '../../state/store';
  * espelha o que o mestre manda, sempre com o limiar de desvio (não existe "ação local" aqui
  * pra pular a checagem, diferente do lado do mestre).
  *
- * Volume/mudo são sempre locais — nunca sincronizados (cada jogador ajusta o próprio).
+ * Volume é controlado só pelo GM (`midia.volume`, sincronizado — slider em `MidiaTab.tsx`) —
+ * decisão do usuário, todo mundo ouve no mesmo nível. Mudo continua local (cada jogador
+ * silencia só pra si, sem afetar os outros nem precisar de permissão do mestre).
  */
 export default function MidiaPlayerJogador() {
   const midia = useStore((s) => s.midia);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [desbloqueado, setDesbloqueado] = useState(false);
-  const [volume, setVolume] = useState(0.8);
   const [mudo, setMudo] = useState(false);
 
   const faixaAtual = midia.faixas.find((f) => f.id === midia.faixaAtualId) ?? null;
@@ -37,8 +38,8 @@ export default function MidiaPlayerJogador() {
   }, [midia.faixaAtualId, midia.tocando, midia.atualizadoEm, desbloqueado]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
-  }, [volume]);
+    if (audioRef.current) audioRef.current.volume = midia.volume;
+  }, [midia.volume]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.muted = mudo;
@@ -79,19 +80,9 @@ export default function MidiaPlayerJogador() {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {faixaAtual ? faixaAtual.nome : 'sem áudio tocando'}
             </span>
-            <button className="icone-botao" onClick={() => setMudo((m) => !m)} title={mudo ? 'ativar som' : 'mudo'}>
+            <button className="icone-botao" onClick={() => setMudo((m) => !m)} title={mudo ? 'ativar som' : 'mudo (só pra você)'}>
               {mudo ? 'mudo' : 'som'}
             </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              style={{ width: '60px' }}
-              title="volume"
-            />
           </>
         )}
       </div>
