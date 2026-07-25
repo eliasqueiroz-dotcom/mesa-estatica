@@ -50,6 +50,10 @@ export default function MidiaPlayerGM() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [midia.faixaAtualId, midia.tocando, midia.atualizadoEm]);
 
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = midia.volume;
+  }, [midia.volume]);
+
   const aoTerminar = () => {
     const s = useStore.getState();
     const ordenadas = [...s.midia.faixas].sort((a, b) => a.ordem - b.ordem);

@@ -126,10 +126,11 @@ export function criarEstadoMidia(): EstadoMidia {
     posicaoSegundos: 0,
     atualizadoEm: new Date(0).toISOString(),
     modoLoop: 'nenhum',
+    volume: 0.8,
   };
 }
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

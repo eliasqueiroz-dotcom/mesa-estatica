@@ -143,6 +143,20 @@ export default function MidiaTab() {
             loop: {rotuloLoop}
           </button>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="vazio" style={{ fontSize: 12 }} title="volume — vale pra todo mundo, mestre e jogadores">
+            volume (todos)
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={midia.volume}
+            onChange={(e) => atualizarEstadoMidia({ volume: Number(e.target.value) })}
+            style={{ width: '120px' }}
+          />
+        </div>
       </div>
 
       <div className="secao" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
