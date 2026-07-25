@@ -2,6 +2,7 @@ import type { Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { eraRemocaoExplicita } from './remocaoExplicita';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -132,7 +133,9 @@ export function iniciarSyncNpcs(): () => void {
       if (anterior !== npc) agendarPush(npc.id, npc);
     }
     for (const idAntigo of idsAnteriores) {
-      if (!idsAtuais.has(idAntigo)) {
+      // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
+      // remocaoExplicita.ts.
+      if (!idsAtuais.has(idAntigo) && eraRemocaoExplicita(idAntigo)) {
         cliente
           .from('npcs_publico')
           .delete()

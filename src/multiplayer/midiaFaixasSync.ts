@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { computarDiffFaixas } from './midiaFaixasDiff';
+import { eraRemocaoExplicita } from './remocaoExplicita';
 
 /** Reordenar/adicionar/remover não é um arrasto contínuo — mesmo valor de fichas/npcs, não
  *  precisa do 150ms mais curto de `tokensSync.ts`. */
@@ -79,7 +80,10 @@ export function iniciarSyncMidiaFaixas(): () => void {
     faixasAnteriores = state.midia.faixas;
 
     for (const faixa of upserts) agendarUpsert(faixa.id, faixa);
+    // só apaga no servidor se o botão "excluir" marcou o id de propósito — ver
+    // remocaoExplicita.ts.
     for (const id of removidos) {
+      if (!eraRemocaoExplicita(id)) continue;
       cliente
         .from('midia_faixas')
         .delete()

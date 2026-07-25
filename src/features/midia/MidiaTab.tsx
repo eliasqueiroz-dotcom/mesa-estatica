@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { calcularPosicaoEsperada } from '../../multiplayer/posicaoMidia';
+import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { useStore } from '../../state/store';
 import type { FaixaMidia } from '../../state/types';
 
@@ -65,6 +66,7 @@ export default function MidiaTab() {
 
   const excluir = async (faixa: FaixaMidia) => {
     if (!window.confirm(`excluir "${faixa.nome}"?`)) return;
+    marcarRemocaoExplicita(faixa.id);
     removerFaixaMidia(faixa.id);
     if (supabase) {
       const { error } = await supabase.storage.from('midia').remove([faixa.path]);

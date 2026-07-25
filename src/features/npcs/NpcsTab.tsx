@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { corPv, useIniciativa } from '../../hooks/useIniciativa';
+import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { NpcAcao } from '../../state/types';
@@ -72,7 +73,10 @@ export default function NpcsTab() {
 
   const remover = (id: string, nome: string) => {
     const ok = window.confirm(`tirar "${nome || 'sem nome'}" do tabuleiro? não volta.`);
-    if (ok) removerNpc(id);
+    if (ok) {
+      marcarRemocaoExplicita(id);
+      removerNpc(id);
+    }
   };
 
   const novoNpc = () => {

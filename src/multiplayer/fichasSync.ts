@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
+import { eraRemocaoExplicita } from './remocaoExplicita';
 
 /** Push debounçado — sem isso, cada tecla digitada numa ficha disparava uma escrita no
  *  Supabase na hora (visto ao vivo: lag perceptível ao digitar, mais o eco do Realtime
@@ -160,7 +161,10 @@ export function iniciarSyncFichas(): () => void {
       if (anterior !== ficha) agendarPush(ficha.id, { ficha, basePV });
     }
     for (const idAntigo of idsAnteriores) {
-      if (!idsAtuais.has(idAntigo)) {
+      // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
+      // remocaoExplicita.ts. Sumir da lista local por qualquer outro motivo (aba
+      // desatualizada, etc.) nunca deve virar DELETE pra todo mundo.
+      if (!idsAtuais.has(idAntigo) && eraRemocaoExplicita(idAntigo)) {
         cliente
           .from('characters_publico')
           .delete()
