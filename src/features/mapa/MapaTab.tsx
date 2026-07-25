@@ -83,6 +83,21 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+    setImgNatural(null);
+  }, [mapa.imagemDataUrl]);
+
+  // `onLoad` sozinho perde a corrida quando o navegador já decodificou a imagem antes do
+  // React religar o listener (comum em `data:` URI) — sem isso, `imgNatural` fica preso no
+  // valor da imagem anterior (ou `null`) e o grid (relativo à imagem) desalinha. `.complete`
+  // cobre o caso de cache-hit.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
+    }
+  }, [mapa.imagemDataUrl]);
+
   const participantePorId = (id: string) => {
     const ficha = fichas.find((f) => f.id === id);
     if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, ficha };
@@ -107,10 +122,23 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     }
   };
 
-  /** posição do ponteiro em % de .mapa-area (caixa de conteúdo, sem a borda) — mesma
-   *  conversão usada por token, mover e alças. */
+  /** Posição do ponteiro em % da IMAGEM renderizada (não do container) — mesma base de
+   *  `GradeMapa.x/y/largura/altura` (ver state/types.ts) e mesma conta que os tokens já usam
+   *  pra se posicionar. Container varia por dispositivo (mestre tem `.mapa-toolbar` acima,
+   *  encolhendo a altura; jogador não) — se o grid fosse % do container, a mesma grade.x/y
+   *  cairia num lugar diferente da imagem em cada tela, por mais que o valor sincronizado
+   *  seja idêntico. Sem imagem carregada ainda, cai pra % do container (não tem imagem pra
+   *  servir de referência). */
   const posPercentual = (e: React.PointerEvent) => {
     const rect = retanguloConteudo(containerRef.current!);
+    const imgEl = imgRef.current;
+    if (imgEl && imgEl.naturalWidth > 0 && imgEl.naturalHeight > 0) {
+      const imgR = getImgRenderRect(rect.width, rect.height, imgEl.naturalWidth, imgEl.naturalHeight);
+      return {
+        px: ((e.clientX - rect.left - imgR.offsetX) / imgR.renderW) * 100,
+        py: ((e.clientY - rect.top - imgR.offsetY) / imgR.renderH) * 100,
+      };
+    }
     return { px: ((e.clientX - rect.left) / rect.width) * 100, py: ((e.clientY - rect.top) / rect.height) * 100 };
   };
 

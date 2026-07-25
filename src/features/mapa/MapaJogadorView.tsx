@@ -65,6 +65,18 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     setImgNatural(null);
   }, [mapa.imagemDataUrl]);
 
+  // `onLoad` sozinho perde a corrida quando o navegador já decodificou a imagem antes do
+  // React religar o listener (comum em `data:` URI — decodificação é quase instantânea, às
+  // vezes síncrona) — sem isso, `imgNatural` fica `null` pra sempre e o grid (agora relativo
+  // à imagem, não ao container) cai no fallback de % do container, que é exatamente o bug
+  // que essa mudança de coordenadas veio corrigir. `.complete` cobre o caso de cache-hit.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
+    }
+  }, [mapa.imagemDataUrl]);
+
   const meuToken = mapa.tokens.find((t) => t.participanteId === minhaFicha.id);
   const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
 
