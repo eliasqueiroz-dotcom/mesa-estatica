@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { consultarIsGm } from '../../multiplayer/auth';
 import { buscarOwnerToken, montarLinkJogador, regenerarOwnerToken } from '../../multiplayer/links';
 
 interface Props {
@@ -6,7 +7,12 @@ interface Props {
   fichaNome: string;
 }
 
-type Status = 'idle' | 'carregando' | 'copiado' | 'erro';
+/** `buscarOwnerToken`/`regenerarOwnerToken` retornam `null` tanto quando o multiplayer não
+ *  está configurado quanto quando a RLS bloqueia a leitura por sessão não vinculada como
+ *  mestre — os dois casos pareciam idênticos (mesmo aviso "multiplayer não configurado"),
+ *  o que mascarava o caso real mais comum: vínculo de mestre expirado/nunca feito nesta aba,
+ *  não a ficha ainda não ter sincronizado. `consultarIsGm()` distingue os dois na hora do erro. */
+type Status = 'idle' | 'carregando' | 'copiado' | 'erro-vinculo' | 'erro-config';
 
 /**
  * Controles GM-only pro link do jogador (mesa-estatica-multiplayer-completo.md Parte V §4):
@@ -21,10 +27,15 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
     if (novo !== 'idle') setTimeout(() => setStatus('idle'), 1800);
   };
 
+  const avisarFalha = async () => {
+    const souGm = await consultarIsGm();
+    avisar(souGm ? 'erro-config' : 'erro-vinculo');
+  };
+
   const copiar = async () => {
     setStatus('carregando');
     const token = await buscarOwnerToken(fichaId);
-    if (!token) return avisar('erro');
+    if (!token) return avisarFalha();
     await navigator.clipboard.writeText(montarLinkJogador(token));
     avisar('copiado');
   };
@@ -34,7 +45,7 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
     if (!ok) return;
     setStatus('carregando');
     const token = await regenerarOwnerToken(fichaId);
-    if (!token) return avisar('erro');
+    if (!token) return avisarFalha();
     await navigator.clipboard.writeText(montarLinkJogador(token));
     avisar('copiado');
   };
@@ -42,9 +53,11 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
   const titulo =
     status === 'copiado'
       ? 'link copiado'
-      : status === 'erro'
-        ? 'multiplayer não configurado ou ficha ainda não sincronizada'
-        : 'copiar link do jogador';
+      : status === 'erro-vinculo'
+        ? 'sessão não vinculada como mestre — clique no indicador "mestre" no topo, cole o token e tente de novo'
+        : status === 'erro-config'
+          ? 'multiplayer não configurado nesta máquina, ou a ficha ainda não sincronizou — espere alguns segundos e tente de novo'
+          : 'copiar link do jogador';
 
   return (
     <>
@@ -57,7 +70,9 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
           e.stopPropagation();
           void copiar();
         }}
-        style={{ color: status === 'copiado' ? 'var(--rede)' : status === 'erro' ? 'var(--ruido)' : undefined }}
+        style={{
+          color: status === 'copiado' ? 'var(--rede)' : status.startsWith('erro') ? 'var(--ruido)' : undefined,
+        }}
       >
         🔗
       </span>
