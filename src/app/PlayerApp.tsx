@@ -9,6 +9,7 @@ import MidiaJogadorView from '../features/midia/MidiaJogadorView';
 import MidiaPlayerJogador from '../features/midia/MidiaPlayerJogador';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
+import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
@@ -114,6 +115,7 @@ export default function PlayerApp() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <RuidoOverlay />
+      <AlertaOverlayJogador />
       <header
         style={{
           display: 'flex',

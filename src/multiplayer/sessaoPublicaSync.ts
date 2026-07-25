@@ -23,6 +23,8 @@ export interface Linha {
   indice_atual_turno: number;
   rodada: number;
   condicoes_combate: SessaoPublica['condicoesCombate'];
+  ameaca: number;
+  ruido_narrativo: number;
 }
 
 const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
@@ -41,6 +43,8 @@ const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
   indice_atual_turno: s.indiceAtualTurno,
   rodada: s.rodada,
   condicoes_combate: s.condicoesCombate,
+  ameaca: s.ameaca,
+  ruido_narrativo: s.ruidoNarrativo,
 });
 
 export const paraSessaoPublica = (r: Linha): SessaoPublica => ({
@@ -59,6 +63,8 @@ export const paraSessaoPublica = (r: Linha): SessaoPublica => ({
   indiceAtualTurno: r.indice_atual_turno,
   rodada: r.rodada,
   condicoesCombate: r.condicoes_combate,
+  ameaca: r.ameaca,
+  ruidoNarrativo: r.ruido_narrativo,
 });
 
 /**

@@ -97,6 +97,8 @@ export function criarSessaoPublica(): SessaoPublica {
     indiceAtualTurno: 0,
     rodada: 1,
     condicoesCombate: {},
+    ameaca: 0,
+    ruidoNarrativo: 0,
   };
 }
 
@@ -127,7 +129,7 @@ export function criarEstadoMidia(): EstadoMidia {
   };
 }
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

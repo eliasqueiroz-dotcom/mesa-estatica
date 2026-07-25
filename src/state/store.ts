@@ -660,7 +660,23 @@ export const useStore = create<Store>()(
         })),
 
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),
-      atualizarSessaoPrivada: (patch) => set((s) => ({ sessaoPrivada: { ...s.sessaoPrivada, ...patch } })),
+      // Ameaça/Ruído Narrativo espelham em sessaoPublica no mesmo set() — visual pro jogador
+      // (AlertaOverlayJogador.tsx), nunca o número. Tensão nunca aparece no patch daqui porque
+      // não existe em SessaoPublica — o espelhamento é naturalmente pulado. Referência de
+      // sessaoPublica só muda quando um dos dois campos está no patch (evita push desnecessário
+      // em sessaoPublicaSync.ts, que compara por referência).
+      atualizarSessaoPrivada: (patch) =>
+        set((s) => ({
+          sessaoPrivada: { ...s.sessaoPrivada, ...patch },
+          sessaoPublica:
+            patch.ameaca !== undefined || patch.ruidoNarrativo !== undefined
+              ? {
+                  ...s.sessaoPublica,
+                  ...(patch.ameaca !== undefined ? { ameaca: patch.ameaca } : {}),
+                  ...(patch.ruidoNarrativo !== undefined ? { ruidoNarrativo: patch.ruidoNarrativo } : {}),
+                }
+              : s.sessaoPublica,
+        })),
       avancarCena: () =>
         set((s) => {
           const novaCena = s.sessaoPublica.contadorCena + 1;
@@ -937,6 +953,11 @@ export const useStore = create<Store>()(
         // v13 → v14: aba Mídia — jukebox sincronizado (faixas + estado de playback).
         if (versaoAnterior < 14) {
           estado.midia = criarEstadoMidia();
+        }
+        // v14 → v15: Ameaça/Ruído Narrativo espelhados em sessaoPublica (visual pro jogador,
+        // nunca o número — ver AlertaOverlayJogador.tsx).
+        if (versaoAnterior < 15) {
+          estado.sessaoPublica = { ameaca: 0, ruidoNarrativo: 0, ...(estado.sessaoPublica ?? {}) };
         }
         return estado as Store;
       },

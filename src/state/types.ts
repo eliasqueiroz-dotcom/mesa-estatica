@@ -192,6 +192,13 @@ export interface SessaoPublica {
   /** Condições de combate por combatente (participanteId → ids de `CONDICOES_COMBATE`). Lembrete
    *  visual pro mestre, não modificador automático (Parte II §4). Limpo ao encerrar o combate. */
   condicoesCombate: Record<string, string[]>;
+
+  /** Cópia de `sessaoPrivada.ameaca`/`.ruidoNarrativo` (espelhada em `atualizarSessaoPrivada`) —
+   *  `sessaoPrivada` continua a fonte de edição do GM. Nunca renderizado como número/gauge pro
+   *  jogador (`AlertaOverlayJogador.tsx`), só como efeito visual — mesma régua de `tierDeGauge`
+   *  já usada em `AlertaOverlay.tsx`. `tensao` fica de fora de propósito, nunca sobe daqui. */
+  ameaca: number;
+  ruidoNarrativo: number;
 }
 
 export interface EventoSessao {
