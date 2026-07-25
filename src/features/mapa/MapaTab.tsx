@@ -12,6 +12,7 @@ import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
 import TokenOverlay from './TokenOverlay';
+import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 
 const LARGURA_ALTURA_MINIMA = 2; // % — evita a caixa do grid colapsar a zero arrastando uma alça
@@ -366,7 +367,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
                 role="button"
                 tabIndex={0}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => removerTokenMapa(t.id)}
+                onClick={() => {
+                  marcarRemocaoExplicita(t.id);
+                  removerTokenMapa(t.id);
+                }}
               >
                 ×
               </span>

@@ -1,3 +1,4 @@
+import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { useStore } from '../../state/store';
 import FichaEditor from './FichaEditor';
 import ImportarPersonagemBotao from './ImportarPersonagemBotao';
@@ -15,7 +16,10 @@ export default function FichasTab() {
 
   const remover = (id: string, nome: string) => {
     const ok = window.confirm(`apagar "${nome || 'sem nome'}" da rede? o papel não esquece.`);
-    if (ok) removerFicha(id);
+    if (ok) {
+      marcarRemocaoExplicita(id);
+      removerFicha(id);
+    }
   };
 
   return (

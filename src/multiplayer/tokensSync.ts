@@ -2,6 +2,7 @@ import type { TokenMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { eraRemocaoExplicita } from './remocaoExplicita';
 import { computarDiffTokens } from './tokensDiff';
 
 /** Mais curto que o de fichas/npcs (`ATRASO_PUSH_MS` em `fichasSync.ts`) — posição de token
@@ -97,7 +98,10 @@ export function iniciarSyncTokens(): () => void {
     tokensAnteriores = state.mapa.tokens;
 
     for (const token of upserts) agendarUpsert(token.id, token);
+    // só apaga no servidor se o botão "remover" marcou o id de propósito — ver
+    // remocaoExplicita.ts.
     for (const id of removidos) {
+      if (!eraRemocaoExplicita(id)) continue;
       cliente
         .from('tokens')
         .delete()

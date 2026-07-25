@@ -147,6 +147,14 @@ Bug relacionado achado durante a verificação ao vivo: `imgNatural` (dimensão 
 
 Validado ao vivo com dois containers de proporção bem diferentes (mestre 927×773 com toolbar, jogador com outra altura) — grid calculado bate exatamente (4 casas decimais) com o esperado nos dois lados.
 
+## CRÍTICO: fichas/NPCs/tokens sendo apagados por sessões de mestre desatualizadas (25/07)
+
+Usuário reportou "jogador não vê token de outro jogador no mapa". Investigando com um segundo personagem de teste, achei que a ficha dele tinha sido **apagada do banco inteiro** minutos depois de criada, sem nenhuma ação do usuário — o problema nunca foi renderização.
+
+Causa raiz: `fichasSync.ts`/`npcsSync.ts`/`tokensSync.ts`/`midiaFaixasSync.ts` inferiam exclusão comparando a lista local atual com um snapshot anterior — "sumiu um id daqui? apaga no servidor". Isso é seguro só se toda sessão conectada como mestre estiver sempre com a lista 100% atualizada. Mas o `GM_TOKEN` é compartilhado (dá pra vincular como mestre em mais de uma aba/dispositivo ao mesmo tempo) — se UMA dessas sessões tiver uma lista desatualizada (aba em segundo plano que perdeu o Realtime, recarregamento em timing ruim), a PRÓXIMA edição qualquer nela reinterpreta "um item que essa aba não conhece" como "foi removido" e apaga de verdade, pra todo mundo. Reproduzido ao vivo.
+
+Fix: `src/multiplayer/remocaoExplicita.ts` novo — exclusão só propaga pro servidor quando o próprio botão "remover"/"excluir" da UI marcou o id de propósito (`marcarRemocaoExplicita`), nunca por inferência de diff (`eraRemocaoExplicita` consome a marca). Aplicado nos 4 módulos de sync com esse padrão + os 4 pontos de UI que removem algo (`FichasTab.tsx`, `NpcsTab.tsx`, `MapaTab.tsx` — token —, `MidiaTab.tsx` — faixa). Validado ao vivo: criar ficha + editar não aciona delete nenhum; clicar "remover" continua apagando do servidor normalmente.
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
