@@ -60,7 +60,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
       const origem = quem === 'npc' ? (npc?.nome || 'NPC') : (ficha?.nome || 'd20 rápido');
       const id = quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null);
       const formula = quem === 'npc' && bonus !== 0 ? `d20+${bonus}` : 'd20';
-      registrarLog('teste', `${origem} · rolagem rápida (sem perícia/DT) → ${total}`, id);
+      registrarLog('teste', `${origem} · rolagem rápida (sem perícia/DT) → ${total}`, id, visibilidade);
       registrarRoll({
         origem,
         personagemId: id,
@@ -94,6 +94,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           'teste',
           `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
           ficha.id,
+          visibilidade,
         );
         registrarRoll({
           origem: ficha.nome || 'Personagem',
@@ -115,6 +116,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           'teste',
           `${npc.nome || 'NPC'} · teste rápido → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
           npc.id,
+          visibilidade,
         );
         registrarRoll({
           origem: npc.nome || 'NPC',

@@ -34,6 +34,20 @@ const paraToken = (r: LinhaTokenSupabase): TokenMapa => ({
   y: r.y,
 });
 
+/** Tokens sendo arrastados localmente agora (MapaTab.tsx/MapaJogadorView.tsx marcam no
+ *  pointerdown, desmarcam no pointerup) — o handler de Realtime abaixo pula update remoto
+ *  pra esses ids. Sem isso, o eco da própria escrita (sempre ≥150ms atrás, por causa do
+ *  debounce de `agendarUpsert`) chega no meio de um arrasto rápido e sobrescreve a posição
+ *  local mais recente com uma mais antiga — visível como o token "caindo atrás" do cursor
+ *  por um instante, até o próximo pointermove corrigir. */
+const tokensEmArrasto = new Set<string>();
+export function marcarTokenEmArrasto(id: string): void {
+  tokensEmArrasto.add(id);
+}
+export function desmarcarTokenEmArrasto(id: string): void {
+  tokensEmArrasto.delete(id);
+}
+
 /**
  * Fase A (mesa-estatica-multiplayer-completo.md §11): sincroniza só a posição/existência
  * dos tokens via Supabase Realtime. Zustand continua a fonte local/otimista; o Supabase
@@ -102,9 +116,11 @@ export function iniciarSyncTokens(): () => void {
         const s = useStore.getState();
         if (payload.eventType === 'DELETE') {
           const idRemovido = (payload.old as { id: string }).id;
+          if (tokensEmArrasto.has(idRemovido)) return;
           useStore.setState({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== idRemovido) } });
         } else {
           const token = paraToken(payload.new as LinhaTokenSupabase);
+          if (tokensEmArrasto.has(token.id)) return;
           const existe = s.mapa.tokens.some((t) => t.id === token.id);
           const tokens = existe
             ? s.mapa.tokens.map((t) => (t.id === token.id ? token : t))

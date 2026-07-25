@@ -15,7 +15,9 @@ const N = 5;
 export default function SessaoPublicaView() {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const log = useStore((s) => s.log);
-  const ultimos = log.slice(0, N);
+  // defesa em profundidade — mesmo filtro de LogView.tsx: rolagem privada nunca aparece pro
+  // jogador (registrarLog embute o resultado no texto livre, sem checagem de visibilidade nele).
+  const ultimos = log.filter((e) => e.visibilidade !== 'privada').slice(0, N);
 
   const { nomeDaMesa, numeroSessao, clima, hora, caso, localAtual, objetivo, atmosfera, cenaAtual } = sessaoPublica;
 

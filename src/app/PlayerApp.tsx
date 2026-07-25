@@ -10,6 +10,7 @@ import MidiaPlayerJogador from '../features/midia/MidiaPlayerJogador';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
+import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
@@ -147,6 +148,7 @@ export default function PlayerApp() {
           </nav>
         </div>
       </header>
+      <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <div
           style={{

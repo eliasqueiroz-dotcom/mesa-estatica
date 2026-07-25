@@ -77,6 +77,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           'teste',
           `${origem} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
           ficha.id,
+          visibilidade,
         );
         registrarRoll({
           origem,
@@ -100,6 +101,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           'teste',
           `${origem} · teste → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
           npc.id,
+          visibilidade,
         );
         registrarRoll({
           origem,
