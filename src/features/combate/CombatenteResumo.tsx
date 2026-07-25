@@ -3,7 +3,11 @@ import { descricaoSurto } from '../../rules/data/surto';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 
 interface Props {
-  nome: string;
+  /** Vazio/omitido esconde a linha de nome inteira (dot + defesa continuam) — usado quando
+   *  o nome já aparece em outro lugar (cabeçalho do overlay, linha da iniciativa) e mostrar
+   *  de novo aqui seria redundante. Nunca cai no fallback "sem nome" nesse caso — só um PC/NPC
+   *  com nome genuinamente vazio (campo "Nome" em branco na ficha) mostra o fallback. */
+  nome?: string;
   cor: string;
   pvAtual: number;
   pvMaximo: number;
@@ -64,10 +68,12 @@ export default function CombatenteResumo({
           aria-hidden
           style={{ background: cor, width: 12, height: 12, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }}
         />
-        <span className="mono" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {nome || 'sem nome'}
-        </span>
-        <span className="vazio" style={{ fontSize: 12 }}>
+        {nome !== undefined && nome !== '' && (
+          <span className="mono" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {nome}
+          </span>
+        )}
+        <span className="vazio" style={{ fontSize: 12, marginLeft: nome ? undefined : 'auto' }}>
           🛡 <span className="mono">{defesa}</span>
         </span>
       </div>
