@@ -7,6 +7,7 @@ import { ordenarIniciativa } from '../rules/teste';
 import {
   COR_NPC_PADRAO,
   criarEstadoInicial,
+  criarEstadoMidia,
   criarFichaVazia,
   criarGradeInicial,
   criarNpcVazio,
@@ -20,6 +21,8 @@ import type {
   EntradaRoll,
   EstadoGlobal,
   EstadoMapa,
+  EstadoMidia,
+  FaixaMidia,
   Ficha,
   GradeMapa,
   Npc,
@@ -105,6 +108,17 @@ interface Acoes {
   adicionarTokenMapa: (participanteId: string, tipo: 'pc' | 'npc') => void;
   moverTokenMapa: (id: string, x: number, y: number) => void;
   removerTokenMapa: (id: string) => void;
+
+  /** Ordem = maior ordem atual + 1. Retorna o id gerado. */
+  adicionarFaixaMidia: (nome: string, path: string, url: string) => string;
+  removerFaixaMidia: (id: string) => void;
+  /** Troca `ordem` com o vizinho imediato na lista ordenada; no-op nas bordas. */
+  moverFaixaMidia: (id: string, direcao: 'cima' | 'baixo') => void;
+  /** Patch genérico de playback — sempre recarimba `atualizadoEm`. Todo transporte
+   *  (play/pause/seek/próxima/anterior/loop/fim-de-faixa) passa por aqui. */
+  atualizarEstadoMidia: (
+    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop'>>,
+  ) => void;
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
   limparLog: () => void;
@@ -572,6 +586,39 @@ export const useStore = create<Store>()(
       removerTokenMapa: (id) =>
         set((s) => ({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== id) } })),
 
+      adicionarFaixaMidia: (nome, path, url) => {
+        const id = crypto.randomUUID();
+        set((s) => {
+          const maxOrdem = s.midia.faixas.reduce((m, f) => Math.max(m, f.ordem), -1);
+          const faixa: FaixaMidia = { id, nome, path, url, ordem: maxOrdem + 1, criadoEm: new Date().toISOString() };
+          return { midia: { ...s.midia, faixas: [...s.midia.faixas, faixa] } };
+        });
+        return id;
+      },
+      removerFaixaMidia: (id) =>
+        set((s) => ({
+          midia: {
+            ...s.midia,
+            faixas: s.midia.faixas.filter((f) => f.id !== id),
+            faixaAtualId: s.midia.faixaAtualId === id ? null : s.midia.faixaAtualId,
+            tocando: s.midia.faixaAtualId === id ? false : s.midia.tocando,
+          },
+        })),
+      moverFaixaMidia: (id, direcao) =>
+        set((s) => {
+          const ordenadas = [...s.midia.faixas].sort((a, b) => a.ordem - b.ordem);
+          const idx = ordenadas.findIndex((f) => f.id === id);
+          const alvo = direcao === 'cima' ? idx - 1 : idx + 1;
+          if (idx === -1 || alvo < 0 || alvo >= ordenadas.length) return s;
+          const [a, b] = [ordenadas[idx], ordenadas[alvo]];
+          const faixas = s.midia.faixas.map((f) =>
+            f.id === a.id ? { ...f, ordem: b.ordem } : f.id === b.id ? { ...f, ordem: a.ordem } : f,
+          );
+          return { midia: { ...s.midia, faixas } };
+        }),
+      atualizarEstadoMidia: (patch) =>
+        set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
+
       registrarLog: (tipo, texto, personagemId = null) => {
         const entrada: EntradaLog = {
           id: crypto.randomUUID(),
@@ -688,10 +735,10 @@ export const useStore = create<Store>()(
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, midia, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
           get();
         return JSON.stringify(
-          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, log, rollsLog, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, midia, log, rollsLog, config },
           null,
           2,
         );
@@ -756,6 +803,23 @@ export const useStore = create<Store>()(
               y: typeof t.y === 'number' ? t.y : 0.5,
             })),
             grade: { ...base.mapa.grade, ...d.mapa?.grade },
+          },
+          midia: {
+            faixas: (d.midia?.faixas ?? []).map((f) => ({
+              id: f.id ?? crypto.randomUUID(),
+              nome: f.nome ?? '',
+              path: f.path ?? '',
+              url: f.url ?? '',
+              ordem: typeof f.ordem === 'number' ? f.ordem : 0,
+              criadoEm: f.criadoEm ?? new Date().toISOString(),
+            })),
+            faixaAtualId: d.midia?.faixaAtualId ?? null,
+            // nunca importa playback em curso — evita reviver "tocando: true" pra todo
+            // mundo se o GM importar um JSON antigo em cima de uma sessão ao vivo.
+            tocando: false,
+            posicaoSegundos: 0,
+            atualizadoEm: new Date(0).toISOString(),
+            modoLoop: d.midia?.modoLoop ?? 'nenhum',
           },
           log: d.log ?? [],
           rollsLog: d.rollsLog ?? [],
@@ -869,6 +933,10 @@ export const useStore = create<Store>()(
         // v11 → v12: garante surtosAtivos em toda ficha
         if (versaoAnterior < 12 && estado.fichas) {
           estado.fichas = estado.fichas.map((f: any) => ({ surtosAtivos: [], ...f }));
+        }
+        // v13 → v14: aba Mídia — jukebox sincronizado (faixas + estado de playback).
+        if (versaoAnterior < 14) {
+          estado.midia = criarEstadoMidia();
         }
         return estado as Store;
       },

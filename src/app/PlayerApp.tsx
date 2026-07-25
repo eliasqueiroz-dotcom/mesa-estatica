@@ -5,21 +5,27 @@ import FichaEditor from '../features/fichas/FichaEditor';
 import FichaPublicaView from '../features/fichas/FichaPublicaView';
 import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
 import MapaJogadorView from '../features/mapa/MapaJogadorView';
+import MidiaJogadorView from '../features/midia/MidiaJogadorView';
+import MidiaPlayerJogador from '../features/midia/MidiaPlayerJogador';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
+import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
   useFichasPublicas,
   useHidratarMapaPublico,
+  useHidratarMidia,
   useHidratarSessaoPublica,
   useIniciativaPublica,
   useNpcsPublicos,
 } from '../multiplayer/hidratacaoJogador';
+import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
+import LogTabJogador from './LogTabJogador';
 
-type AbaId = 'sessao' | 'personagens' | 'dados' | 'npcs' | 'mapa';
+type AbaId = 'sessao' | 'personagens' | 'dados' | 'npcs' | 'mapa' | 'midia' | 'log';
 
 const ABAS: { id: AbaId; label: string }[] = [
   { id: 'sessao', label: 'Sessão' },
@@ -27,6 +33,8 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'dados', label: 'Dados' },
   { id: 'npcs', label: 'NPCs & Combate' },
   { id: 'mapa', label: 'Mapa' },
+  { id: 'midia', label: 'Mídia' },
+  { id: 'log', label: 'Log' },
 ];
 
 /**
@@ -48,28 +56,33 @@ export default function PlayerApp() {
 
   useHidratarSessaoPublica();
   useHidratarMapaPublico();
+  useHidratarMidia();
   const { carregando, possuiFicha } = useMinhaFicha();
   const minhaFicha = useStore((s) => s.fichas.find((f) => f.id === s.fichaAtivaId) ?? null);
   const outrasFichas = useFichasPublicas().filter((f) => f.id !== minhaFicha?.id);
   const npcs = useNpcsPublicos();
   const iniciativa = useIniciativaPublica();
 
-  // sync de tokens (posição no mapa) — mesmo módulo do GmApp (App.tsx), RLS ainda aberta
-  // pra `tokens` desde a Fase A; gated pela mesma auth anônima que `useMinhaFicha` já dispara.
+  // sync de tokens (posição no mapa) + log/rolagens — mesmos módulos do GmApp (App.tsx), RLS
+  // ainda aberta pra `tokens` desde a Fase A; gated pela mesma auth anônima que `useMinhaFicha`
+  // já dispara.
   useEffect(() => {
     let pararTokens = () => {};
+    let pararLogRolls = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
       pararTokens = iniciarSyncTokens();
+      pararLogRolls = iniciarSyncLogRolls();
     });
     return () => {
       cancelado = true;
       pararTokens();
+      pararLogRolls();
     };
   }, []);
 
-  // atalhos: 1-5 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel —
+  // atalhos: 1-7 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel —
   // mesmo padrão de App.tsx, ignorado enquanto o foco está num campo de texto.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -78,7 +91,7 @@ export default function PlayerApp() {
         alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
       if (digitando || e.ctrlKey || e.altKey || e.metaKey) return;
 
-      const indiceAba = '12345'.indexOf(e.key);
+      const indiceAba = '1234567'.indexOf(e.key);
       if (indiceAba !== -1) {
         setAba(ABAS[indiceAba].id);
         return;
@@ -100,6 +113,7 @@ export default function PlayerApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <RuidoOverlay />
       <header
         style={{
           display: 'flex',
@@ -211,6 +225,17 @@ export default function PlayerApp() {
           style={{
             position: 'absolute',
             inset: 0,
+            visibility: aba === 'midia' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'midia' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <MidiaJogadorView />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
             visibility: aba === 'npcs' ? 'visible' : 'hidden',
             pointerEvents: aba === 'npcs' ? 'auto' : 'none',
             padding: '1.5rem',
@@ -227,7 +252,20 @@ export default function PlayerApp() {
             )}
           </div>
         </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'log' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'log' ? 'auto' : 'none',
+            height: '100%',
+            overflowY: 'auto',
+          }}
+        >
+          <LogTabJogador />
+        </div>
       </main>
+      <MidiaPlayerJogador />
       {possuiFicha && minhaFicha && (
         <QuickRollOverlayJogador
           ficha={minhaFicha}

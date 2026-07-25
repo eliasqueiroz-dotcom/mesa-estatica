@@ -1,5 +1,5 @@
 import type { Atributo } from '../rules/data/pericias';
-import type { EstadoGlobal, Ficha, GradeMapa, Npc, NpcAcao, SessaoPrivada, SessaoPublica } from './types';
+import type { EstadoGlobal, EstadoMidia, Ficha, GradeMapa, Npc, NpcAcao, SessaoPrivada, SessaoPublica } from './types';
 
 const gerarId = () => crypto.randomUUID();
 
@@ -116,7 +116,18 @@ export function criarSessaoPrivada(): SessaoPrivada {
   };
 }
 
-export const SCHEMA_VERSION = 13;
+export function criarEstadoMidia(): EstadoMidia {
+  return {
+    faixas: [],
+    faixaAtualId: null,
+    tocando: false,
+    posicaoSegundos: 0,
+    atualizadoEm: new Date(0).toISOString(),
+    modoLoop: 'nenhum',
+  };
+}
+
+export const SCHEMA_VERSION = 14;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -128,6 +139,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     npcs: [],
     iniciativa: [],
     mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() },
+    midia: criarEstadoMidia(),
     log: [],
     rollsLog: [],
     config: { basePV: 20 },

@@ -5,6 +5,8 @@ import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
 import type { FichaPublica } from './fichaSplit';
 import { paraEntrada, type LinhaIniciativa } from './iniciativaSync';
+import { paraEstadoMidia, type Linha as LinhaMidiaEstado } from './midiaEstadoSync';
+import { paraFaixa, type LinhaFaixa } from './midiaFaixasSync';
 import { paraNpcSemNotasMestre, type LinhaPublico as LinhaNpcPublico } from './npcsSync';
 import { paraSessaoPublica, type Linha as LinhaSessaoPublica } from './sessaoPublicaSync';
 
@@ -91,6 +93,76 @@ export function useHidratarMapaPublico(): void {
     return () => {
       cancelado = true;
       cliente.removeChannel(canal);
+    };
+  }, []);
+}
+
+/**
+ * Playlist + estado de playback do jukebox (`midia_faixas`/`midia_estado`) — vai pro
+ * `useStore` compartilhado pelo mesmo motivo do mapa: `MidiaPlayerJogador.tsx`/
+ * `MidiaJogadorView.tsx` leem `s.midia` direto, mesmo tipo usado pelo mestre (sem split
+ * público/privado — faixas de áudio não têm campo nenhum que precise ficar escondido do
+ * jogador). Nunca escreve de volta.
+ */
+export function useHidratarMidia(): void {
+  useEffect(() => {
+    const cliente = supabase;
+    if (!cliente) return;
+
+    let cancelado = false;
+
+    cliente
+      .from('midia_faixas')
+      .select('*')
+      .order('ordem', { ascending: true })
+      .then(({ data }) => {
+        if (!cancelado && data) {
+          useStore.setState((s) => ({ midia: { ...s.midia, faixas: (data as LinhaFaixa[]).map(paraFaixa) } }));
+        }
+      });
+
+    cliente
+      .from('midia_estado')
+      .select('*')
+      .eq('id', 'midia')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelado && data) {
+          useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(data as LinhaMidiaEstado) } }));
+        }
+      });
+
+    const canalFaixas = cliente
+      .channel('jogador-midia-faixas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'midia_faixas' }, (payload) => {
+        const s = useStore.getState();
+        if (payload.eventType === 'DELETE') {
+          const idRemovido = (payload.old as { id: string }).id;
+          useStore.setState({ midia: { ...s.midia, faixas: s.midia.faixas.filter((f) => f.id !== idRemovido) } });
+        } else {
+          const faixa = paraFaixa(payload.new as LinhaFaixa);
+          const existe = s.midia.faixas.some((f) => f.id === faixa.id);
+          const faixas = existe
+            ? s.midia.faixas.map((f) => (f.id === faixa.id ? faixa : f))
+            : [...s.midia.faixas, faixa];
+          useStore.setState({ midia: { ...s.midia, faixas } });
+        }
+      })
+      .subscribe();
+
+    const canalEstado = cliente
+      .channel('jogador-midia-estado')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'midia_estado' }, (payload) => {
+        if (payload.eventType === 'DELETE') return;
+        const patch = paraEstadoMidia(payload.new as LinhaMidiaEstado);
+        useStore.setState((s) => ({ midia: { ...s.midia, ...patch } }));
+      })
+      .subscribe();
+
+    return () => {
+      cancelado = true;
+      cliente.removeChannel(canalFaixas);
+      cliente.removeChannel(canalEstado);
     };
   }, []);
 }

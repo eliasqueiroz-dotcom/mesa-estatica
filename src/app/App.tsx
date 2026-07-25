@@ -3,6 +3,8 @@ import DadosTab from '../features/dados/DadosTab';
 import QuickRollOverlay from '../features/dados/QuickRollOverlay';
 import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
+import MidiaPlayerGM from '../features/midia/MidiaPlayerGM';
+import MidiaTab from '../features/midia/MidiaTab';
 import VinculoMestre from '../features/multiplayer/VinculoMestre';
 import NpcsTab from '../features/npcs/NpcsTab';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
@@ -13,7 +15,10 @@ import { useStore } from '../state/store';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
+import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { iniciarSyncMapaPublico } from '../multiplayer/mapaPublicoSync';
+import { iniciarSyncMidiaEstado } from '../multiplayer/midiaEstadoSync';
+import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
@@ -26,9 +31,10 @@ const ATALHOS: Record<string, string> = {
   mapa: '4',
   npcs: '5',
   log: '6',
+  midia: '7',
 };
 
-type AbaId = 'sessao' | 'personagens' | 'dados' | 'mapa' | 'npcs' | 'log';
+type AbaId = 'sessao' | 'personagens' | 'dados' | 'mapa' | 'npcs' | 'log' | 'midia';
 
 const ABAS: { id: AbaId; label: string }[] = [
   { id: 'sessao', label: 'Sessão' },
@@ -37,6 +43,7 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'mapa', label: 'Mapa' },
   { id: 'npcs', label: 'NPCs & Iniciativa' },
   { id: 'log', label: 'Log' },
+  { id: 'midia', label: 'Mídia' },
 ];
 
 function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
@@ -111,6 +118,9 @@ export default function App() {
     let pararSessaoPublica = () => {};
     let pararIniciativa = () => {};
     let pararMapaPublico = () => {};
+    let pararMidiaFaixas = () => {};
+    let pararMidiaEstado = () => {};
+    let pararLogRolls = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -120,6 +130,9 @@ export default function App() {
       pararSessaoPublica = iniciarSyncSessaoPublica();
       pararIniciativa = iniciarSyncIniciativa();
       pararMapaPublico = iniciarSyncMapaPublico();
+      pararMidiaFaixas = iniciarSyncMidiaFaixas();
+      pararMidiaEstado = iniciarSyncMidiaEstado();
+      pararLogRolls = iniciarSyncLogRolls();
     });
     return () => {
       cancelado = true;
@@ -129,6 +142,9 @@ export default function App() {
       pararSessaoPublica();
       pararIniciativa();
       pararMapaPublico();
+      pararMidiaFaixas();
+      pararMidiaEstado();
+      pararLogRolls();
     };
   }, []);
 
@@ -165,6 +181,7 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <RuidoOverlay />
       <AlertaOverlay />
+      <MidiaPlayerGM />
       <header
         style={{
           display: 'flex',
@@ -282,6 +299,17 @@ export default function App() {
           }}
         >
           <LogTab />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'midia' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'midia' ? 'auto' : 'none',
+            height: '100%',
+          }}
+        >
+          <MidiaTab />
         </div>
       </main>
       <QuickRollOverlay
