@@ -246,7 +246,10 @@ export interface EstadoConfig {
 
 export interface GradeMapa {
   ativa: boolean;
-  x: number; // % de .mapa-area, canto superior esquerdo
+  // % da IMAGEM renderizada (object-fit: contain), não de .mapa-area — container varia por
+  // dispositivo (mestre tem .mapa-toolbar acima, jogador não), imagem é o que é compartilhado
+  // de verdade entre os dois. Canto superior esquerdo.
+  x: number;
   y: number; // %
   largura: number; // %
   altura: number; // %

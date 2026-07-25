@@ -137,6 +137,16 @@ Nova rodada de teste ao vivo achou 5 problemas, todos investigados a fundo (3 ag
 
 Decisão de produto: volume da mídia deixa de ser local por jogador e vira sincronizado, controlado só pelo GM — mudo continua local (cada jogador silencia só pra si, sem depender do mestre). `EstadoMidia` ganha `volume` (migração `0014_midia_volume.sql`, coluna em `midia_estado`), threading em `midiaEstadoSync.ts` (Linha/PatchEstadoMidia/mappers/diff local). `MidiaTab.tsx` (GM) ganha um slider "volume (todos)"; `MidiaPlayerGM.tsx` e `MidiaPlayerJogador.tsx` aplicam `midia.volume` no próprio `<audio>` via `useEffect`. `MidiaPlayerJogador.tsx` perde o slider de volume local (só o botão de mudo continua). `SCHEMA_VERSION` 15→16 com bloco `migrate` (default 0.8 pra estado já persistido sem o campo). Validado ao vivo: GM ajusta o slider → volume do jogador muda em sincronia; mudo do jogador continua isolado (não afeta o GM nem outros jogadores).
 
+## Correção real no fix do gridline (25/07) — bug que o fix anterior não resolvia de verdade
+
+Usuário reportou que o gridline ainda desalinhava entre mestre e jogador mesmo depois do fix anterior (`retanguloGradeEmPx`). Investigação achou um erro de semântica introduzido naquele fix: `GradeMapa.x/y/largura/altura` sempre foram definidos como **% de `.mapa-area`** (o container, documentado no próprio tipo) — o fix anterior mudou só a RENDERIZAÇÃO pra tratar esses valores como % da IMAGEM, sem atualizar a EDIÇÃO (arrastar/redimensionar o grid em `MapaTab.tsx` ainda calculava em % do container via `posPercentual`). Container varia por dispositivo (mestre tem `.mapa-toolbar` acima, encolhendo a altura; jogador não) — grid em % de container nunca poderia alinhar com a imagem de forma consistente entre os dois, não importa a proporção.
+
+Fix de verdade: `posPercentual` (`MapaTab.tsx`) agora calcula em % da IMAGEM renderizada (mesma base de `retanguloGradeEmPx` e dos tokens), não do container — sistema de coordenadas consistente ponta a ponta (edição e renderização). Tipo `GradeMapa` documentado de novo pra refletir isso. **Efeito colateral aceito**: qualquer grid já configurado precisa ser reposicionado uma vez (os números salvos tinham o significado antigo).
+
+Bug relacionado achado durante a verificação ao vivo: `imgNatural` (dimensão natural da imagem, usada pro cálculo `getImgRenderRect`) dependia só do evento `onLoad` do `<img>` — perde a corrida quando o navegador já decodificou a imagem antes do React religar o listener (comum em `data:` URI, decodificação quase síncrona), deixando `imgNatural` `null` pra sempre e o grid preso no fallback de % do container (exatamente o bug que o fix de coordenadas queria matar). `MapaJogadorView.tsx`/`MapaTab.tsx` ganharam um `useEffect` que checa `img.complete` direto, cobrindo o caso de cache-hit que o `onLoad` sozinho perde.
+
+Validado ao vivo com dois containers de proporção bem diferentes (mestre 927×773 com toolbar, jogador com outra altura) — grid calculado bate exatamente (4 casas decimais) com o esperado nos dois lados.
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
