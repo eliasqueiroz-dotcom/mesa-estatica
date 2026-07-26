@@ -296,6 +296,7 @@ export default function App() {
             visibility: aba === 'log' ? 'visible' : 'hidden',
             pointerEvents: aba === 'log' ? 'auto' : 'none',
             height: '100%',
+            overflowY: 'auto',
           }}
         >
           <LogTab />
