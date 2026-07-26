@@ -107,7 +107,14 @@ export function useMinhaFicha(): { carregando: boolean; possuiFicha: boolean } {
         ? (basePVImplicito as BasePV)
         : 20;
 
-      const ficha = montarFicha(paraFichaPublica(linhaPublico), dados);
+      // Backward-compatibilidade com dados antigos em characters_privado.dados que não
+      // têm pvAtual/surtosAtivos (antes da mudança em FichaPrivadaDados): mescla da
+      // linha pública. Mesmo padrão de fichasSync.ts.
+      const ficha = montarFicha(paraFichaPublica(linhaPublico), {
+        ...dados,
+        pvAtual: linhaPublico.pv_atual,
+        surtosAtivos: linhaPublico.surtos_ativos,
+      });
       useStore.setState((s) => ({
         fichas: [ficha],
         fichaAtivaId: ficha.id,

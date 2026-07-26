@@ -39,7 +39,7 @@ export function personagemEstaEmSurto(
   surtosAtivos: { expiraEm: number; id?: string; escolha?: string | null }[],
   sessao: EstadoSessaoParaSurto,
 ): boolean {
-  return surtosAtivos.some((s) => {
+  return (surtosAtivos ?? []).some((s) => {
     if (sessao.modoCombate) {
       return s.expiraEm >= sessao.rodada;
     }

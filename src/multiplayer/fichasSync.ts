@@ -50,7 +50,18 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null
     cliente.from('characters_privado').select('*').eq('id', id).maybeSingle(),
   ]);
   if (!publico || !privado) return null;
-  return montarFicha(paraFichaPublica(publico as LinhaPublico), (privado as LinhaPrivado).dados);
+  const linhaPublico = publico as LinhaPublico;
+  const dadosPrivados = (privado as LinhaPrivado).dados;
+  // Backward-compatibilidade: dados antigos (antes da mudança no FichaPrivadaDados que
+  // passou a incluir pvAtual/surtosAtivos em characters_privado.dados) não têm esses
+  // campos no JSON de dados — eles só existiam em characters_publico. Para não quebrar,
+  // mescla os valores da linha pública por cima; para dados novos o valor é o mesmo,
+  // então o override é inócuo.
+  return montarFicha(paraFichaPublica(linhaPublico), {
+    ...dadosPrivados,
+    pvAtual: linhaPublico.pv_atual,
+    surtosAtivos: linhaPublico.surtos_ativos,
+  });
 }
 
 /** Busca inicial (ver comentário em `iniciarSyncFichas`) — só monta fichas que existirem nas
@@ -66,7 +77,17 @@ async function buscarTodas(cliente: Cliente): Promise<Ficha[]> {
   const fichas: Ficha[] = [];
   for (const publico of publicos as LinhaPublico[]) {
     const privado = privadosPorId.get(publico.id);
-    if (privado) fichas.push(montarFicha(paraFichaPublica(publico), privado.dados));
+    if (privado) {
+      // Mesma backward-compatibilidade de buscarEMontar — dados antigos em
+      // characters_privado.dados não têm pvAtual/surtosAtivos; busca da linha pública.
+      fichas.push(
+        montarFicha(paraFichaPublica(publico), {
+          ...privado.dados,
+          pvAtual: publico.pv_atual,
+          surtosAtivos: publico.surtos_ativos,
+        }),
+      );
+    }
   }
   return fichas;
 }
