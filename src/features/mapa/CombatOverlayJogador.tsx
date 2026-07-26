@@ -1,25 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import CombateJogadorView from '../iniciativa/CombateJogadorView';
 import { useStore } from '../../state/store';
-import type { EntradaIniciativa, Ficha, Npc } from '../../state/types';
+import type { EntradaIniciativa, Ficha } from '../../state/types';
 
 interface Props {
   iniciativa: EntradaIniciativa[];
   minhaFicha: Ficha;
-  outrasFichas: FichaPublica[];
-  npcs: Omit<Npc, 'notasMestre'>[];
 }
 
-/**
- * Espelho de `CombatOverlay.tsx` (mestre) pro jogador — mesma chrome flutuante/arrastável
- * (botão "ATK", painel que abre por cima do mapa, sem precisar trocar de aba durante o
- * combate), mas o conteúdo é `CombateJogadorView` (já 100% read-only) em vez de
- * `IniciativaPanel` — nunca reaproveita o painel do mestre direto, mesmo raciocínio já
- * documentado em `CombateJogadorView.tsx`. A faixa de arrasto aqui não repete "combate ·
- * rodada X" (isso já vem no cabeçalho interno de `CombateJogadorView`) — só grip + fechar.
- */
-export default function CombatOverlayJogador({ iniciativa, minhaFicha, outrasFichas, npcs }: Props) {
+export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
 
   const [aberto, setAberto] = useState(false);
@@ -121,7 +110,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha, outrasFic
               ×
             </button>
           </div>
-          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} />
+          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} />
         </div>
       )}
       <button
