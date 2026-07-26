@@ -10,6 +10,7 @@ export default defineConfig({
   base: '/mesa-estatica/',
   plugins: [react()],
   build: {
+    sourcemap: true,
     rollupOptions: {
       input: {
         mestre: 'index.html',

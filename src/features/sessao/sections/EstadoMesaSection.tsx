@@ -17,7 +17,7 @@ export default function EstadoMesaSection() {
   const iniciarSessaoTimer = useStore((s) => s.iniciarSessaoTimer);
   const encerrarSessaoTimer = useStore((s) => s.encerrarSessaoTimer);
 
-  const { iniciadaEm } = sessaoPrivada.estatisticas;
+  const { iniciadaEm } = sessaoPrivada.estatisticas ?? {};
   const [agora, setAgora] = useState(Date.now());
 
   useEffect(() => {

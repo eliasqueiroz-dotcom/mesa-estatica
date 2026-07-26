@@ -17,10 +17,10 @@ export default function EstatisticasSection() {
       <div className="campos-grid mono" style={{ fontSize: '13px' }}>
         <span>Personagens: {totalFichas}</span>
         <span>NPCs: {totalNpcs}</span>
-        <span>Rolagens: {estatisticas.rolagens}</span>
-        <span>Surtos: {estatisticas.surtos}</span>
+        <span>Rolagens: {estatisticas?.rolagens ?? 0}</span>
+        <span>Surtos: {estatisticas?.surtos ?? 0}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          Mortes: {estatisticas.mortes}
+          Mortes: {estatisticas?.mortes ?? 0}
           <button className="icone-botao" onClick={() => ajustarMortes(-1)}>
             −
           </button>

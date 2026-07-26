@@ -25,6 +25,7 @@ import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
 import LogTabJogador from './LogTabJogador';
+import '../features/fichas/ficha.css';
 
 type AbaId = 'sessao' | 'personagens' | 'dados' | 'npcs' | 'mapa' | 'midia' | 'log';
 

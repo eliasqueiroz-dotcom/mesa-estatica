@@ -5,6 +5,8 @@ import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
 
+const EMPTY_CONDICOES: string[] = [];
+
 interface Props {
   minhaFicha: Ficha;
   nome: string;
@@ -20,7 +22,7 @@ export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[minhaFicha.id] ?? []);
+  const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[minhaFicha.id] ?? EMPTY_CONDICOES);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
