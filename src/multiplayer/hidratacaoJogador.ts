@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EntradaIniciativa, GradeMapa } from '../state/types';
+import type { EntradaIniciativa, GradeMapa, Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
@@ -7,7 +7,7 @@ import type { FichaPublica } from './fichaSplit';
 import { paraEntrada, type LinhaIniciativa } from './iniciativaSync';
 import { paraEstadoMidia, type Linha as LinhaMidiaEstado } from './midiaEstadoSync';
 import { paraFaixa, type LinhaFaixa } from './midiaFaixasSync';
-import { paraNpcPublico, type LinhaPublico as LinhaNpcPublico, type NpcPublico } from './npcsSync';
+import { paraNpcSemNotasMestre, type LinhaPublico as LinhaNpcPublico } from './npcsSync';
 import { paraSessaoPublica, type Linha as LinhaSessaoPublica } from './sessaoPublicaSync';
 
 /**
@@ -205,8 +205,8 @@ export function useFichasPublicas(): FichaPublica[] {
   return fichas;
 }
 
-export function useNpcsPublicos(): NpcPublico[] {
-  const [npcs, setNpcs] = useState<NpcPublico[]>([]);
+export function useNpcsPublicos(): Omit<Npc, 'notasMestre'>[] {
+  const [npcs, setNpcs] = useState<Omit<Npc, 'notasMestre'>[]>([]);
 
   useEffect(() => {
     const cliente = supabase;
@@ -220,7 +220,7 @@ export function useNpcsPublicos(): NpcPublico[] {
       .from('npcs_publico')
       .select('*')
       .then(({ data }) => {
-        if (!cancelado && data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcPublico));
+        if (!cancelado && data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcSemNotasMestre));
       });
 
     const canal = cliente
@@ -230,7 +230,7 @@ export function useNpcsPublicos(): NpcPublico[] {
           const idRemovido = (payload.old as { id: string }).id;
           setNpcs((atual) => atual.filter((n) => n.id !== idRemovido));
         } else {
-          const npc = paraNpcPublico(payload.new as LinhaNpcPublico);
+          const npc = paraNpcSemNotasMestre(payload.new as LinhaNpcPublico);
           setNpcs((atual) => (atual.some((n) => n.id === npc.id) ? atual.map((n) => (n.id === npc.id ? npc : n)) : [...atual, npc]));
         }
       })

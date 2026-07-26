@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FichaPublica } from '../../multiplayer/fichaSplit';
-import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
 import { nomeCondicao } from '../../rules/data/condicoesCombate';
 import { personagemEstaEmSurto } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
-import type { EntradaIniciativa, Ficha } from '../../state/types';
+import type { EntradaIniciativa, Ficha, Npc } from '../../state/types';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
 import CombatOverlayJogador from './CombatOverlayJogador';
@@ -19,10 +18,21 @@ const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup no própr
 interface Props {
   minhaFicha: Ficha;
   outrasFichas: FichaPublica[];
-  npcs: NpcPublico[];
+  npcs: Omit<Npc, 'notasMestre'>[];
   iniciativa: EntradaIniciativa[];
 }
 
+/**
+ * Aba Mapa do jogador (mesa-estatica-multiplayer-completo.md Parte IV §5): vê o tabuleiro
+ * (fundo + grade, via `useHidratarMapaPublico`/`mapa_publico`, read-only) e move só o
+ * próprio token — sem upload, sem grade editável, sem adicionar/remover token, sem
+ * `TokenOverlay` (essa é a superfície de edição de mestre). Tokens de NPC não `visivel` nunca
+ * chegam aqui pra começo de conversa (RLS de `npcs_publico`, filtrado antes de `npcs` virar
+ * prop) — ainda assim, um token cujo participante não resolve (nenhuma ficha/NPC público
+ * bate o id) não é desenhado, em vez de cair num "?" genérico como no `MapaTab` do mestre:
+ * um token fantasma sem nome ainda denunciaria "tem algo aqui", o que a Parte IV pede pra
+ * nunca vazar.
+ */
 export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, iniciativa }: Props) {
   const mapa = useStore((s) => s.mapa);
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
@@ -55,6 +65,11 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     setImgNatural(null);
   }, [mapa.imagemDataUrl]);
 
+  // `onLoad` sozinho perde a corrida quando o navegador já decodificou a imagem antes do
+  // React religar o listener (comum em `data:` URI — decodificação é quase instantânea, às
+  // vezes síncrona) — sem isso, `imgNatural` fica `null` pra sempre e o grid (agora relativo
+  // à imagem, não ao container) cai no fallback de % do container, que é exatamente o bug
+  // que essa mudança de coordenadas veio corrigir. `.complete` cobre o caso de cache-hit.
   useEffect(() => {
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth > 0) {
@@ -78,7 +93,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     }
     const ficha = outrasFichas.find((f) => f.id === id);
     if (ficha) {
-      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const };
+      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, sanidadeCritica: false, surtosAtivos: ficha.surtosAtivos, tipo: 'pc' as const };
     }
     const npc = npcs.find((n) => n.id === id);
     if (npc) {
@@ -221,22 +236,19 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             </div>
           );
         })}
-        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} />
+        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} />
       </div>
 
-      {overlay && (() => {
-        const souEu = overlay.tipo === 'pc' && overlay.participanteId === minhaFicha.id;
-        const p = participantePorId(overlay.participanteId);
-        if (!p) return null;
-        return (
-          <TokenOverlayJogador
-            minhaFicha={minhaFicha}
-            nome={p.nome}
-            idFora={souEu ? null : overlay.participanteId}
-            onFechar={() => setOverlay(null)}
-          />
-        );
-      })()}
+      {overlay && (
+        <TokenOverlayJogador
+          tipo={overlay.tipo}
+          participanteId={overlay.participanteId}
+          minhaFicha={minhaFicha}
+          outrasFichas={outrasFichas}
+          npcs={npcs}
+          onFechar={() => setOverlay(null)}
+        />
+      )}
     </div>
   );
 }
