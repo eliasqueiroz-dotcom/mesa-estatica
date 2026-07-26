@@ -25,6 +25,18 @@ interface LinhaPrivado {
  * perfeitamente válido, só porque o navegador também tava vinculado como mestre. O filtro
  * explícito por `auth_uid` deixa a query determinística nos dois casos.
  *
+ * **Segundo bug real, achado em 25/07 (dia da sessão)**: `vincular-jogador` faz
+ * `UPDATE ... SET auth_uid WHERE owner_token = X` — nunca limpa o `auth_uid` de nenhuma
+ * OUTRA linha. Se o mesmo navegador/identidade anônima já vinculou a uma ficha antes (ex.:
+ * o próprio mestre testando o link, ou o jogador clicando em mais de um link de teste) e
+ * depois vincula a uma ficha diferente, DUAS linhas de `characters_privado` acabam com o
+ * mesmo `auth_uid` — o filtro por `auth_uid` vira ambíguo e `.maybeSingle()` lança
+ * `PGRST116` de novo, mesmo com o link certo. `owner_token` tem `unique` no banco
+ * (`0002_fase_b_fichas.sql`), então filtrar por ele (quando a URL trouxer `?t=`) é
+ * deterministico independente de quantas fichas aquele `auth_uid` acabou vinculado — cai
+ * pro filtro por `auth_uid` só quando não há `?t=` na URL (revisita sem o link, sessão já
+ * vinculada antes).
+ *
  * Depois do bootstrap, popula o `useStore` compartilhado com essa ÚNICA ficha e liga
  * `iniciarSyncFichas` — o MESMO módulo que o `GmApp` usa. Não existe lógica "sou jogador,
  * então..." aqui: a RLS decide o que a escrita de fato alcança (só a própria linha), então
@@ -71,11 +83,11 @@ export function useMinhaFicha(): { carregando: boolean; possuiFicha: boolean } {
         return;
       }
 
-      const { data: privado } = await cliente
-        .from('characters_privado')
-        .select('id, dados')
-        .eq('auth_uid', userData.user.id)
-        .maybeSingle();
+      const ownerToken = new URLSearchParams(window.location.search).get('t');
+      const consultaPrivado = cliente.from('characters_privado').select('id, dados');
+      const { data: privado } = ownerToken
+        ? await consultaPrivado.eq('owner_token', ownerToken).maybeSingle()
+        : await consultaPrivado.eq('auth_uid', userData.user.id).maybeSingle();
       if (cancelado) return;
       if (!privado) {
         setCarregando(false);
