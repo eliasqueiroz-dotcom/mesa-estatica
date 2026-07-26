@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { calcularSanidadeMaxima, calcularTierRuido } from '../../rules/derivados';
 import { useStore } from '../../state/store';
+import { tierDeGauge } from '../sessao/AlertaOverlay';
 
 const DURACAO_BURST_MS = 1500;
 
@@ -40,7 +41,10 @@ export default function RuidoOverlay() {
   const ultimoBurstRuidoEm = useStore((s) => s.ultimoBurstRuidoEm);
   const burstTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const tier = useTierRuidoFichaAtiva();
+  const tierSanidade = useTierRuidoFichaAtiva();
+  const ruidoNarrativo = useStore((s) => s.sessaoPrivada.ruidoNarrativo);
+  const tierNarrativo = tierDeGauge(ruidoNarrativo);
+  const tier = Math.max(tierSanidade, tierNarrativo) as 0 | 1 | 2 | 3;
 
   useEffect(() => {
     document.documentElement.dataset.ruido = String(tier);
