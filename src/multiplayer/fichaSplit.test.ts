@@ -11,9 +11,9 @@ describe('dividirFicha / montarFicha', () => {
       id: ficha.id,
       nome: 'Maria',
       corVisual: ficha.corVisual,
-      observacaoCombate: '',
     });
     expect(privado).not.toHaveProperty('nome');
+    expect(privado.observacaoCombate).toBe('');
     expect(privado.dinheiroReal).toBe(ficha.dinheiroReal);
     expect(privado.sanidadeAtual).toBe(ficha.sanidadeAtual);
     expect(privado.pvAtual).toBe(ficha.pvAtual);
