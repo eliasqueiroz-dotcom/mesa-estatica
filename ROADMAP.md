@@ -155,6 +155,12 @@ Causa raiz: `fichasSync.ts`/`npcsSync.ts`/`tokensSync.ts`/`midiaFaixasSync.ts` i
 
 Fix: `src/multiplayer/remocaoExplicita.ts` novo — exclusão só propaga pro servidor quando o próprio botão "remover"/"excluir" da UI marcou o id de propósito (`marcarRemocaoExplicita`), nunca por inferência de diff (`eraRemocaoExplicita` consome a marca). Aplicado nos 4 módulos de sync com esse padrão + os 4 pontos de UI que removem algo (`FichasTab.tsx`, `NpcsTab.tsx`, `MapaTab.tsx` — token —, `MidiaTab.tsx` — faixa). Validado ao vivo: criar ficha + editar não aciona delete nenhum; clicar "remover" continua apagando do servidor normalmente.
 
+## Vínculo de jogador quebrava com auth_uid duplicado (25/07)
+
+Usuário reportou que clicar no link do jogador não vinculava a ficha. `vincular-jogador` só faz `UPDATE ... WHERE owner_token = X`, nunca limpa `auth_uid` de outra linha — qualquer navegador que já tivesse vinculado a uma ficha antes (teste do próprio mestre, ou o jogador clicando em mais de um link) e depois vinculasse a outra deixava **duas fichas com o mesmo `auth_uid`**. `minhaFicha.ts` buscava "minha ficha" só por `auth_uid`, e essa duplicidade lançava `PGRST116` (múltiplas linhas) — "link inválido" com um link perfeitamente válido.
+
+Fix: quando a URL trouxer `?t=<owner_token>`, filtrar por ele (é `unique` no banco) em vez de `auth_uid` — determinístico independente de quantas fichas aquele `auth_uid` acabou vinculado. Sem `?t=` (revisita sem o link), continua caindo no filtro por `auth_uid`. Validado ao vivo contra produção: forcei duas fichas com o mesmo `auth_uid` de propósito e confirmei que o link correto ainda carrega a ficha certa (campos da ficha conferidos, não só o nome no log público).
+
 ## Dia 7 — Playtest e folga
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
