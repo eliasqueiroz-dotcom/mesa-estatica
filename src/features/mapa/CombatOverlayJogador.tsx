@@ -77,13 +77,14 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
+        ...(aberto ? { width: 'calc(100% - 16px)' } : {}),
       }}
     >
       {aberto && (
         <div
           ref={painelRef}
           className="secao"
-          style={{ width: 'calc(100% - 16px)', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
+          style={{ width: '100%', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
         >
           <div
             onPointerDown={iniciarArrasto}
