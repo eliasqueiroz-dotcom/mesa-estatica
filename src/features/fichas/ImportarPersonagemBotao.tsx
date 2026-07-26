@@ -19,6 +19,7 @@ const EXEMPLO = {
   kitAntecedente: 'gravador analógico, credencial vencida, arquivo de matérias engavetadas',
   contatoOuRecurso: 'fonte dentro de uma corporação, só fala por mensagem autodestrutiva',
   armas: [{ nome: 'Faca', bonusAtaque: '', dano: '1d6', alcance: '1,5m', nota: 'fácil de esconder' }],
+  kitInvestigacao: [{ nome: 'Kit médico de campo', nota: 'Marcado — sem ele, Medicina em campo: DT +5' }],
   anotacoes: '',
 };
 
@@ -38,6 +39,7 @@ Regras de preenchimento:
 - "pericias": chave é o id ou nome da perícia (${perícias}); valor é "nenhum", "treinado" ou "veterano".
 - "vinculos" e "traumas": no máximo 3 cada.
 - "corVisual" (opcional): só se a ficha tiver uma cor definida, em hex tipo "#4fc1d4" — senão omita.
+- "kitInvestigacao": lista opcional de itens de investigação { nome, nota }.
 - apelido ou citação dentro de um texto: use aspas simples ('assim'), nunca aspas duplas sem escapar — aspas duplas cruas dentro de um valor quebram o JSON (veja "nome" no exemplo acima).
 - Responda só com o JSON, sem markdown, sem comentário antes ou depois.
 

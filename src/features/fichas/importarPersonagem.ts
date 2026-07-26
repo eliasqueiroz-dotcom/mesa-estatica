@@ -2,7 +2,7 @@ import { ANTECEDENTES } from '../../rules/data/antecedentes';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import type { BasePV } from '../../rules/data/dificuldades';
 import { ATRIBUTOS, PERICIAS, type Atributo, type GrauPericia } from '../../rules/data/pericias';
-import type { ArmaFicha, Ficha, TraumaFicha, Vinculo } from '../../state/types';
+import type { ArmaFicha, Ficha, KitInvestigacaoItem, TraumaFicha, Vinculo } from '../../state/types';
 
 /**
  * Formato solto que um personagem em .docx, convertido por uma IA qualquer, deve virar —
@@ -33,6 +33,7 @@ export interface FichaImportavel {
   contatoUsadoNesteCaso?: boolean;
   outrosItens?: string;
   armas?: { nome?: string; bonusAtaque?: string; dano?: string; alcance?: string; nota?: string }[];
+  kitInvestigacao?: { nome?: string; nota?: string }[];
   dinheiroReal?: number;
   dinheiroPonto?: number;
   anotacoes?: string;
@@ -190,6 +191,15 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
       nota: a.nota ?? '',
     }));
     patch.armas = armas;
+  }
+
+  if (dados.kitInvestigacao?.length) {
+    const itens: KitInvestigacaoItem[] = dados.kitInvestigacao.map((a) => ({
+      id: crypto.randomUUID(),
+      nome: a.nome ?? '',
+      nota: a.nota ?? '',
+    }));
+    patch.kitInvestigacao = itens;
   }
 
   return { nomeParaExibir: dados.nome?.trim() || 'sem nome', patch, avisos };
