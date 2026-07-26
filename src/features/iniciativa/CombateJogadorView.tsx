@@ -19,18 +19,24 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
 
   const conteudo = !modoCombate ? (
-    <>
-      <h3 className="label" style={{ marginBottom: '0.3rem' }}>Combate</h3>
+    semMoldura ? (
       <p className="vazio">fora de combate.</p>
-    </>
+    ) : (
+      <>
+        <h3 className="label" style={{ marginBottom: '0.3rem' }}>Combate</h3>
+        <p className="vazio">fora de combate.</p>
+      </>
+    )
   ) : (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-        <h3 className="label" style={{ margin: 0 }}>
-          Combate
-        </h3>
-        <span className="vazio mono">rodada {rodada}</span>
-      </div>
+      {!semMoldura && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+          <h3 className="label" style={{ margin: 0 }}>
+            Combate
+          </h3>
+          <span className="vazio mono">rodada {rodada}</span>
+        </div>
+      )}
 
       {iniciativa.length === 0 ? (
         <p className="vazio">aguardando o mestre rolar iniciativa.</p>
