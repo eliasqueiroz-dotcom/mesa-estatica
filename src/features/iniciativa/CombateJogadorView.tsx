@@ -7,26 +7,24 @@ import CombatenteResumo from '../combate/CombatenteResumo';
 interface Props {
   iniciativa: EntradaIniciativa[];
   minhaFicha: Ficha;
+  /** Quando true, omite o <section className="secao"> externo — usado dentro de CombatOverlayJogador que já tem .secao no painel. */
+  semMoldura?: boolean;
 }
 
-export default function CombateJogadorView({ iniciativa, minhaFicha }: Props) {
+export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura }: Props) {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const basePV = useStore((s) => s.config.basePV);
   const { modoCombate, indiceAtualTurno, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
 
-  if (!modoCombate) {
-    return (
-      <section className="secao">
-        <h3 className="label">Combate</h3>
-        <p className="vazio">fora de combate.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="secao">
+  const conteudo = !modoCombate ? (
+    <>
+      <h3 className="label" style={{ marginBottom: '0.3rem' }}>Combate</h3>
+      <p className="vazio">fora de combate.</p>
+    </>
+  ) : (
+    <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
         <h3 className="label" style={{ margin: 0 }}>
           Combate
@@ -81,6 +79,9 @@ export default function CombateJogadorView({ iniciativa, minhaFicha }: Props) {
           })}
         </div>
       )}
-    </section>
+    </>
   );
+
+  if (semMoldura) return conteudo;
+  return <section className="secao">{conteudo}</section>;
 }

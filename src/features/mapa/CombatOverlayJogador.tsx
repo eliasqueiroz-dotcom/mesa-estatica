@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) {
-  const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
+  const { modoCombate, rodada } = useStore((s) => s.sessaoPublica);
 
   const [aberto, setAberto] = useState(false);
   const [panelPos, setPanelPos] = useState({ x: 8, y: 8 });
@@ -82,35 +82,21 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
       {aberto && (
         <div
           ref={painelRef}
-          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)' }}
+          className="secao"
+          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
         >
           <div
             onPointerDown={iniciarArrasto}
-            className="secao"
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              padding: '0.3rem 0.5rem',
-              marginBottom: '-1px',
-              cursor: arrastando ? 'grabbing' : 'grab',
-              userSelect: 'none',
-              touchAction: 'none',
-            }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', cursor: arrastando ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none' }}
           >
-            <button
-              className="icone-botao"
-              onClick={() => {
-                setPanelPos({ x: 8, y: 8 });
-                setAberto(false);
-              }}
-              title="fechar"
-              onPointerDown={(ev) => ev.stopPropagation()}
-            >
+            <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
+              combate{modoCombate ? ` · rodada ${rodada}` : ''}
+            </h3>
+            <button className="icone-botao" onClick={() => { setPanelPos({ x: 8, y: 8 }); setAberto(false); }} title="fechar" onPointerDown={(ev) => ev.stopPropagation()}>
               ×
             </button>
           </div>
-          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} />
+          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} semMoldura />
         </div>
       )}
       <button
