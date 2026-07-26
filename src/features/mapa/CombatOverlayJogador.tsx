@@ -83,7 +83,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
         <div
           ref={painelRef}
           className="secao"
-          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
+          style={{ width: 'calc(100% - 16px)', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
         >
           <div
             onPointerDown={iniciarArrasto}
