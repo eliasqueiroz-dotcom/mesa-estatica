@@ -966,9 +966,9 @@ export const useStore = create<Store>()(
         if (versaoAnterior < 16) {
           estado.midia = { volume: 0.8, ...(estado.midia ?? {}) };
         }
-        // v16 → v17: kitInvestigacao em cada ficha
-        if (versaoAnterior < 17 && estado.fichas) {
-          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ kitInvestigacao: [], ...f }));
+        // v17 → v18: kitInvestigacao em cada ficha (corrige spread que sobrescrevia com undefined)
+        if (versaoAnterior < 18 && estado.fichas) {
+          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, kitInvestigacao: f.kitInvestigacao ?? [] }));
         }
         return estado as Store;
       },
