@@ -53,13 +53,13 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
     setResultadoRoll(null);
     rolar('1d20', (grupos) => {
       const valor = grupos[0]?.rolls[0]?.value ?? 0;
-      const mod = quem === 'npc' ? bonus : 0;
+      const mod = bonus;
       const total = valor + mod;
       setResultadoRoll({ d20: valor, modificador: mod, total });
 
       const origem = quem === 'npc' ? (npc?.nome || 'NPC') : (ficha?.nome || 'd20 rápido');
       const id = quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null);
-      const formula = quem === 'npc' && bonus !== 0 ? `d20+${bonus}` : 'd20';
+      const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
       registrarLog('teste', `${origem} · rolagem rápida (sem perícia/DT) → ${total}`, id, visibilidade);
       registrarRoll({
         origem,
@@ -234,6 +234,11 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
                   ))}
                 </select>
               </div>
+            </div>
+          )}
+
+          {modo === 'simples' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
               <div>
                 <label htmlFor="qr-bonus">Bônus</label>
                 <input

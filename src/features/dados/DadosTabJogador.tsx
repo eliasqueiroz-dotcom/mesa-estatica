@@ -5,6 +5,7 @@ import RoladorSanidadeJogador from './RoladorSanidadeJogador';
 import RoladorSurtoJogador from './RoladorSurtoJogador';
 import RoladorTesteJogador from './RoladorTesteJogador';
 import RoladorTraumaJogador from './RoladorTraumaJogador';
+import RolagemLivreJogador from './RolagemLivreJogador';
 
 interface Props {
   ficha: Ficha;
@@ -52,6 +53,7 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
       <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
       <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
+      <RolagemLivreJogador fichaId={ficha.id} ready={podeRolar} rolar={rolar} />
     </div>
   );
 }

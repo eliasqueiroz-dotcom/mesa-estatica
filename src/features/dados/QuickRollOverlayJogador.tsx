@@ -31,6 +31,7 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
 
   const [modo, setModo] = useState<'simples' | 'pericia'>('simples');
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
+  const [bonus, setBonus] = useState(0);
   const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
 
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
@@ -42,15 +43,18 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       '1d20',
       (grupos) => {
         const valor = grupos[0]?.rolls[0]?.value ?? 0;
-        setResultadoRoll({ d20: valor, modificador: 0, total: valor });
+        const mod = bonus;
+        const total = valor + mod;
+        setResultadoRoll({ d20: valor, modificador: mod, total });
 
         const nome = ficha.nome || 'd20 rápido';
-        registrarLog('teste', `${nome} · rolagem rápida → ${valor}`, ficha.id, 'publica');
+        const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
+        registrarLog('teste', `${nome} · rolagem rápida → ${total}`, ficha.id, 'publica');
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,
-          formula: 'd20',
-          total: valor,
+          formula,
+          total,
           bruto: valor,
           visibilidade: 'publica',
         });
@@ -146,6 +150,18 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
               perícia
             </button>
           </div>
+
+          {modo === 'simples' && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <label htmlFor="qrj-bonus">Bônus</label>
+              <input
+                id="qrj-bonus"
+                type="number"
+                value={bonus}
+                onChange={(e) => setBonus(Number(e.target.value) || 0)}
+              />
+            </div>
+          )}
 
           {modo === 'pericia' && (
             <div style={{ marginBottom: '0.5rem' }}>
