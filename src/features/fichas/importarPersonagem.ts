@@ -37,6 +37,7 @@ export interface FichaImportavel {
   dinheiroReal?: number;
   dinheiroPonto?: number;
   anotacoes?: string;
+  observacaoCombate?: string;
 }
 
 export interface ResultadoImportacao {
@@ -119,6 +120,7 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
   if (typeof dados.contatoUsadoNesteCaso === 'boolean') patch.contatoUsadoNesteCaso = dados.contatoUsadoNesteCaso;
   if (dados.outrosItens) patch.outrosItens = dados.outrosItens;
   if (dados.anotacoes) patch.anotacoes = dados.anotacoes;
+  if (dados.observacaoCombate) patch.observacaoCombate = dados.observacaoCombate;
 
   if (dados.corVisual) {
     if (CORVISUAL_HEX.test(dados.corVisual)) patch.corVisual = dados.corVisual;

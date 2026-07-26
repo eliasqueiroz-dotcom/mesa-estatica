@@ -52,6 +52,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     dinheiroReal: 500,
     dinheiroPonto: 800,
     anotacoes: '',
+    observacaoCombate: '',
     surtosAtivos: [],
   };
 }
@@ -131,7 +132,7 @@ export function criarEstadoMidia(): EstadoMidia {
   };
 }
 
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

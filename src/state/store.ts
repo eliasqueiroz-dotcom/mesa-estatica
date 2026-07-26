@@ -788,6 +788,7 @@ export const useStore = create<Store>()(
             reguladores: f.reguladores ?? [],
             vinculos: f.vinculos ?? [],
             anotacoes: f.anotacoes ?? '',
+            observacaoCombate: f.observacaoCombate ?? '',
             kitAntecedente: f.kitAntecedente ?? '',
             contatoOuRecurso: f.contatoOuRecurso ?? '',
             contatoUsadoNesteCaso: f.contatoUsadoNesteCaso ?? false,
@@ -969,6 +970,10 @@ export const useStore = create<Store>()(
         // v17 → v18: kitInvestigacao em cada ficha (corrige spread que sobrescrevia com undefined)
         if (versaoAnterior < 18 && estado.fichas) {
           estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, kitInvestigacao: f.kitInvestigacao ?? [] }));
+        }
+        // v18 → v19: observacaoCombate em cada ficha
+        if (versaoAnterior < 19 && estado.fichas) {
+          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, observacaoCombate: f.observacaoCombate ?? '' }));
         }
         return estado as Store;
       },

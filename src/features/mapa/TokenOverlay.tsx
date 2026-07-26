@@ -95,6 +95,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
+  const atualizarFicha = useStore((s) => s.atualizarFicha);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -168,6 +169,19 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
 
             <div className="vazio" style={{ fontSize: 12, textAlign: 'center', marginTop: '0.5rem', color: 'var(--real)' }}>
               🛡 defesa: <span className="mono">{calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa)}</span>
+            </div>
+
+            <div style={{ marginTop: '0.6rem' }}>
+              <label className="vazio" style={{ fontSize: 11, display: 'block', marginBottom: '0.25rem' }}>
+                observações de combate
+              </label>
+              <textarea
+                rows={2}
+                placeholder="ex.: tiro no pé direito, proteção danificada…"
+                value={ficha.observacaoCombate ?? ''}
+                onChange={(e) => atualizarFicha(ficha.id, { observacaoCombate: e.target.value })}
+                style={{ width: '100%', minHeight: '2.5em', fontSize: 12 }}
+              />
             </div>
 
             {(emSurto || traumasAtivos.length > 0) && (

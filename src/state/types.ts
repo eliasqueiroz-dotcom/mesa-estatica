@@ -97,6 +97,7 @@ export interface Ficha {
   dinheiroPonto: number;
 
   anotacoes: string;
+  observacaoCombate: string;
 
   surtosAtivos: SurtoAtivo[];
 }

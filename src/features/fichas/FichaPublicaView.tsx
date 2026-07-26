@@ -16,6 +16,11 @@ export default function FichaPublicaView({ ficha }: Props) {
           {ficha.nome || 'sem nome'}
         </h3>
       </div>
+      {ficha.observacaoCombate && (
+        <p className="vazio" style={{ marginTop: '0.4rem', marginBottom: 0, fontSize: 12, whiteSpace: 'pre-wrap' }}>
+          {ficha.observacaoCombate}
+        </p>
+      )}
     </section>
   );
 }

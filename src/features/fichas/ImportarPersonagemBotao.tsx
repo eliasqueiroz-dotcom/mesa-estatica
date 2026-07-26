@@ -21,6 +21,7 @@ const EXEMPLO = {
   armas: [{ nome: 'Faca', bonusAtaque: '', dano: '1d6', alcance: '1,5m', nota: 'fácil de esconder' }],
   kitInvestigacao: [{ nome: 'Kit médico de campo', nota: 'Marcado — sem ele, Medicina em campo: DT +5' }],
   anotacoes: '',
+  observacaoCombate: 'tiro no pé direito — desvantagem em Agilidade',
 };
 
 function montarPrompt(): string {
