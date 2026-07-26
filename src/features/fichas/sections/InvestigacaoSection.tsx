@@ -1,0 +1,90 @@
+import { useState } from 'react';
+import { KIT_INVESTIGACAO, type DefinicaoKitInvestigacao } from '../../../rules/data/kitInvestigacao';
+import type { KitInvestigacaoItem } from '../../../state/types';
+import type { SecaoFichaProps } from '../tipos';
+
+export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps) {
+  const [arsenalSelect, setArsenalSelect] = useState('');
+
+  const atualizar = (id: string, patch: Partial<KitInvestigacaoItem>) => {
+    onChange({ kitInvestigacao: ficha.kitInvestigacao.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+  };
+
+  const remover = (id: string) => {
+    onChange({ kitInvestigacao: ficha.kitInvestigacao.filter((a) => a.id !== id) });
+  };
+
+  const adicionarDoCatalogo = (nomeEquipamento: string) => {
+    const def = KIT_INVESTIGACAO.find((a: DefinicaoKitInvestigacao) => a.nome === nomeEquipamento);
+    if (!def) return;
+    const nova: KitInvestigacaoItem = {
+      id: crypto.randomUUID(),
+      nome: def.nome,
+      nota: `${def.acesso} / ${def.etiquetas} — ${def.nota}`,
+    };
+    onChange({ kitInvestigacao: [...ficha.kitInvestigacao, nova] });
+  };
+
+  return (
+    <section className="secao">
+      <h3 className="label">Kit de Investigação</h3>
+      {ficha.kitInvestigacao.length > 0 && (
+        <table className="armas-tabela">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Nota / Acesso</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {ficha.kitInvestigacao.map((a) => (
+              <tr key={a.id}>
+                <td>
+                  <input value={a.nome} onChange={(e) => atualizar(a.id, { nome: e.target.value })} />
+                </td>
+                <td>
+                  <input value={a.nota} onChange={(e) => atualizar(a.id, { nota: e.target.value })} />
+                </td>
+                <td>
+                  <button className="icone-botao perigo" onClick={() => remover(a.id)}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="acento" onClick={() => {
+          const nova: KitInvestigacaoItem = { id: crypto.randomUUID(), nome: '', nota: '' };
+          onChange({ kitInvestigacao: [...ficha.kitInvestigacao, nova] });
+        }}>
+          + item livre
+        </button>
+        <select
+          value={arsenalSelect}
+          onChange={(e) => {
+            const val = e.target.value;
+            setArsenalSelect('');
+            if (val) adicionarDoCatalogo(val);
+          }}
+        >
+          <option value="">+ do catálogo…</option>
+          {KIT_INVESTIGACAO.map((a) => (
+            <option key={a.nome} value={a.nome}>
+              {a.nome} — {a.preco} ({a.acesso})
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="vazio" style={{ marginTop: '0.75rem' }}>
+        Acesso: Comum = compra direta · Marcado = registrado na rede · Restrito = Contato + teste DT 15-20 · Proibido = gancho de caso
+      </p>
+      <p className="vazio" style={{ marginTop: '0.4rem' }}>
+        Etiquetas: Rastreável (rede sabe onde está) · Analógico (fora da rede, sobrevive à Correção) · Ilegal (ser pego é problema) · Óbvio (todo mundo nota)
+      </p>
+    </section>
+  );
+}

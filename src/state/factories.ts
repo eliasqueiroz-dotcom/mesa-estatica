@@ -45,6 +45,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     contatoUsadoNesteCaso: false,
     outrosItens: '',
     armas: [],
+    kitInvestigacao: [],
     reguladores: [],
     acessos: 0,
     anestesiaAte: null,

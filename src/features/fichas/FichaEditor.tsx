@@ -6,6 +6,7 @@ import AtributosDerivadosSection from './sections/AtributosDerivadosSection';
 import DinheiroSection from './sections/DinheiroSection';
 import EquipamentoSection from './sections/EquipamentoSection';
 import IdentidadeSection from './sections/IdentidadeSection';
+import InvestigacaoSection from './sections/InvestigacaoSection';
 import PericiasSection from './sections/PericiasSection';
 import ReguladoresSection from './sections/ReguladoresSection';
 import TraumasSection from './sections/TraumasSection';
@@ -23,6 +24,7 @@ export default function FichaEditor({ ficha }: { ficha: Ficha }) {
       <PericiasSection ficha={ficha} onChange={onChange} />
       <TraumasSection ficha={ficha} onChange={onChange} />
       <EquipamentoSection ficha={ficha} onChange={onChange} />
+      <InvestigacaoSection ficha={ficha} onChange={onChange} />
       <ArmasSection ficha={ficha} onChange={onChange} />
       <ReguladoresSection ficha={ficha} onChange={onChange} />
       <DinheiroSection ficha={ficha} onChange={onChange} />

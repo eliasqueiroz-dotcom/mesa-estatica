@@ -29,6 +29,12 @@ export interface SurtoAtivo {
   escolha: string | null;
 }
 
+export interface KitInvestigacaoItem {
+  id: string;
+  nome: string;
+  nota: string;
+}
+
 export interface ArmaFicha {
   id: string;
   nome: string;
@@ -81,6 +87,7 @@ export interface Ficha {
   outrosItens: string;
 
   armas: ArmaFicha[];
+  kitInvestigacao: KitInvestigacaoItem[];
 
   reguladores: DoseRegulador[];
   acessos: number; // telemetria acumulada — o mestre "gasta na pior hora"
