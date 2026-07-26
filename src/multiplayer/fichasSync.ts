@@ -1,4 +1,5 @@
 import type { BasePV } from '../rules/data/dificuldades';
+import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
 import type { Ficha } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { useStore } from '../state/store';
@@ -6,10 +7,6 @@ import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
-/** Push debounçado — sem isso, cada tecla digitada numa ficha disparava uma escrita no
- *  Supabase na hora (visto ao vivo: lag perceptível ao digitar, mais o eco do Realtime
- *  voltando com um valor levemente atrasado por cima do que acabou de ser digitado). Só a
- *  edição local (Zustand) continua instantânea; o push espera uma pausa de verdade. */
 const ATRASO_PUSH_MS = 400;
 
 type Cliente = NonNullable<typeof supabase>;
@@ -31,24 +28,20 @@ interface LinhaPrivado {
   dados: FichaPrivadaDados;
 }
 
-const paraLinhaPublico = (p: FichaPublica): LinhaPublico => ({
-  id: p.id,
-  nome: p.nome,
-  cor_visual: p.corVisual,
-  pv_atual: p.pvAtual,
-  pv_maximo: p.pvMaximo,
-  defesa: p.defesa,
-  surtos_ativos: p.surtosAtivos,
+const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
+  id: ficha.id,
+  nome: ficha.nome,
+  cor_visual: ficha.corVisual,
+  pv_atual: ficha.pvAtual,
+  pv_maximo: calcularPvMaximo(basePV, ficha.atributos.vigor),
+  defesa: calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa),
+  surtos_ativos: ficha.surtosAtivos,
 });
 
 export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
-  pvAtual: r.pv_atual,
-  pvMaximo: r.pv_maximo,
-  defesa: r.defesa,
-  surtosAtivos: r.surtos_ativos,
 });
 
 async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null> {
@@ -83,8 +76,9 @@ async function buscarTodas(cliente: Cliente): Promise<Ficha[]> {
  * Nunca escreve owner_token/auth_uid numa linha já existente — isso é exclusivo
  * da Edge Function vincular-jogador.
  */
-async function empurrarFicha(cliente: Cliente, ficha: Ficha, basePV: BasePV) {
-  const { publico, privado } = dividirFicha(ficha, basePV);
+async function empurrarFicha(cliente: Cliente, ficha: Ficha) {
+  const { privado } = dividirFicha(ficha);
+  const basePV = useStore.getState().config.basePV;
   const { data: existente } = await cliente.from('characters_privado').select('id').eq('id', ficha.id).maybeSingle();
 
   if (!existente) {
@@ -93,7 +87,7 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha, basePV: BasePV) {
       .from('characters_privado')
       .insert({ id: ficha.id, owner_token: ownerToken, dados: privado });
     if (erroPrivado) throw erroPrivado;
-    const { error: erroPublico } = await cliente.from('characters_publico').insert(paraLinhaPublico(publico));
+    const { error: erroPublico } = await cliente.from('characters_publico').insert(paraLinhaPublico(ficha, basePV));
     if (erroPublico) throw erroPublico;
   } else {
     const { error: erroPrivado } = await cliente
@@ -103,7 +97,7 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha, basePV: BasePV) {
     if (erroPrivado) throw erroPrivado;
     const { error: erroPublico } = await cliente
       .from('characters_publico')
-      .update(paraLinhaPublico(publico))
+      .update(paraLinhaPublico(ficha, basePV))
       .eq('id', ficha.id);
     if (erroPublico) throw erroPublico;
   }
@@ -143,8 +137,8 @@ export function iniciarSyncFichas(): () => void {
   let aplicandoRemotoContagem = 0;
   let fichasAnteriores = useStore.getState().fichas;
 
-  const agendarPush = criarDebouncePorChave<{ ficha: Ficha; basePV: BasePV }>(ATRASO_PUSH_MS, (_id, { ficha, basePV }) => {
-    empurrarFicha(cliente, ficha, basePV).catch((e) =>
+  const agendarPush = criarDebouncePorChave<Ficha>(ATRASO_PUSH_MS, (_id, ficha) => {
+    empurrarFicha(cliente, ficha).catch((e) =>
       console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
     );
   });
@@ -152,13 +146,12 @@ export function iniciarSyncFichas(): () => void {
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0 || state.fichas === prevState.fichas) return;
 
-    const basePV = state.config.basePV;
     const idsAnteriores = new Set(fichasAnteriores.map((f) => f.id));
     const idsAtuais = new Set(state.fichas.map((f) => f.id));
 
     for (const ficha of state.fichas) {
       const anterior = fichasAnteriores.find((f) => f.id === ficha.id);
-      if (anterior !== ficha) agendarPush(ficha.id, { ficha, basePV });
+      if (anterior !== ficha) agendarPush(ficha.id, ficha);
     }
     for (const idAntigo of idsAnteriores) {
       // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
