@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
+import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 
 // Duplicado de `RoladorSanidade.tsx` de propósito (poucas linhas, puro) — evita puxar aquele
@@ -44,6 +45,7 @@ interface Props {
  * verdade na própria tela, com a DT real.
  */
 export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
+  const registrarLog = useStore((s) => s.registrarLog);
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
   const [rolando, setRolando] = useState(false);
   const [resultado, setResultado] = useState<{ d20: number; perdaRolada: number } | null>(null);
@@ -59,6 +61,7 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
         const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
         setResultado({ d20, perdaRolada });
         setRolando(false);
+        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · Vontade+${gatilho.nome} → d20=${d20}, perda=${perdaRolada}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,

@@ -25,6 +25,8 @@ interface Props {
  */
 export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [resultado, setResultado] = useState<{ d20: number; modificador: number; total: number } | null>(null);
@@ -48,6 +50,18 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
         const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
         setResultado({ d20, modificador, total: d20 + modificador });
         setRolando(false);
+
+        const nome = ficha.nome || 'Personagem';
+        const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
+        registrarLog('teste', `${nome} · ${atributo.nome}+${pericia.nome} → d20${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
+        registrarRoll({
+          origem: nome,
+          personagemId: ficha.id,
+          formula: `d20${modStr}`,
+          total: d20 + modificador,
+          bruto: d20,
+          visibilidade: 'publica',
+        });
       },
       'rede',
       ficha.id,

@@ -27,6 +27,7 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
   const ajustarDeterminacao = useStore((s) => s.ajustarDeterminacao);
+  const registrarLog = useStore((s) => s.registrarLog);
 
   const [traumaId, setTraumaId] = useState('');
   const [rolando, setRolando] = useState(false);
@@ -58,6 +59,7 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
         setTeste(r);
         setRolando(false);
         if (r.sucesso) setResolvido(true);
+        registrarLog('trauma', `${ficha.nome || 'Personagem'} · "${trauma.nome}" · Vontade vs DT${DT_GATILHO} → ${r.sucesso ? 'segura' : 'falha'}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,

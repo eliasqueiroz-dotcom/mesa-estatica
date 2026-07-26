@@ -27,6 +27,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
   const dispararBurstRuido = useStore((s) => s.dispararBurstRuido);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
+  const registrarLog = useStore((s) => s.registrarLog);
   const sessaoPublica = useStore((s) => s.sessaoPublica);
 
   const [rolando, setRolando] = useState(false);
@@ -56,6 +57,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
               { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: r.entradaA.nome },
             ],
           });
+          registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} → ${r.entradaA.nome} (destino insiste)`, ficha.id, 'publica');
         } else {
           atualizarFicha(ficha.id, {
             surtosAtivos: [
@@ -69,6 +71,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
               [ficha.id]: { nomeFicha: ficha.nome ?? 'Personagem', entradaA: r.entradaA, entradaB: r.entradaB },
             },
           }));
+          registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} — escolha pendente`, ficha.id, 'publica');
         }
       },
       'ruido',
@@ -80,6 +83,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
     if (!resultado) return;
     setEscolhido(lado);
     resolverEscolhaSurtoPendente(ficha.id, lado);
+    registrarLog('surto', `${ficha.nome || 'Personagem'} · escolheu lado ${lado} do surto`, ficha.id, 'publica');
   };
 
   return (

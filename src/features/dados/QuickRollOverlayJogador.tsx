@@ -26,6 +26,8 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
   const habilitado = abaAtual !== 'dados' && aberto;
   const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-jogador', habilitado, 45, resolverRolagemJogador);
   const basePV = useStore((s) => s.config.basePV);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const [modo, setModo] = useState<'simples' | 'pericia'>('simples');
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
@@ -40,6 +42,17 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       (grupos) => {
         const valor = grupos[0]?.rolls[0]?.value ?? 0;
         setResultadoRoll({ d20: valor, modificador: 0, total: valor });
+
+        const nome = ficha.nome || 'd20 rápido';
+        registrarLog('teste', `${nome} · rolagem rápida → ${valor}`, ficha.id, 'publica');
+        registrarRoll({
+          origem: nome,
+          personagemId: ficha.id,
+          formula: 'd20',
+          total: valor,
+          bruto: valor,
+          visibilidade: 'publica',
+        });
       },
       'rede',
       ficha.id,
@@ -58,6 +71,18 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
         const grauPericia = ficha.pericias[periciaId] ?? 0;
         const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
         setResultadoRoll({ d20, modificador, total: d20 + modificador });
+
+        const nome = ficha.nome || 'Personagem';
+        const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
+        registrarLog('teste', `${nome} · teste rápido → d20${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
+        registrarRoll({
+          origem: nome,
+          personagemId: ficha.id,
+          formula: `d20${modStr}`,
+          total: d20 + modificador,
+          bruto: d20,
+          visibilidade: 'publica',
+        });
       },
       'rede',
       ficha.id,
