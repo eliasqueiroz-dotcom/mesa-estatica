@@ -1,5 +1,6 @@
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { personagemEstaEmSurto } from '../../rules/surto';
+import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
@@ -16,6 +17,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
+  const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const { modoCombate, indiceAtualTurno, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
@@ -47,7 +49,6 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
           {iniciativa.map((e, i) => {
             const ativo = i === indiceAtualTurno;
             const souEu = ehMeuTurno(e.participanteId);
-            const condicoes = condicoesCombate?.[e.participanteId] ?? [];
             const pvMaximo = calcularPvMaximo(basePV, minhaFicha.atributos.vigor);
             const defesa = calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa);
             const surtoAtivo = personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
@@ -91,12 +92,26 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
                       pvAtual={minhaFicha.pvAtual}
                       pvMaximo={pvMaximo}
                       defesa={defesa}
-                      condicoes={condicoes}
                       surtoAtivo={surtoAtivo}
                       surtoEscolha={surtoEscolha}
                       editavel
                       onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
                     />
+                    <div className="combate-condicoes" style={{ marginTop: '0.5rem' }}>
+                      {CONDICOES_COMBATE.map((c) => {
+                        const ligada = condicoesCombate?.[minhaFicha.id]?.includes(c.id) ?? false;
+                        return (
+                          <button
+                            key={c.id}
+                            className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                            title={c.efeito}
+                            onClick={() => alternarCondicaoCombate(minhaFicha.id, c.id)}
+                          >
+                            {nomeCondicao(c.id)}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
                       <span className="vazio" style={{ fontSize: 10, color: 'var(--real)' }}>🛡</span>
                       <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>

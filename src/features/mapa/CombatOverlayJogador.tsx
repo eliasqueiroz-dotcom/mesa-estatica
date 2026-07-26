@@ -77,7 +77,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
-        ...(aberto ? { width: 'calc(100% - 16px)' } : {}),
+        ...(aberto ? { width: 'min(450px, calc(100% - 16px))' } : {}),
       }}
     >
       {aberto && (
