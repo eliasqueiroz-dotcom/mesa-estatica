@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import DadosTabJogador from '../features/dados/DadosTabJogador';
 import QuickRollOverlayJogador from '../features/dados/QuickRollOverlayJogador';
 import FichaEditor from '../features/fichas/FichaEditor';
-import FichaPublicaView from '../features/fichas/FichaPublicaView';
 import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
 import MapaJogadorView from '../features/mapa/MapaJogadorView';
 import MidiaJogadorView from '../features/midia/MidiaJogadorView';
@@ -190,7 +189,10 @@ export default function PlayerApp() {
               <p className="vazio">link inválido ou ficha ainda não vinculada — confira com o mestre.</p>
             )}
             {outrasFichas.map((f) => (
-              <FichaPublicaView key={f.id} ficha={f} />
+              <div key={f.id} className="secao" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span aria-hidden style={{ background: f.corVisual, width: 14, height: 14, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />
+                <span className="label">{f.nome || 'sem nome'}</span>
+              </div>
             ))}
           </div>
         </div>

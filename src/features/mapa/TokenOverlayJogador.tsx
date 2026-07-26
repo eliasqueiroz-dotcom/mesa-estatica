@@ -19,6 +19,7 @@ export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
+  const atualizarFicha = useStore((s) => s.atualizarFicha);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
@@ -54,21 +55,35 @@ export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar
         </div>
 
         {idFora === null ? (
-          <CombatenteResumo
-            nome=""
-            cor={minhaFicha.corVisual}
-            pvAtual={minhaFicha.pvAtual}
-            pvMaximo={calcularPvMaximo(basePV, minhaFicha.atributos.vigor)}
-            defesa={calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa)}
-            condicoes={condicoesAtivas}
-            surtoAtivo={personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada })}
-            surtoEscolha={minhaFicha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null}
-            editavel
-            sanidadeAtual={minhaFicha.sanidadeAtual}
-            sanidadeMaxima={calcularSanidadeMaxima(minhaFicha.atributos.vontade)}
-            onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
-            onAjustarSanidade={(d) => ajustarSanidadeAtual(minhaFicha.id, minhaFicha.sanidadeAtual + d)}
-          />
+          <>
+            <CombatenteResumo
+              nome=""
+              cor={minhaFicha.corVisual}
+              pvAtual={minhaFicha.pvAtual}
+              pvMaximo={calcularPvMaximo(basePV, minhaFicha.atributos.vigor)}
+              defesa={calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa)}
+              condicoes={condicoesAtivas}
+              surtoAtivo={personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada })}
+              surtoEscolha={minhaFicha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null}
+              editavel
+              sanidadeAtual={minhaFicha.sanidadeAtual}
+              sanidadeMaxima={calcularSanidadeMaxima(minhaFicha.atributos.vontade)}
+              onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
+              onAjustarSanidade={(d) => ajustarSanidadeAtual(minhaFicha.id, minhaFicha.sanidadeAtual + d)}
+            />
+            <div style={{ marginTop: '0.75rem' }}>
+              <label className="label" style={{ fontSize: 11, display: 'block', marginBottom: '0.25rem' }}>
+                observações de combate
+              </label>
+              <textarea
+                rows={3}
+                value={minhaFicha.observacaoCombate ?? ''}
+                onChange={(e) => atualizarFicha(minhaFicha.id, { observacaoCombate: e.target.value })}
+                placeholder="anotações de PV, defesa, condições…"
+                style={{ width: '100%', minHeight: '2.5em', fontSize: 12 }}
+              />
+            </div>
+          </>
         ) : (
           <p className="vazio" style={{ textAlign: 'center', margin: '1.5rem 0' }}>
             informação restrita ao mestre
