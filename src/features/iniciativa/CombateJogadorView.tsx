@@ -66,7 +66,6 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
                     {e.nome || 'sem nome'}
                     {souEu && <span className="badge" style={{ marginLeft: '0.4rem' }}>você</span>}
                   </span>
-                  <span className="vazio">{e.valor}</span>
                 </div>
                 {souEu && (
                   <CombatenteResumo
