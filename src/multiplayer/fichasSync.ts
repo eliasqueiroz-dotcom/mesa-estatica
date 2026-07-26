@@ -19,6 +19,7 @@ export interface LinhaPublico {
   pv_maximo: number;
   defesa: number;
   surtos_ativos: Ficha['surtosAtivos'];
+  observacao_combate?: string;
 }
 
 interface LinhaPrivado {
@@ -36,12 +37,14 @@ const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
   pv_maximo: calcularPvMaximo(basePV, ficha.atributos.vigor),
   defesa: calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa),
   surtos_ativos: ficha.surtosAtivos,
+  observacao_combate: ficha.observacaoCombate ?? '',
 });
 
 export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
+  observacaoCombate: r.observacao_combate ?? '',
 });
 
 async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null> {
