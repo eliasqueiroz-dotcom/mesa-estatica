@@ -14,6 +14,8 @@ interface Props {
 export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura }: Props) {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const basePV = useStore((s) => s.config.basePV);
+  const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
+  const atualizarFicha = useStore((s) => s.atualizarFicha);
   const { modoCombate, indiceAtualTurno, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
@@ -68,16 +70,40 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
                   </span>
                 </div>
                 {souEu && (
-                  <CombatenteResumo
-                    nome=""
-                    cor={minhaFicha.corVisual}
-                    pvAtual={minhaFicha.pvAtual}
-                    pvMaximo={pvMaximo}
-                    defesa={defesa}
-                    condicoes={condicoes}
-                    surtoAtivo={surtoAtivo}
-                    surtoEscolha={surtoEscolha}
-                  />
+                  <div style={{ paddingLeft: '1.1rem' }}>
+                    {minhaFicha.armas.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                        {minhaFicha.armas.map((a) => (
+                          <span
+                            key={a.id}
+                            className="badge"
+                            style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
+                          >
+                            🗡 {a.nome || 'arma'}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <CombatenteResumo
+                      nome=""
+                      cor={minhaFicha.corVisual}
+                      pvAtual={minhaFicha.pvAtual}
+                      pvMaximo={pvMaximo}
+                      defesa={defesa}
+                      condicoes={condicoes}
+                      surtoAtivo={surtoAtivo}
+                      surtoEscolha={surtoEscolha}
+                      editavel
+                      onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
+                      <span className="vazio" style={{ fontSize: 10, color: 'var(--real)' }}>🛡</span>
+                      <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
+                      <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa}</span>
+                      <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) + 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                    </div>
+                  </div>
                 )}
               </div>
             );
