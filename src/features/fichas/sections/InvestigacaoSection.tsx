@@ -5,13 +5,14 @@ import type { SecaoFichaProps } from '../tipos';
 
 export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps) {
   const [arsenalSelect, setArsenalSelect] = useState('');
+  const itens = ficha.kitInvestigacao ?? [];
 
   const atualizar = (id: string, patch: Partial<KitInvestigacaoItem>) => {
-    onChange({ kitInvestigacao: ficha.kitInvestigacao.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
+    onChange({ kitInvestigacao: itens.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
   };
 
   const remover = (id: string) => {
-    onChange({ kitInvestigacao: ficha.kitInvestigacao.filter((a) => a.id !== id) });
+    onChange({ kitInvestigacao: itens.filter((a) => a.id !== id) });
   };
 
   const adicionarDoCatalogo = (nomeEquipamento: string) => {
@@ -22,13 +23,13 @@ export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps
       nome: def.nome,
       nota: `${def.acesso} / ${def.etiquetas} — ${def.nota}`,
     };
-    onChange({ kitInvestigacao: [...ficha.kitInvestigacao, nova] });
+    onChange({ kitInvestigacao: [...itens, nova] });
   };
 
   return (
     <section className="secao">
       <h3 className="label">Kit de Investigação</h3>
-      {ficha.kitInvestigacao.length > 0 && (
+      {itens.length > 0 && (
         <table className="armas-tabela">
           <thead>
             <tr>
@@ -38,7 +39,7 @@ export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps
             </tr>
           </thead>
           <tbody>
-            {ficha.kitInvestigacao.map((a) => (
+            {itens.map((a) => (
               <tr key={a.id}>
                 <td>
                   <input value={a.nome} onChange={(e) => atualizar(a.id, { nome: e.target.value })} />
@@ -59,7 +60,7 @@ export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="acento" onClick={() => {
           const nova: KitInvestigacaoItem = { id: crypto.randomUUID(), nome: '', nota: '' };
-          onChange({ kitInvestigacao: [...ficha.kitInvestigacao, nova] });
+          onChange({ kitInvestigacao: [...itens, nova] });
         }}>
           + item livre
         </button>

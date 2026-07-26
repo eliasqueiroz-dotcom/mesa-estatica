@@ -784,6 +784,7 @@ export const useStore = create<Store>()(
             pericias: f.pericias ?? {},
             traumas: f.traumas ?? [],
             armas: f.armas ?? [],
+            kitInvestigacao: f.kitInvestigacao ?? [],
             reguladores: f.reguladores ?? [],
             vinculos: f.vinculos ?? [],
             anotacoes: f.anotacoes ?? '',
@@ -964,6 +965,10 @@ export const useStore = create<Store>()(
         // v15 → v16: volume da música sincronizado (só o GM ajusta).
         if (versaoAnterior < 16) {
           estado.midia = { volume: 0.8, ...(estado.midia ?? {}) };
+        }
+        // v16 → v17: kitInvestigacao em cada ficha
+        if (versaoAnterior < 17 && estado.fichas) {
+          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ kitInvestigacao: [], ...f }));
         }
         return estado as Store;
       },

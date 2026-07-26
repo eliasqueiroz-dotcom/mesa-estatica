@@ -131,7 +131,7 @@ export function criarEstadoMidia(): EstadoMidia {
   };
 }
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
