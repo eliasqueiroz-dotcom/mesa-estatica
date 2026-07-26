@@ -1,40 +1,26 @@
 import { useEffect } from 'react';
-import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { personagemEstaEmSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
-import type { Ficha, Npc } from '../../state/types';
+import type { Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
 
-const EMPTY_CONDICOES: string[] = [];
-
 interface Props {
-  tipo: 'pc' | 'npc';
-  participanteId: string;
   minhaFicha: Ficha;
-  outrasFichas: FichaPublica[];
-  npcs: Omit<Npc, 'notasMestre'>[];
+  nome: string;
+  /** null = é o próprio PC (mostra detalhes); qualquer string = restrito */
+  idFora: string | null;
   onFechar: () => void;
 }
 
-/**
- * Overlay de detalhes ao clicar num token no mapa do jogador (mesa-estatica-multiplayer-completo.md
- * Parte IV §4) — mesma chrome de modal de `TokenOverlay.tsx`/`ImportarPersonagemBotao.tsx`
- * (fixo, caixa `.secao` central, Esc/clique-fora fecha), mas NÃO reaproveita `TokenOverlay.tsx`
- * direto — aquele é a superfície de edição total do mestre (condições, notas de NPC, ações).
- * Três ramos: próprio PC (editável — PV/Sanidade via `ajustarPvAtual`/`ajustarSanidadeAtual`,
- * seguro por construção porque no bundle do jogador `s.fichas` só contém a própria ficha, ver
- * `useMinhaFicha`), PC alheio (read-only, via `FichaPublica`, que já tem `defesa` pública),
- * NPC (read-only, já 100% público).
- */
-export default function TokenOverlayJogador({ tipo, participanteId, minhaFicha, outrasFichas, npcs, onFechar }: Props) {
+export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[participanteId] ?? EMPTY_CONDICOES);
+  const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[minhaFicha.id] ?? []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -43,14 +29,6 @@ export default function TokenOverlayJogador({ tipo, participanteId, minhaFicha, 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onFechar]);
-
-  const souEu = tipo === 'pc' && participanteId === minhaFicha.id;
-  const ficha = tipo === 'pc' && !souEu ? outrasFichas.find((f) => f.id === participanteId) : undefined;
-  const npc = tipo === 'npc' ? npcs.find((n) => n.id === participanteId) : undefined;
-
-  if (!souEu && !ficha && !npc) return null;
-
-  const nome = souEu ? minhaFicha.nome : ficha ? ficha.nome : npc!.nome;
 
   return (
     <div
@@ -73,7 +51,7 @@ export default function TokenOverlayJogador({ tipo, participanteId, minhaFicha, 
           </button>
         </div>
 
-        {souEu && (
+        {idFora === null ? (
           <CombatenteResumo
             nome=""
             cor={minhaFicha.corVisual}
@@ -89,30 +67,10 @@ export default function TokenOverlayJogador({ tipo, participanteId, minhaFicha, 
             onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
             onAjustarSanidade={(d) => ajustarSanidadeAtual(minhaFicha.id, minhaFicha.sanidadeAtual + d)}
           />
-        )}
-
-        {ficha && (
-          <CombatenteResumo
-            nome=""
-            cor={ficha.corVisual}
-            pvAtual={ficha.pvAtual}
-            pvMaximo={ficha.pvMaximo}
-            defesa={ficha.defesa}
-            condicoes={condicoesAtivas}
-            surtoAtivo={personagemEstaEmSurto(ficha.surtosAtivos, { modoCombate, contadorCena, rodada })}
-            surtoEscolha={ficha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null}
-          />
-        )}
-
-        {npc && (
-          <CombatenteResumo
-            nome=""
-            cor={npc.corVisual}
-            pvAtual={npc.pvAtual}
-            pvMaximo={npc.pvMaximo}
-            defesa={npc.defesa}
-            condicoes={condicoesAtivas}
-          />
+        ) : (
+          <p className="vazio" style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+            informação restrita ao mestre
+          </p>
         )}
       </div>
     </div>

@@ -28,6 +28,14 @@ interface LinhaPrivado {
   notas_mestre: string;
 }
 
+/** Visão pública de NPC — só o que o jogador vê. */
+export interface NpcPublico {
+  id: string;
+  nome: string;
+  corVisual: string;
+  visivel: boolean;
+}
+
 const paraLinhaPublico = (n: Npc): LinhaPublico => ({
   id: n.id,
   nome: n.nome,
@@ -53,6 +61,13 @@ export const paraNpcSemNotasMestre = (r: LinhaPublico): Omit<Npc, 'notasMestre'>
   notas: r.notas,
   categoria: r.categoria,
   acoes: r.acoes,
+  visivel: r.visivel,
+});
+
+export const paraNpcPublico = (r: LinhaPublico): NpcPublico => ({
+  id: r.id,
+  nome: r.nome,
+  corVisual: r.cor_visual,
   visivel: r.visivel,
 });
 
