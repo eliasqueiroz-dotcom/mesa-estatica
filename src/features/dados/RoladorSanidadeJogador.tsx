@@ -61,7 +61,7 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
         const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
         setResultado({ d20, perdaRolada });
         setRolando(false);
-        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · Vontade+${gatilho.nome} → d20=${d20}, perda=${perdaRolada}`, ficha.id, 'publica');
+        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · Vontade+${gatilho.nome} → d20=${d20}, perda_rolada=${perdaRolada}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,
@@ -92,7 +92,7 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
       {resultado && (
         <div className="alerta-banner mono" style={{ marginTop: '0.75rem' }}>
           <span>
-            d20={resultado.d20} · rolou {resultado.perdaRolada} de Sanidade — aguarde o mestre confirmar quanto perde
+            d20={resultado.d20} · rolou {resultado.perdaRolada} no dado de Sanidade — aguarde o mestre confirmar quanto perde
             de verdade
           </span>
         </div>
