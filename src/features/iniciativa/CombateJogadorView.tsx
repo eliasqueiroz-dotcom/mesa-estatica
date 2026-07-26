@@ -10,9 +10,11 @@ interface Props {
   minhaFicha: Ficha;
   /** Quando true, omite o <section className="secao"> externo — usado dentro de CombatOverlayJogador que já tem .secao no painel. */
   semMoldura?: boolean;
+  /** Mapa participanteId → corVisual, usado pra mostrar bolinha colorida antes do nome. Opcional — omitido no uso standalone (NPCs tab). */
+  corMap?: Record<string, string>;
 }
 
-export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura }: Props) {
+export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura, corMap }: Props) {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
@@ -65,6 +67,13 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura 
               >
                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: souEu ? '0.4rem' : 0 }}>
                   <span style={{ width: '1.2em', textAlign: 'center', color: 'var(--rede)' }}>{ativo ? '▶' : ''}</span>
+                  <span
+                    style={{
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: corMap?.[e.participanteId] ?? '#666',
+                      display: 'inline-block', flexShrink: 0,
+                    }}
+                  />
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {e.nome || 'sem nome'}
                     {souEu && <span className="badge" style={{ marginLeft: '0.4rem' }}>você</span>}

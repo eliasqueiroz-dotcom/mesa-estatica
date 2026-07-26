@@ -65,6 +65,11 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   const meuToken = mapa.tokens.find((t) => t.participanteId === minhaFicha.id);
   const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
 
+  const corMap: Record<string, string> = {};
+  corMap[minhaFicha.id] = minhaFicha.corVisual;
+  for (const f of outrasFichas) corMap[f.id] = f.corVisual;
+  for (const n of npcs) corMap[n.id] = n.corVisual ?? COR_NPC_PADRAO;
+
   const participantePorId = (id: string) => {
     if (id === minhaFicha.id) {
       const sanidadeCritica = minhaFicha.sanidadeAtual <= calcularSanidadeMaxima(minhaFicha.atributos.vontade) * 0.25;
@@ -221,7 +226,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             </div>
           );
         })}
-        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} />
+        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
       </div>
 
       {overlay && (() => {

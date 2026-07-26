@@ -6,9 +6,10 @@ import type { EntradaIniciativa, Ficha } from '../../state/types';
 interface Props {
   iniciativa: EntradaIniciativa[];
   minhaFicha: Ficha;
+  corMap: Record<string, string>;
 }
 
-export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) {
+export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap }: Props) {
   const { modoCombate, rodada } = useStore((s) => s.sessaoPublica);
 
   const [aberto, setAberto] = useState(false);
@@ -77,7 +78,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
-        ...(aberto ? { width: 'min(450px, calc(100% - 16px))' } : {}),
+        ...(aberto ? { width: 'min(420px, calc(100% - 16px))' } : {}),
       }}
     >
       {aberto && (
@@ -97,7 +98,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha }: Props) 
               ×
             </button>
           </div>
-          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} semMoldura />
+          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} semMoldura />
         </div>
       )}
       <button
