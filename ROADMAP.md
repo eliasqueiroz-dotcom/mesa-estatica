@@ -161,7 +161,35 @@ Usuário reportou que clicar no link do jogador não vinculava a ficha. `vincula
 
 Fix: quando a URL trouxer `?t=<owner_token>`, filtrar por ele (é `unique` no banco) em vez de `auth_uid` — determinístico independente de quantas fichas aquele `auth_uid` acabou vinculado. Sem `?t=` (revisita sem o link), continua caindo no filtro por `auth_uid`. Validado ao vivo contra produção: forcei duas fichas com o mesmo `auth_uid` de propósito e confirmei que o link correto ainda carrega a ficha certa (campos da ficha conferidos, não só o nome no log público).
 
-## Dia 7 — Playtest e folga
+## Schema mismatch: `surtosAtivos` undefined → `.some()` crash no mestre (26/07)
+
+Após aplicar a restrição de dados públicos (`ef466ef`, que reduziu `FichaPublica` a
+só `id/nome/corVisual`), o bundle do mestre começou a crashar com
+`Cannot read properties of undefined (reading 'some')` no chunk `alerta-sessao`.
+
+**Causa raiz**: o commit `ef466ef` mudou `FichaPrivadaDados` de
+`Omit<Ficha, 'id' | 'nome' | 'corVisual' | 'pvAtual' | 'surtosAtivos'>` para
+`Omit<Ficha, 'id' | 'nome' | 'corVisual'>`. Com isso, `pvAtual`/`surtosAtivos`
+deixaram de ser destruturados em `dividirFicha` e passaram a ser salvos em
+`characters_privado.dados`. Mas a RECONSTRUÇÃO da Ficha (`buscarEMontar`,
+`buscarTodas`, `minhaFicha.ts`) sempre dependeu de `paraFichaPublica` para ler
+esses campos de `characters_publico` — e `paraFichaPublica` parou de mapeá-los
+junto com a restrição. Resultado: dados antigos no Supabase (escritos antes da
+mudança) não tinham `pvAtual`/`surtosAtivos` em `characters_privado.dados` *nem*
+eram mapeados de `characters_publico`, produzindo `undefined` no store.
+
+**Fix em 2 camadas**:
+1. Reconstrução: `buscarEMontar`, `buscarTodas` e `minhaFicha.ts` agora mesclam
+   `pvAtual`/`surtosAtivos` de `characters_publico` por cima de
+   `characters_privado.dados` — para dados novos o valor é o mesmo (override
+   inócuo), para antigos fornece o fallback. `montarFicha`/`paraFichaPublica`
+   não precisaram mudar.
+2. Defesa em profundidade: `personagemEstaEmSurto` em `surto.ts` ganhou
+   `(surtosAtivos ?? []).some(...)` — protege contra undefined vindo de
+   qualquer caminho futuro.
+
+Validado: 171 testes, build limpo, ambas as entradas (mestre + jogador)
+compilam sem erro.
 
 - [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
 - [ ] README com o comando de subir offline (`npm run preview`) e o checklist do dia.
