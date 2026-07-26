@@ -52,7 +52,8 @@ export default function RolagemLivreJogador({ fichaId, ready, rolar }: RolagemLi
       const total = resultados.reduce((soma, g) => soma + g.value, 0);
       const totalComBonus = total + bonus;
       const notacaoTexto = termos.map((t) => `${t.quantidade}d${t.faces}`).join(' + ');
-      const texto = `Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
+      const textoBonus = bonus !== 0 ? ` + bônus ${bonus} = ${totalComBonus}` : '';
+      const texto = `Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}${textoBonus}`;
       registrarLog('rolagem-livre', texto, fichaId, 'publica');
 
       registrarRoll({

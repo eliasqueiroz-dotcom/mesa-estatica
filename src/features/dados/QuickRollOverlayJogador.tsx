@@ -49,7 +49,8 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
 
         const nome = ficha.nome || 'd20 rápido';
         const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
-        registrarLog('teste', `${nome} · rolagem rápida → ${total}`, ficha.id, 'publica');
+        const logMsg = bonus !== 0 ? `${nome} · rolagem rápida → d20: ${valor}${bonus >= 0 ? '+' : ''}${bonus} = ${total}` : `${nome} · rolagem rápida → ${total}`;
+        registrarLog('teste', logMsg, ficha.id, 'publica');
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,
