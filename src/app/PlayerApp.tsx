@@ -24,6 +24,7 @@ import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
+import { COR_NPC_PADRAO } from '../state/factories';
 import LogTabJogador from './LogTabJogador';
 import '../features/fichas/ficha.css';
 
@@ -64,6 +65,11 @@ export default function PlayerApp() {
   const outrasFichas = useFichasPublicas().filter((f) => f.id !== minhaFicha?.id);
   const npcs = useNpcsPublicos();
   const iniciativa = useIniciativaPublica();
+
+  const corMap: Record<string, string> = {};
+  if (minhaFicha) corMap[minhaFicha.id] = minhaFicha.corVisual;
+  for (const f of outrasFichas) corMap[f.id] = f.corVisual;
+  for (const n of npcs) corMap[n.id] = n.corVisual ?? COR_NPC_PADRAO;
 
   // sync de tokens (posição no mapa) + log/rolagens — mesmos módulos do GmApp (App.tsx), RLS
   // ainda aberta pra `tokens` desde a Fase A; gated pela mesma auth anônima que `useMinhaFicha`
@@ -251,7 +257,7 @@ export default function PlayerApp() {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {minhaFicha && (
-              <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} />
+              <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
             )}
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>

@@ -104,6 +104,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                       surtoAtivo={surtoAtivo}
                       surtoEscolha={surtoEscolha}
                       editavel
+                      hideDot
                       onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
                     />
                     <div className="combate-condicoes" style={{ marginTop: '0.5rem' }}>

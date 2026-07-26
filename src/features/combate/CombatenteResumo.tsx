@@ -9,6 +9,9 @@ interface Props {
    *  com nome genuinamente vazio (campo "Nome" em branco na ficha) mostra o fallback. */
   nome?: string;
   cor: string;
+  /** Quando true, omite a bolinha colorida — usada quando já há uma bolinha na linha
+   *  principal do combatente (CombateJogadorView) e mostrar outra aqui seria redundante. */
+  hideDot?: boolean;
   pvAtual: number;
   pvMaximo: number;
   defesa: number;
@@ -56,6 +59,7 @@ export default function CombatenteResumo({
   surtoAtivo = false,
   surtoEscolha = null,
   editavel = false,
+  hideDot = false,
   sanidadeAtual,
   sanidadeMaxima,
   onAjustarPv,
@@ -64,10 +68,12 @@ export default function CombatenteResumo({
   return (
     <div className="combatente-resumo">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-        <span
-          aria-hidden
-          style={{ background: cor, width: 12, height: 12, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }}
-        />
+        {!hideDot && (
+          <span
+            aria-hidden
+            style={{ background: cor, width: 12, height: 12, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }}
+          />
+        )}
         {nome !== undefined && nome !== '' && (
           <span className="mono" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {nome}
