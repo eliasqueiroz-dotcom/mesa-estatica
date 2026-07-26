@@ -61,7 +61,7 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
         const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
         setResultado({ d20, perdaRolada });
         setRolando(false);
-        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · Vontade+${gatilho.nome} → d20=${d20}, dado_sanidade=${perdaRolada}`, ficha.id, 'publica');
+        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · teste de sanidade ${gatilho.nome}(Vontade) → 1d20: ${d20}, perda_rolada=${perdaRolada}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,

@@ -59,7 +59,7 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
         setTeste(r);
         setRolando(false);
         if (r.sucesso) setResolvido(true);
-        registrarLog('trauma', `${ficha.nome || 'Personagem'} · "${trauma.nome}" · Vontade vs DT${DT_GATILHO} → ${r.sucesso ? 'segura' : 'falha'}`, ficha.id, 'publica');
+        registrarLog('trauma', `${ficha.nome || 'Personagem'} · teste de trauma "${trauma.nome}"(Vontade) vs DT${DT_GATILHO} → 1d20: ${r.d20} = ${r.total} · ${r.sucesso ? 'segura' : 'falha'}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,

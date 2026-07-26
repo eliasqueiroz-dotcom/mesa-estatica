@@ -53,7 +53,7 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
 
         const nome = ficha.nome || 'Personagem';
         const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-        registrarLog('teste', `${nome} · ${atributo.nome}+${pericia.nome} → d20${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
+        registrarLog('teste', `${nome} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,
