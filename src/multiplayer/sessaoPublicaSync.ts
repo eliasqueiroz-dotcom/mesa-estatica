@@ -28,7 +28,7 @@ export interface Linha {
   ruido_narrativo: number;
 }
 
-const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
+export const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
   nome_da_mesa: s.nomeDaMesa,
   numero_sessao: s.numeroSessao,
   clima: s.clima,

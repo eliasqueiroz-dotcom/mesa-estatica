@@ -381,7 +381,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
               onPointerDown={iniciarArrastoToken(t.id)}
               title={partesTitulo.join(' — ')}
             >
-              <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={30} />
+              <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={36} />
               {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
               <span
                 className="mapa-token__remover"

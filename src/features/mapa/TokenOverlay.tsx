@@ -139,7 +139,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
               foto={tipo === 'pc' ? ficha!.foto : npc!.foto}
               silhueta={tipo === 'npc' ? npc!.silhueta : null}
               bordaCor={tipo === 'pc' ? ficha!.corVisual : npc!.corVisual}
-              tamanho={40}
+              tamanho={52}
               ampliavel
             />
             <h3 style={{ margin: 0 }}>{(tipo === 'pc' ? ficha!.nome : npc!.nome) || 'sem nome'}</h3>

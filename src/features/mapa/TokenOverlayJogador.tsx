@@ -53,7 +53,7 @@ export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhu
       <div className="secao" style={{ width: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-            <Avatar nome={nome} cor={cor} foto={foto} silhueta={silhueta} bordaCor={cor} tamanho={40} ampliavel />
+            <Avatar nome={nome} cor={cor} foto={foto} silhueta={silhueta} bordaCor={cor} tamanho={52} ampliavel />
             <h3 style={{ margin: 0 }}>{nome || 'sem nome'}</h3>
           </div>
           <button className="icone-botao" onClick={onFechar} title="fechar (Esc)" style={{ color: 'var(--ruido)' }}>

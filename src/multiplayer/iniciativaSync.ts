@@ -13,7 +13,7 @@ export interface LinhaIniciativa {
   posicao: number;
 }
 
-const paraLinha = (e: EntradaIniciativa, posicao: number): LinhaIniciativa => ({
+export const paraLinha = (e: EntradaIniciativa, posicao: number): LinhaIniciativa => ({
   id: e.id,
   participante_id: e.participanteId,
   tipo: e.tipo,

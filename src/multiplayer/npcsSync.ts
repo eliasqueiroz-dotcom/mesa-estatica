@@ -40,7 +40,7 @@ export interface NpcPublico {
   visivel: boolean;
 }
 
-const paraLinhaPublico = (n: Npc): LinhaPublico => ({
+export const paraLinhaPublico = (n: Npc): LinhaPublico => ({
   id: n.id,
   nome: n.nome,
   cor_visual: n.corVisual,

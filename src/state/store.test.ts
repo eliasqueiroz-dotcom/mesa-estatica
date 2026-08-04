@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { useStore } from './store';
+import { migrate, useStore } from './store';
 import { calcularSanidadeMaxima } from '../rules/derivados';
-import { criarEstadoInicial, criarFichaVazia } from './factories';
+import { criarEstadoInicial, criarFichaVazia, criarGradeInicial } from './factories';
 import { TABELA_SURTO } from '../rules/data/surto';
 
 beforeEach(() => {
@@ -637,5 +637,59 @@ describe('rolarIniciativaGrupo', () => {
     const iniciativa = useStore.getState().iniciativa;
     expect(iniciativa.find((e) => e.participanteId === 'outro')?.valor).toBe(99);
     expect(iniciativa).toHaveLength(3);
+  });
+});
+
+// ===== migrate (schema versionado do persist) =====
+// Caminho DIFERENTE de importarJSON (acima) — migrate só roda na reidratação do
+// localStorage pelo zustand/persist. Cobre as migrações mais recentes/arriscadas, não as
+// 23 versões uma por uma.
+describe('migrate', () => {
+  it('v1 → v2: injeta grade default quando mapa não tem grade', () => {
+    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [] } }, 1);
+    expect(estado.mapa.grade).toEqual(criarGradeInicial());
+  });
+
+  it('v1 → v2: não mexe em mapa que já tem grade', () => {
+    const gradeCustom = { ...criarGradeInicial(), colunas: 20 };
+    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [], grade: gradeCustom } }, 1);
+    expect(estado.mapa.grade).toEqual(gradeCustom);
+  });
+
+  it('v10 → v11: converte surtoAtivo/surtoEscolha soltos em surtosAtivos', () => {
+    const estado = migrate(
+      { fichas: [{ id: 'f1', nome: 'Helena', surtoAtivo: 5, surtoEscolha: 'Fuga cega' }] },
+      10,
+    );
+    expect(estado.fichas[0].surtosAtivos).toHaveLength(1);
+    expect(estado.fichas[0].surtosAtivos[0]).toMatchObject({ expiraEm: 5, escolha: 'Fuga cega' });
+    expect(estado.fichas[0]).not.toHaveProperty('surtoAtivo');
+    expect(estado.fichas[0]).not.toHaveProperty('surtoEscolha');
+  });
+
+  it('v10 → v11: ficha sem surto ativo (surtoAtivo null) vira array vazio', () => {
+    const estado = migrate({ fichas: [{ id: 'f1', nome: 'Pedro', surtoAtivo: null, surtoEscolha: null }] }, 10);
+    expect(estado.fichas[0].surtosAtivos).toEqual([]);
+  });
+
+  it('v21 → v22: injeta foto null em fichas e silhueta null em npcs', () => {
+    const estado = migrate(
+      { fichas: [{ id: 'f1', nome: 'Helena' }], npcs: [{ id: 'n1', nome: 'Guarda' }] },
+      21,
+    );
+    expect(estado.fichas[0].foto).toBeNull();
+    expect(estado.npcs[0].silhueta).toBeNull();
+  });
+
+  it('v22 → v23: injeta foto null em npcs existentes', () => {
+    const estado = migrate({ npcs: [{ id: 'n1', nome: 'Guarda', silhueta: 'guarda' }] }, 22);
+    expect(estado.npcs[0].foto).toBeNull();
+    expect(estado.npcs[0].silhueta).toBe('guarda');
+  });
+
+  it('estado já na versão atual passa sem alterações inesperadas', () => {
+    const fichaAtual = { id: 'f1', nome: 'Helena', foto: 'data:image/jpeg;base64,x', surtosAtivos: [] };
+    const estado = migrate({ fichas: [fichaAtual], npcs: [] }, 23);
+    expect(estado.fichas[0]).toEqual(fichaAtual);
   });
 });

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -9,6 +10,21 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: '/mesa-estatica/',
   plugins: [react()],
+  test: {
+    // `tests/` (raiz, fora de src/) guarda um spec Playwright avulso (player-app.spec.ts) que
+    // nunca foi versionado nem tem playwright.config — sem excluir, o vitest tenta rodar como
+    // teste dele mesmo e falha sempre ("Playwright Test did not expect test.describe()...").
+    // Precisa repetir o default do vitest aqui porque declarar `exclude` SUBSTITUI o default,
+    // não soma — sem isso, node_modules/dist etc. voltariam a ser varridos.
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+      'tests/**',
+    ],
+  },
   build: {
     sourcemap: true,
     rollupOptions: {

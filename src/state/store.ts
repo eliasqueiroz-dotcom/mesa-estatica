@@ -226,6 +226,152 @@ function criarStorageComDebounce(bruto: Storage): StateStorage {
   };
 }
 
+/** Migração de schema versionado (persist) — função nomeada e exportada só pra dar pra
+ *  testar direto (store.test.ts), sem montar o zustand/persist inteiro nem mockar
+ *  localStorage. */
+export function migrate(persistedState: unknown, versaoAnterior: number): Store {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const estado = persistedState as any;
+  // v1 → v2: mapa não tinha `grade` (grid customizável da aba Mapa).
+  if (versaoAnterior < 2 && estado.mapa && !estado.mapa.grade) {
+    estado.mapa = { ...estado.mapa, grade: criarGradeInicial() };
+  }
+  // v2 → v3: `sessao` (único objeto) vira `sessaoPublica`/`sessaoPrivada` separados
+  // (mesa-estatica-multiplayer-completo.md Parte III §0 — prepara pro Supabase futuro).
+  if (versaoAnterior < 3 && estado.sessao) {
+    const antiga = estado.sessao;
+    estado.sessaoPublica = {
+      ...criarSessaoPublica(),
+      nomeDaMesa: antiga.nomeDaMesa,
+      numeroSessao: antiga.numeroSessao,
+      clima: antiga.clima,
+      hora: antiga.hora,
+      cenaAtual: antiga.cenaAtual,
+    };
+    estado.sessaoPrivada = criarSessaoPrivada();
+    delete estado.sessao;
+  }
+  // v3 → v4: cor de NPC editável, marcador de Surto até fim de cena, modo combate por
+  // turnos (mesa-estatica-multiplayer-completo.md Parte II §1-4).
+  if (versaoAnterior < 4) {
+    if (estado.npcs) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      estado.npcs = estado.npcs.map((n: any) => ({ corVisual: COR_NPC_PADRAO, ...n }));
+    }
+    if (estado.fichas) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      estado.fichas = estado.fichas.map((f: any) => ({ surtoAtivo: null, ...f }));
+    }
+    if (estado.sessaoPublica) {
+      estado.sessaoPublica = {
+        modoCombate: false,
+        indiceAtualTurno: 0,
+        rodada: 1,
+        ...estado.sessaoPublica,
+      };
+    }
+  }
+  // v4 → v5: qual entrada da Tabela de Surto está em vigor (correcoes-parte2.md item 11).
+  if (versaoAnterior < 5 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.fichas = estado.fichas.map((f: any) => ({ surtoEscolha: null, ...f }));
+  }
+  // v5 → v6: DT da cena sai dos roladores (visíveis na tela compartilhada) e vira campo
+  // privado em "cena atual" — só o mestre define/vê.
+  if (versaoAnterior < 6) {
+    estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...(estado.sessaoPrivada ?? {}) };
+  }
+  // v6 → v7: condições de combate por combatente (Parte II §4).
+  if (versaoAnterior < 7) {
+    estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
+  }
+  // v7 → v8: selecionadosIniciativa na sessaoPrivada; reforça condicoesCombate.
+  if (versaoAnterior < 8) {
+    estado.sessaoPrivada = { selecionadosIniciativa: [], ...(estado.sessaoPrivada ?? {}) };
+    estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
+  }
+  // v8 → v9: visivel, notasMestre, categoria, acoes em Npc
+  if (versaoAnterior < 9 && estado.npcs) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.npcs = estado.npcs.map((n: any) => ({
+      ...n,
+      visivel: false,
+      notasMestre: '',
+      categoria: '',
+      acoes: [],
+    }));
+  }
+  // v9 → v10: rolls_log
+  if (versaoAnterior < 10) {
+    estado.rollsLog = [];
+  }
+  // v10 → v11: surto vira array surtosAtivos em cada ficha
+  if (versaoAnterior < 11 && estado.fichas) {
+    estado.fichas = estado.fichas.map((f: any) => {
+      const { surtoAtivo, surtoEscolha, ...resto } = f;
+      const surtosAtivos: SurtoAtivo[] = [];
+      if (surtoAtivo != null) {
+        surtosAtivos.push({
+          id: crypto.randomUUID(),
+          expiraEm: surtoAtivo,
+          escolha: surtoEscolha ?? null,
+        });
+      }
+      return { ...resto, surtosAtivos };
+    });
+  }
+  // v11 → v12: garante surtosAtivos em toda ficha
+  if (versaoAnterior < 12 && estado.fichas) {
+    estado.fichas = estado.fichas.map((f: any) => ({ surtosAtivos: [], ...f }));
+  }
+  // v13 → v14: aba Mídia — jukebox sincronizado (faixas + estado de playback).
+  if (versaoAnterior < 14) {
+    estado.midia = criarEstadoMidia();
+  }
+  // v14 → v15: Ameaça/Ruído Narrativo espelhados em sessaoPublica (visual pro jogador,
+  // nunca o número — ver AlertaOverlayJogador.tsx).
+  if (versaoAnterior < 15) {
+    estado.sessaoPublica = { ameaca: 0, ruidoNarrativo: 0, ...(estado.sessaoPublica ?? {}) };
+  }
+  // v15 → v16: volume da música sincronizado (só o GM ajusta).
+  if (versaoAnterior < 16) {
+    estado.midia = { volume: 0.8, ...(estado.midia ?? {}) };
+  }
+  // v17 → v18: kitInvestigacao em cada ficha (corrige spread que sobrescrevia com undefined)
+  if (versaoAnterior < 18 && estado.fichas) {
+    estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, kitInvestigacao: f.kitInvestigacao ?? [] }));
+  }
+  // v18 → v19: observacaoCombate em cada ficha
+  if (versaoAnterior < 19 && estado.fichas) {
+    estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, observacaoCombate: f.observacaoCombate ?? '' }));
+  }
+  // v19 → v20: escala/unidade na grade do mapa (régua de medição).
+  if (versaoAnterior < 20 && estado.mapa?.grade) {
+    estado.mapa.grade = { escala: 1.5, unidade: 'm', ...estado.mapa.grade };
+  }
+  // v20 → v21: duração opcional por condição de combate.
+  if (versaoAnterior < 21 && estado.sessaoPublica) {
+    estado.sessaoPublica = { condicaoDuracao: {}, ...estado.sessaoPublica };
+  }
+  // v21 → v22: foto de perfil do PC (upload) e silhueta pré-instalada de NPC (Avatar.tsx).
+  if (versaoAnterior < 22) {
+    if (estado.fichas) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      estado.fichas = estado.fichas.map((f: any) => ({ foto: null, ...f }));
+    }
+    if (estado.npcs) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      estado.npcs = estado.npcs.map((n: any) => ({ silhueta: null, ...n }));
+    }
+  }
+  // v22 → v23: foto de perfil real do NPC (upload do mestre, precedência sobre silhueta).
+  if (versaoAnterior < 23 && estado.npcs) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.npcs = estado.npcs.map((n: any) => ({ foto: null, ...n }));
+  }
+  return estado as Store;
+}
+
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
@@ -951,148 +1097,7 @@ export const useStore = create<Store>()(
       storage: createJSONStorage(() => (ehBundleJogador ? semPersistencia : criarStorageComDebounce(localStorage))),
       version: SCHEMA_VERSION,
       partialize: (state) => state,
-      migrate: (persistedState, versaoAnterior) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const estado = persistedState as any;
-        // v1 → v2: mapa não tinha `grade` (grid customizável da aba Mapa).
-        if (versaoAnterior < 2 && estado.mapa && !estado.mapa.grade) {
-          estado.mapa = { ...estado.mapa, grade: criarGradeInicial() };
-        }
-        // v2 → v3: `sessao` (único objeto) vira `sessaoPublica`/`sessaoPrivada` separados
-        // (mesa-estatica-multiplayer-completo.md Parte III §0 — prepara pro Supabase futuro).
-        if (versaoAnterior < 3 && estado.sessao) {
-          const antiga = estado.sessao;
-          estado.sessaoPublica = {
-            ...criarSessaoPublica(),
-            nomeDaMesa: antiga.nomeDaMesa,
-            numeroSessao: antiga.numeroSessao,
-            clima: antiga.clima,
-            hora: antiga.hora,
-            cenaAtual: antiga.cenaAtual,
-          };
-          estado.sessaoPrivada = criarSessaoPrivada();
-          delete estado.sessao;
-        }
-        // v3 → v4: cor de NPC editável, marcador de Surto até fim de cena, modo combate por
-        // turnos (mesa-estatica-multiplayer-completo.md Parte II §1-4).
-        if (versaoAnterior < 4) {
-          if (estado.npcs) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            estado.npcs = estado.npcs.map((n: any) => ({ corVisual: COR_NPC_PADRAO, ...n }));
-          }
-          if (estado.fichas) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            estado.fichas = estado.fichas.map((f: any) => ({ surtoAtivo: null, ...f }));
-          }
-          if (estado.sessaoPublica) {
-            estado.sessaoPublica = {
-              modoCombate: false,
-              indiceAtualTurno: 0,
-              rodada: 1,
-              ...estado.sessaoPublica,
-            };
-          }
-        }
-        // v4 → v5: qual entrada da Tabela de Surto está em vigor (correcoes-parte2.md item 11).
-        if (versaoAnterior < 5 && estado.fichas) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          estado.fichas = estado.fichas.map((f: any) => ({ surtoEscolha: null, ...f }));
-        }
-        // v5 → v6: DT da cena sai dos roladores (visíveis na tela compartilhada) e vira campo
-        // privado em "cena atual" — só o mestre define/vê.
-        if (versaoAnterior < 6) {
-          estado.sessaoPrivada = { dificuldadeCena: 'media', dificuldadeCenaCustom: 15, ...(estado.sessaoPrivada ?? {}) };
-        }
-        // v6 → v7: condições de combate por combatente (Parte II §4).
-        if (versaoAnterior < 7) {
-          estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
-        }
-        // v7 → v8: selecionadosIniciativa na sessaoPrivada; reforça condicoesCombate.
-        if (versaoAnterior < 8) {
-          estado.sessaoPrivada = { selecionadosIniciativa: [], ...(estado.sessaoPrivada ?? {}) };
-          estado.sessaoPublica = { condicoesCombate: {}, ...(estado.sessaoPublica ?? {}) };
-        }
-        // v8 → v9: visivel, notasMestre, categoria, acoes em Npc
-        if (versaoAnterior < 9 && estado.npcs) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          estado.npcs = estado.npcs.map((n: any) => ({
-            ...n,
-            visivel: false,
-            notasMestre: '',
-            categoria: '',
-            acoes: [],
-          }));
-        }
-        // v9 → v10: rolls_log
-        if (versaoAnterior < 10) {
-          estado.rollsLog = [];
-        }
-        // v10 → v11: surto vira array surtosAtivos em cada ficha
-        if (versaoAnterior < 11 && estado.fichas) {
-          estado.fichas = estado.fichas.map((f: any) => {
-            const { surtoAtivo, surtoEscolha, ...resto } = f;
-            const surtosAtivos: SurtoAtivo[] = [];
-            if (surtoAtivo != null) {
-              surtosAtivos.push({
-                id: crypto.randomUUID(),
-                expiraEm: surtoAtivo,
-                escolha: surtoEscolha ?? null,
-              });
-            }
-            return { ...resto, surtosAtivos };
-          });
-        }
-        // v11 → v12: garante surtosAtivos em toda ficha
-        if (versaoAnterior < 12 && estado.fichas) {
-          estado.fichas = estado.fichas.map((f: any) => ({ surtosAtivos: [], ...f }));
-        }
-        // v13 → v14: aba Mídia — jukebox sincronizado (faixas + estado de playback).
-        if (versaoAnterior < 14) {
-          estado.midia = criarEstadoMidia();
-        }
-        // v14 → v15: Ameaça/Ruído Narrativo espelhados em sessaoPublica (visual pro jogador,
-        // nunca o número — ver AlertaOverlayJogador.tsx).
-        if (versaoAnterior < 15) {
-          estado.sessaoPublica = { ameaca: 0, ruidoNarrativo: 0, ...(estado.sessaoPublica ?? {}) };
-        }
-        // v15 → v16: volume da música sincronizado (só o GM ajusta).
-        if (versaoAnterior < 16) {
-          estado.midia = { volume: 0.8, ...(estado.midia ?? {}) };
-        }
-        // v17 → v18: kitInvestigacao em cada ficha (corrige spread que sobrescrevia com undefined)
-        if (versaoAnterior < 18 && estado.fichas) {
-          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, kitInvestigacao: f.kitInvestigacao ?? [] }));
-        }
-        // v18 → v19: observacaoCombate em cada ficha
-        if (versaoAnterior < 19 && estado.fichas) {
-          estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, observacaoCombate: f.observacaoCombate ?? '' }));
-        }
-        // v19 → v20: escala/unidade na grade do mapa (régua de medição).
-        if (versaoAnterior < 20 && estado.mapa?.grade) {
-          estado.mapa.grade = { escala: 1.5, unidade: 'm', ...estado.mapa.grade };
-        }
-        // v20 → v21: duração opcional por condição de combate.
-        if (versaoAnterior < 21 && estado.sessaoPublica) {
-          estado.sessaoPublica = { condicaoDuracao: {}, ...estado.sessaoPublica };
-        }
-        // v21 → v22: foto de perfil do PC (upload) e silhueta pré-instalada de NPC (Avatar.tsx).
-        if (versaoAnterior < 22) {
-          if (estado.fichas) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            estado.fichas = estado.fichas.map((f: any) => ({ foto: null, ...f }));
-          }
-          if (estado.npcs) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            estado.npcs = estado.npcs.map((n: any) => ({ silhueta: null, ...n }));
-          }
-        }
-        // v22 → v23: foto de perfil real do NPC (upload do mestre, precedência sobre silhueta).
-        if (versaoAnterior < 23 && estado.npcs) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          estado.npcs = estado.npcs.map((n: any) => ({ foto: null, ...n }));
-        }
-        return estado as Store;
-      },
+      migrate,
     },
   ),
 );

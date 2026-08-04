@@ -23,7 +23,7 @@ export interface Linha {
 
 export type PatchEstadoMidia = Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'atualizadoEm' | 'volume'>;
 
-const paraLinha = (m: PatchEstadoMidia): Omit<Linha, 'id'> => ({
+export const paraLinha = (m: PatchEstadoMidia): Omit<Linha, 'id'> => ({
   faixa_atual_id: m.faixaAtualId,
   tocando: m.tocando,
   posicao_segundos: m.posicaoSegundos,

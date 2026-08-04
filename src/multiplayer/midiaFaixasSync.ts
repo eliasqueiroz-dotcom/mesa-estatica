@@ -18,7 +18,7 @@ export interface LinhaFaixa {
   criado_em: string;
 }
 
-const paraLinha = (f: FaixaMidia): LinhaFaixa => ({
+export const paraLinha = (f: FaixaMidia): LinhaFaixa => ({
   id: f.id,
   nome: f.nome,
   storage_path: f.path,

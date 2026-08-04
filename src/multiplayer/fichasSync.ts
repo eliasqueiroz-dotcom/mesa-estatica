@@ -29,7 +29,7 @@ interface LinhaPrivado {
   dados: FichaPrivadaDados;
 }
 
-const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
+export const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
   id: ficha.id,
   nome: ficha.nome,
   cor_visual: ficha.corVisual,

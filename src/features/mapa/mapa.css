@@ -76,10 +76,10 @@
 
 .mapa-token {
   position: absolute;
-  width: 32px;
-  height: 32px;
-  margin-left: -16px;
-  margin-top: -16px;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px;
+  margin-top: -20px;
   border-radius: 50%;
   border: 3px solid var(--ink);
   background: color-mix(in srgb, var(--concrete-0) 88%, transparent);
