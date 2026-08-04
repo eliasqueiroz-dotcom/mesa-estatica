@@ -89,6 +89,11 @@ interface Acoes {
   rolarIniciativaTodos: () => void;
   /** Rola iniciativa apenas para os IDs de participante selecionados (PC ou NPC). */
   rolarIniciativa: (participanteIds: string[]) => void;
+  /** Rola iniciativa em grupo pra NPCs parecidos — 1 d20 + a MAIOR Agilidade entre eles, todos
+   *  recebem o mesmo `valor` (ficam adjacentes no sort de `ordenarIniciativa`). Atalho de mesa
+   *  pro mestre não rolar a mesma coisa 5x pra guardas idênticos — a regra ainda é "d20+Agilidade,
+   *  uma vez" por entidade, isso só compartilha o resultado. Só NPCs (`npcs`), nunca fichas. */
+  rolarIniciativaGrupo: (participanteIds: string[]) => void;
   /** Rerrola só UM combatente já na lista (d20+Agilidade, mesma regra) e reinsere na posição
    *  ordenada — mantém `indiceAtualTurno` grudado em quem estiver na vez, mesmo que a
    *  reordenação desloque índices. Reordena por `valor` (perde o desempate por Agilidade da
@@ -527,6 +532,26 @@ export const useStore = create<Store>()(
         set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
         get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
       },
+      rolarIniciativaGrupo: (participanteIds) => {
+        const { npcs } = get();
+        const grupo = npcs.filter((n) => participanteIds.includes(n.id));
+        if (grupo.length === 0) return;
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const maiorAgilidade = Math.max(...grupo.map((n) => n.agilidade));
+        const valor = d20 + maiorAgilidade;
+        const entradas: EntradaIniciativa[] = grupo.map((n) => ({
+          id: crypto.randomUUID(),
+          participanteId: n.id,
+          tipo: 'npc' as const,
+          nome: n.nome || 'sem nome',
+          valor,
+        }));
+        set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
+        get().registrarLog(
+          'iniciativa',
+          `iniciativa em grupo — ${grupo.map((n) => n.nome || 'sem nome').join(', ')}: d20+${maiorAgilidade}=${valor}`,
+        );
+      },
       rerolarIniciativaDe: (participanteId) => {
         const s = get();
         const entrada = s.iniciativa.find((e) => e.participanteId === participanteId);
@@ -678,6 +703,7 @@ export const useStore = create<Store>()(
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
 
       registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
+        const sessaoPublica = get().sessaoPublica;
         const entrada: EntradaLog = {
           id: crypto.randomUUID(),
           timestamp: new Date().toISOString(),
@@ -685,6 +711,9 @@ export const useStore = create<Store>()(
           personagemId,
           texto,
           ...(visibilidade ? { visibilidade } : {}),
+          // rodada em que a entrada aconteceu, só durante combate — pro filtro "por rodada" do
+          // CombatLogView.tsx; carimbado aqui, sem tocar nenhum dos call sites de registrarLog.
+          ...(sessaoPublica.modoCombate ? { rodada: sessaoPublica.rodada } : {}),
         };
         set((s) => ({ log: [entrada, ...s.log] }));
         if (TIPOS_ROLAGEM.includes(tipo)) {

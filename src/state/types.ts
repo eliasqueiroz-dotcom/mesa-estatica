@@ -162,6 +162,10 @@ export interface EntradaLog {
   /** Só setado quando a rolagem associada é privada (mesma semântica de `EntradaRoll.visibilidade`)
    *  — ausente/undefined trata como pública. Sem migração de schema: campo aditivo opcional. */
   visibilidade?: 'publica' | 'privada';
+  /** Rodada em que a entrada foi registrada, só quando `modoCombate` estava ligado no momento
+   *  (`registrarLog` carimba sozinho). Ausente = fora de combate. Campo aditivo opcional, mesmo
+   *  espírito de `visibilidade`. */
+  rodada?: number;
 }
 
 export interface EntradaRoll {

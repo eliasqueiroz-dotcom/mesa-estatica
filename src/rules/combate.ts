@@ -7,13 +7,14 @@ import { resolverTeste, type ResultadoTeste } from './teste';
 const TIPOS_LOG_COMBATE: EntradaLog['tipo'][] = ['dano', 'iniciativa', 'teste'];
 
 /** Filtra o log narrativo pra só as entradas de combate — opcionalmente restrito a um
- *  combatente. Não tenta separar "por rodada": `EntradaLog` não carrega esse dado (só
- *  timestamp), então filtrar por rodada exigiria gravar a rodada em cada entrada — fora do
- *  escopo deste corte (ver PLANO_REGUA_E_COMBATE.md Fase 5). */
-export function filtrarLogDeCombate(log: EntradaLog[], participanteId?: string | null): EntradaLog[] {
+ *  combatente e/ou a uma rodada exata (`EntradaLog.rodada`, carimbada por `registrarLog`
+ *  quando `modoCombate` está ligado; entrada sem rodada nunca aparece se o filtro de rodada
+ *  estiver ativo). */
+export function filtrarLogDeCombate(log: EntradaLog[], participanteId?: string | null, rodada?: number | null): EntradaLog[] {
   return log.filter((e) => {
     if (!TIPOS_LOG_COMBATE.includes(e.tipo)) return false;
     if (participanteId && e.personagemId !== participanteId) return false;
+    if (rodada != null && e.rodada !== rodada) return false;
     return true;
   });
 }

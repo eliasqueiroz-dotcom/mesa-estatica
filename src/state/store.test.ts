@@ -589,3 +589,53 @@ describe('rerolarIniciativaDe', () => {
     expect(useStore.getState().iniciativa).toBe(antes);
   });
 });
+
+describe('rolarIniciativaGrupo', () => {
+  const criarNpc = (id: string, nome: string, agilidade: number) => ({
+    id, nome, corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
+    notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [],
+  });
+
+  it('todos os NPCs do grupo recebem o mesmo valor — d20 + a MAIOR agilidade entre eles', () => {
+    const npcs = [criarNpc('p1', 'Pol1', 2), criarNpc('p2', 'Pol2', 4), criarNpc('p3', 'Pol3', 1)];
+    useStore.setState({ npcs, iniciativa: [] });
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 = 1
+    useStore.getState().rolarIniciativaGrupo(['p1', 'p2', 'p3']);
+    const iniciativa = useStore.getState().iniciativa;
+    expect(iniciativa).toHaveLength(3);
+    expect(iniciativa.every((e) => e.valor === 5)).toBe(true); // 1 + maior agilidade (4)
+    expect(iniciativa.every((e) => e.tipo === 'npc')).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it('registra uma entrada de log só, com os nomes do grupo', () => {
+    const npcs = [criarNpc('p1', 'Pol1', 2), criarNpc('p2', 'Pol2', 3)];
+    useStore.setState({ npcs, iniciativa: [], log: [] });
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    useStore.getState().rolarIniciativaGrupo(['p1', 'p2']);
+    const log = useStore.getState().log;
+    expect(log).toHaveLength(1);
+    expect(log[0].texto).toContain('Pol1');
+    expect(log[0].texto).toContain('Pol2');
+    vi.restoreAllMocks();
+  });
+
+  it('ids que não batem com nenhum NPC não fazem nada', () => {
+    useStore.setState({ npcs: [], iniciativa: [] });
+    const antes = useStore.getState().iniciativa;
+    useStore.getState().rolarIniciativaGrupo(['nao-existe']);
+    expect(useStore.getState().iniciativa).toBe(antes);
+  });
+
+  it('não mexe em entradas de iniciativa já existentes de outros participantes', () => {
+    const npcs = [criarNpc('p1', 'Pol1', 2), criarNpc('p2', 'Pol2', 3)];
+    useStore.setState({
+      npcs,
+      iniciativa: [{ id: 'e0', participanteId: 'outro', tipo: 'npc', nome: 'Outro', valor: 99 }],
+    });
+    useStore.getState().rolarIniciativaGrupo(['p1', 'p2']);
+    const iniciativa = useStore.getState().iniciativa;
+    expect(iniciativa.find((e) => e.participanteId === 'outro')?.valor).toBe(99);
+    expect(iniciativa).toHaveLength(3);
+  });
+});

@@ -9,6 +9,7 @@ interface LinhaLog {
   texto: string;
   criado_em: string;
   visibilidade: 'publica' | 'privada';
+  rodada: number | null;
 }
 
 interface LinhaRoll {
@@ -29,6 +30,7 @@ const paraLinhaLog = (e: EntradaLog): LinhaLog => ({
   texto: e.texto,
   criado_em: e.timestamp,
   visibilidade: e.visibilidade ?? 'publica',
+  rodada: e.rodada ?? null,
 });
 
 const paraEntradaLog = (r: LinhaLog): EntradaLog => ({
@@ -38,6 +40,7 @@ const paraEntradaLog = (r: LinhaLog): EntradaLog => ({
   personagemId: r.personagem_id,
   texto: r.texto,
   visibilidade: r.visibilidade,
+  rodada: r.rodada ?? undefined,
 });
 
 const paraLinhaRoll = (e: EntradaRoll): LinhaRoll => ({

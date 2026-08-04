@@ -28,6 +28,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
+    agruparNpcs, setAgruparNpcs,
   } = hook;
 
   const [danoEmMassa, setDanoEmMassa] = useState('');
@@ -73,6 +74,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}>
                 <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
                 selecionar todos
+              </label>
+              <label
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}
+                title="1 d20 + a maior Agilidade entre os NPCs selecionados — todos com o mesmo valor de iniciativa"
+              >
+                <input type="checkbox" checked={agruparNpcs} onChange={(e) => setAgruparNpcs(e.target.checked)} />
+                agrupar NPCs selecionados
               </label>
               {disponiveis.map((p) => {
                 const marcado = selecionadosIniciativa.includes(p.id);
@@ -365,9 +373,11 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           style={{ fontSize: 10 }}
                         >
                           <option value="">quem tenta?</option>
-                          {fichas.map((f) => (
-                            <option key={f.id} value={f.id}>{f.nome || 'sem nome'}</option>
-                          ))}
+                          {fichas
+                            .filter((f) => f.id !== e.participanteId && (pvDoCombatente(f.id, 'pc')?.atual ?? 1) > 0)
+                            .map((f) => (
+                              <option key={f.id} value={f.id}>{f.nome || 'sem nome'}</option>
+                            ))}
                         </select>
                         <button
                           className="icone-botao"
@@ -471,6 +481,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 10, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}>
                         <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
                         selecionar todos
+                      </label>
+                      <label
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 10, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}
+                        title="1 d20 + a maior Agilidade entre os NPCs selecionados — todos com o mesmo valor de iniciativa"
+                      >
+                        <input type="checkbox" checked={agruparNpcs} onChange={(e) => setAgruparNpcs(e.target.checked)} />
+                        agrupar NPCs selecionados
                       </label>
                       {disponiveis.map((p) => {
                         const marcado = selecionadosIniciativa.includes(p.id);

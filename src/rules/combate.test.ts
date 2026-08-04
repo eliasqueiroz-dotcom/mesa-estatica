@@ -140,6 +140,34 @@ describe('filtrarLogDeCombate', () => {
     const log = [criarEntradaLog({ id: '1', personagemId: 'p1' }), criarEntradaLog({ id: '2', personagemId: 'p2' })];
     expect(filtrarLogDeCombate(log).map((e) => e.id)).toEqual(['1', '2']);
   });
+
+  it('filtra por rodada exata quando informada', () => {
+    const log = [
+      criarEntradaLog({ id: '1', rodada: 1 }),
+      criarEntradaLog({ id: '2', rodada: 2 }),
+      criarEntradaLog({ id: '3', rodada: 2 }),
+    ];
+    expect(filtrarLogDeCombate(log, null, 2).map((e) => e.id)).toEqual(['2', '3']);
+  });
+
+  it('entrada sem rodada não aparece quando o filtro de rodada está ativo', () => {
+    const log = [criarEntradaLog({ id: '1' }), criarEntradaLog({ id: '2', rodada: 1 })];
+    expect(filtrarLogDeCombate(log, null, 1).map((e) => e.id)).toEqual(['2']);
+  });
+
+  it('combina filtro de rodada com filtro de participante', () => {
+    const log = [
+      criarEntradaLog({ id: '1', personagemId: 'p1', rodada: 1 }),
+      criarEntradaLog({ id: '2', personagemId: 'p2', rodada: 1 }),
+      criarEntradaLog({ id: '3', personagemId: 'p1', rodada: 2 }),
+    ];
+    expect(filtrarLogDeCombate(log, 'p1', 1).map((e) => e.id)).toEqual(['1']);
+  });
+
+  it('sem filtro de rodada (undefined/null), devolve todas independente da rodada', () => {
+    const log = [criarEntradaLog({ id: '1', rodada: 1 }), criarEntradaLog({ id: '2', rodada: 5 }), criarEntradaLog({ id: '3' })];
+    expect(filtrarLogDeCombate(log).map((e) => e.id)).toEqual(['1', '2', '3']);
+  });
 });
 
 describe('gerarResumoCombate', () => {

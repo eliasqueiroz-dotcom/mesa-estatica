@@ -37,6 +37,7 @@ export function useIniciativa() {
   const atualizarSessaoPrivada = useStore((s) => s.atualizarSessaoPrivada);
   const rolarIniciativaTodos = useStore((s) => s.rolarIniciativaTodos);
   const rolarIniciativa = useStore((s) => s.rolarIniciativa);
+  const rolarIniciativaGrupo = useStore((s) => s.rolarIniciativaGrupo);
   const rerolarIniciativaDe = useStore((s) => s.rerolarIniciativaDe);
   const limparIniciativa = useStore((s) => s.limparIniciativa);
   const removerDaIniciativa = useStore((s) => s.removerDaIniciativa);
@@ -69,6 +70,8 @@ export function useIniciativa() {
   /** Seleção pra "aplicar a N" (dano em área) — separada de `selecionadosIniciativa` (que é
    *  pra ANTES de rolar iniciativa). Só existe depois que o combate já começou. */
   const [selecionadosAplicar, setSelecionadosAplicar] = useState<Set<string>>(new Set());
+  /** "agrupar NPCs selecionados" ao rolar — só afeta `rolarSelecionados`, ver ali embaixo. */
+  const [agruparNpcs, setAgruparNpcs] = useState(false);
 
   const toggleSelecionado = (id: string) => {
     const novo = selecionadosIniciativa.includes(id)
@@ -92,7 +95,17 @@ export function useIniciativa() {
   const rolarSelecionados = () => {
     const ids = [...new Set(selecionadosIniciativa)];
     if (ids.length === 0) { rolarIniciativaTodos(); return; }
-    rolarIniciativa(ids);
+    if (agruparNpcs) {
+      const idsNpc = ids.filter((id) => npcs.some((n) => n.id === id));
+      const idsResto = ids.filter((id) => !idsNpc.includes(id));
+      // 1 NPC só não é "grupo" — rola normal, junto do resto, pra não virar um caso especial
+      // silencioso (mesmo d20, mas sem o log "em grupo" confuso pra um único alvo).
+      if (idsNpc.length >= 2) rolarIniciativaGrupo(idsNpc);
+      else if (idsNpc.length === 1) idsResto.push(idsNpc[0]);
+      if (idsResto.length > 0) rolarIniciativa(idsResto);
+    } else {
+      rolarIniciativa(ids);
+    }
     const idsDisponiveis = new Set(disponiveis.map((p) => p.id));
     atualizarSessaoPrivada({ selecionadosIniciativa: selecionadosIniciativa.filter((s) => !idsDisponiveis.has(s)) });
   };
@@ -102,6 +115,7 @@ export function useIniciativa() {
     setExpandidos(new Set());
     setAdicionarAberto(false);
     setSelecionadosAplicar(new Set());
+    setAgruparNpcs(false);
     if (modoCombate) encerrarModoCombate();
     if (iniciativa.length > 0) limparIniciativa();
   };
@@ -260,5 +274,6 @@ export function useIniciativa() {
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
+    agruparNpcs, setAgruparNpcs,
   };
 }

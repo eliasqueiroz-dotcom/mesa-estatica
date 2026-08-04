@@ -261,23 +261,58 @@ a exigir canal privado, o ajuste é uma opção no `channel()`, não uma mudanç
    rodadas (vazio = manual/persistente, igual sempre foi) aparece ao lado de cada chip ativo.
 3. 🟡 Rerrolar iniciativa de um combatente — ✅ feito (`rerolarIniciativaDe`, botão 🎲 por card).
    Adiar — ✅ feito, mas **sem** o badge dedicado do rascunho original: reusa `reordenarIniciativa`
-   (move pro fim da rodada) + a condição `aguardando` (mesmo mecanismo de `estavel`). **Preparar ação**
-   e **iniciativa em grupo pra NPCs iguais** ficaram de fora — `regras.md` não tem mecânica de
-   "ação preparada/gatilho", seria inventar regra (mesmo problema do P0.4 original); "grupo" é só QoL,
-   sem valor de rodada/regra em jogo, adiado por escopo.
+   (move pro fim da rodada) + a condição `aguardando` (mesmo mecanismo de `estavel`). Iniciativa em
+   grupo pra NPCs parecidos — ✅ feito depois, ver item 3 de "Correções pós-implementação" abaixo.
+   **Preparar ação** ficou de fora — `regras.md` não tem mecânica de "ação preparada/gatilho", seria
+   inventar regra (mesmo problema do P0.4 original).
 4. 🟡 Template de área de efeito — ✅ **Círculo e Quadrado** (`AoEOverlay.tsx`, `aoeGeometria.ts`,
    reusa a mesma noção de "célula" da régua). **Cone e Linha ficaram de fora** — exigem matemática de
-   ângulo/segmento que não coube neste corte. Ferramenta GM-only, sem sync multiplayer (é cálculo de
-   dano, não algo que o jogador precise ver) — lista quem está dentro, aplica dano em 1 clique.
-5. ✅ Log de combate filtrado (`CombatLogView.tsx`, filtra `dano`/`iniciativa`/`teste`, com filtro por
-   combatente) e resumo exportável (`gerarResumoCombate`, botão "📋 resumo" copia markdown). **Sem**
-   "recursos gastos"/"XP" do rascunho original — o app não rastreia munição nem progressão, incluir
-   essas linhas seria inventar dado que não existe. **Sem** filtro "por rodada" — `EntradaLog` não
-   carrega rodada, só timestamp; adicionar esse campo ficou fora deste corte.
+   ângulo/segmento que não coube neste corte; conferido contra a tabela de armas (`regras.md:208-211`),
+   nenhuma arma tem dispersão/cone, então não há uso real esperando por essa forma. Ferramenta GM-only,
+   sem sync multiplayer (é cálculo de dano, não algo que o jogador precise ver) — lista quem está
+   dentro, aplica dano em 1 clique.
+5. 🟡 Log de combate filtrado (`CombatLogView.tsx`, filtra `dano`/`iniciativa`/`teste`, com filtro por
+   combatente **e por rodada** — ver item 2 abaixo) e resumo exportável (`gerarResumoCombate`, botão
+   "📋 resumo" copia markdown). **Sem** "recursos gastos"/"XP" do rascunho original — o app não
+   rastreia munição nem progressão, incluir essas linhas seria inventar dado que não existe.
 
 Testes: `src/rules/combate.ts` tem 24 testes (`combate.test.ts`) cobrindo estabilizar, duração e
 resumo; `src/features/mapa/aoeGeometria.ts` tem 9 (`aoeGeometria.test.ts`); `rerolarIniciativaDe` tem
 3 em `store.test.ts`. Suíte completa: 236 testes, `npm run build` limpo.
+
+### Correções pós-implementação (04/08, mesmo dia) — 3 itens que valiam a pena completar
+
+Depois de implementado, revisei o que tinha ficado de fora e o usuário escolheu 3 itens pra
+completar (commit separado do sprint principal):
+
+1. ✅ **Seletor de socorrista não lista mais quem está caído** — bug achado testando ao vivo: o
+   `<select>` "quem tenta?" (estabilizar) listava até a própria pessoa inconsciente como opção de
+   socorrista de si mesma. `IniciativaPanel.tsx` agora filtra `f.id !== e.participanteId` e exclui
+   qualquer outro PC também a 0 PV (`pvDoCombatente(f.id, 'pc')?.atual > 0`).
+2. ✅ **Filtro "por rodada" no log de combate** — o corte original dizia que precisaria de campo
+   novo em `EntradaLog`; foi adicionado (`rodada?: number`, campo aditivo, sem bump de
+   `SCHEMA_VERSION`). `registrarLog` (store.ts) carimba sozinho quando `modoCombate` está ligado —
+   zero call sites tocados fora da própria action. `log_publico` é mapeada coluna-a-coluna (não
+   jsonb), então precisou de migração real: `supabase/migrations/0016_log_rodada.sql`. Select
+   "rodada" no `CombatLogView.tsx`, populado só com as rodadas que de fato aparecem no log.
+3. ✅ **Iniciativa em grupo pra NPCs parecidos** — não era invenção de regra (a regra continua
+   "d20+Agilidade, uma vez" por entidade; isso só compartilha o resultado entre NPCs idênticos, atalho
+   de mesa). Nova action `rolarIniciativaGrupo` (store.ts): 1 d20 + a MAIOR Agilidade do grupo, mesmo
+   `valor` pra todos. Checkbox "agrupar NPCs selecionados" nos dois lugares que já tinham "selecionar
+   todos" (`IniciativaPanel.tsx`). PCs selecionados na mesma leva sempre rolam individualmente, nunca
+   agrupados. Sem badge "Grupo: X (3)" dedicado — o valor igual e o log já deixam claro quem foi
+   agrupado.
+
+Testes novos: +4 em `combate.test.ts` (filtro por rodada) e +4 em `store.test.ts`
+(`rolarIniciativaGrupo`) — suíte final: **244 testes**, `npm run build` limpo. Verificado ao vivo:
+socorrista exclui a própria pessoa caída, filtro de rodada isola corretamente uma rodada específica
+de um log com histórico real de sessões passadas, NPCs agrupados saem com o mesmo valor de
+iniciativa numa única entrada de log.
+
+**Bug de brinde, achado e corrigido nesta passada**: `CombatLogView.tsx` usava
+`.slice(-40).reverse()` pra limitar a lista — como o log é montado por `prepend` (mais novo primeiro,
+`store.ts`), isso pegava as 40 entradas mais ANTIGAS do histórico em vez das mais recentes.
+Corrigido pra `.slice(0, 40).reverse()`.
 
 ---
 
