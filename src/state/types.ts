@@ -234,6 +234,18 @@ export interface EventoSessao {
   feito: boolean;
 }
 
+export type StatusPista = 'nao-descoberta' | 'descoberta' | 'compartilhada';
+
+/** Quadro de pistas/evidências — painel visual do mestre, fora da ficha de personagem. */
+export interface Pista {
+  id: string;
+  texto: string;
+  /** NPC, local ou caso relacionado — texto livre. */
+  ligadoA: string;
+  status: StatusPista;
+  criadoEm: string; // ISO
+}
+
 export interface Lembrete {
   id: string;
   texto: string;
@@ -325,6 +337,7 @@ export interface EstadoGlobal {
   fichas: Ficha[];
   fichaAtivaId: string | null;
   npcs: Npc[];
+  pistas: Pista[];
   iniciativa: EntradaIniciativa[];
   mapa: EstadoMapa;
   midia: EstadoMidia;

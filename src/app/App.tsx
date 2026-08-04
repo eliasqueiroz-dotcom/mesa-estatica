@@ -7,6 +7,7 @@ import MidiaPlayerGM from '../features/midia/MidiaPlayerGM';
 import MidiaTab from '../features/midia/MidiaTab';
 import VinculoMestre from '../features/multiplayer/VinculoMestre';
 import NpcsTab from '../features/npcs/NpcsTab';
+import PistasTab from '../features/pistas/PistasTab';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
@@ -31,11 +32,12 @@ const ATALHOS: Record<string, string> = {
   dados: '3',
   mapa: '4',
   npcs: '5',
-  log: '6',
-  midia: '7',
+  pistas: '6',
+  log: '7',
+  midia: '8',
 };
 
-type AbaId = 'sessao' | 'personagens' | 'dados' | 'mapa' | 'npcs' | 'log' | 'midia';
+type AbaId = 'sessao' | 'personagens' | 'dados' | 'mapa' | 'npcs' | 'pistas' | 'log' | 'midia';
 
 const ABAS: { id: AbaId; label: string }[] = [
   { id: 'sessao', label: 'Sessão' },
@@ -43,6 +45,7 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'dados', label: 'Dados & Regras' },
   { id: 'mapa', label: 'Mapa' },
   { id: 'npcs', label: 'NPCs & Iniciativa' },
+  { id: 'pistas', label: 'Pistas' },
   { id: 'log', label: 'Log' },
   { id: 'midia', label: 'Mídia' },
 ];
@@ -152,8 +155,9 @@ export default function App() {
     };
   }, []);
 
-  // atalhos: 1–6 trocam de aba, R abre a rolagem rápida e já rola, S só abre o painel.
-  // ignorados enquanto o foco está num campo de texto (senão digitar "1" numa ficha trocaria de aba).
+  // atalhos: 1–8 trocam de aba, R abre a rolagem rápida e já rola (de novo se já aberta), X
+  // fecha, C abre a janela de controle secreta (mesmo destino do clique no título). Ignorados
+  // enquanto o foco está num campo de texto (senão digitar "1" numa ficha trocaria de aba).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement | null;
@@ -161,7 +165,7 @@ export default function App() {
         alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable);
       if (digitando || e.ctrlKey || e.altKey || e.metaKey) return;
 
-      const indiceAba = '123456'.indexOf(e.key);
+      const indiceAba = '12345678'.indexOf(e.key);
       if (indiceAba !== -1) {
         setAba(ABAS[indiceAba].id);
         return;
@@ -175,6 +179,8 @@ export default function App() {
         });
       } else if (tecla === 'x') {
         setOverlayAberto(false);
+      } else if (tecla === 'c') {
+        abrirControle();
       }
     };
     window.addEventListener('keydown', handler);
@@ -197,7 +203,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <h1
             onClick={abrirControle}
-            title="abrir controle — janela secreta do mestre"
+            title="abrir controle — janela secreta do mestre (atalho: C)"
             style={{ fontSize: '18px', margin: 0, cursor: 'pointer' }}
           >
             Estática — Mesa
@@ -292,6 +298,19 @@ export default function App() {
           }}
         >
           <NpcsTab />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            visibility: aba === 'pistas' ? 'visible' : 'hidden',
+            pointerEvents: aba === 'pistas' ? 'auto' : 'none',
+            padding: '1.5rem',
+            height: '100%',
+            overflowY: 'auto',
+          }}
+        >
+          <PistasTab />
         </div>
         <div
           style={{

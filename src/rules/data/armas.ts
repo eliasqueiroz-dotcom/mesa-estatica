@@ -21,11 +21,12 @@ export const ARMAS: DefinicaoArma[] = [
 
 export interface DefinicaoProtecao {
   nome: string;
+  preco: string;
   defesa: number;
   nota: string;
 }
 
 export const PROTECOES: DefinicaoProtecao[] = [
-  { nome: 'Colete discreto (R$ 2.500)', defesa: 1, nota: 'passa despercebido' },
-  { nome: 'Colete tático', defesa: 2, nota: 'grita "problema"' },
+  { nome: 'Colete discreto', preco: 'R$ 2.500', defesa: 1, nota: 'passa despercebido' },
+  { nome: 'Colete tático', preco: 'R$ 6.000', defesa: 2, nota: 'grita "problema" — Restrito' },
 ];

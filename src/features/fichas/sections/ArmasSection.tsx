@@ -119,7 +119,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
             <option value="">+ proteção…</option>
             {PROTECOES.map((p) => (
               <option key={p.nome} value={p.nome}>
-                {p.nome}
+                {p.nome} — {p.preco}
               </option>
             ))}
           </select>

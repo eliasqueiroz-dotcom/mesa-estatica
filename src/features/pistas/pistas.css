@@ -1,0 +1,50 @@
+.pista-quadro {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.pista-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 80px;
+}
+
+.pista-coluna__titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--coluna-cor, var(--concrete-2));
+  padding-bottom: 0.35rem;
+}
+
+.pista-card {
+  background: var(--concrete-0);
+  border: 1px solid var(--concrete-2);
+  border-left: 3px solid var(--coluna-cor, var(--concrete-2));
+  border-radius: 2px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pista-card textarea {
+  resize: vertical;
+  min-height: 3.2em;
+  font-size: 13px;
+}
+
+.pista-card__rodape {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pista-card__mover {
+  display: flex;
+  gap: 0.3rem;
+}

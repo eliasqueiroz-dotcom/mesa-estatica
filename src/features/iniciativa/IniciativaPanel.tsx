@@ -37,6 +37,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
 
   const [danoEmMassa, setDanoEmMassa] = useState('');
   const [condicaoEmMassa, setCondicaoEmMassa] = useState('');
+  const [mostrarGlossario, setMostrarGlossario] = useState(false);
 
   return (
     <>
@@ -67,7 +68,20 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             iniciar
           </button>
         )}
+        <button className="icone-botao" onClick={() => setMostrarGlossario((v) => !v)}>
+          glossário {mostrarGlossario ? '▲' : '▼'}
+        </button>
       </div>
+
+      {mostrarGlossario && (
+        <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
+          {CONDICOES_COMBATE.map((c) => (
+            <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 11 }}>
+              <strong style={{ color: 'var(--ink)' }}>{c.nome}</strong> — {c.efeito}
+            </p>
+          ))}
+        </div>
+      )}
 
       {banner}
 

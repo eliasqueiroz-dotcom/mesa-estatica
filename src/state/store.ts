@@ -12,6 +12,7 @@ import {
   criarFichaVazia,
   criarGradeInicial,
   criarNpcVazio,
+  criarPistaVazia,
   criarSessaoPrivada,
   criarSessaoPublica,
   SCHEMA_VERSION,
@@ -27,6 +28,7 @@ import type {
   Ficha,
   GradeMapa,
   Npc,
+  Pista,
   SessaoPrivada,
   SessaoPublica,
   SurtoAtivo,
@@ -84,6 +86,10 @@ interface Acoes {
   atualizarNpc: (id: string, patch: Partial<Npc>) => void;
   removerNpc: (id: string) => void;
   duplicarNpc: (id: string) => void;
+
+  adicionarPista: () => string;
+  atualizarPista: (id: string, patch: Partial<Pista>) => void;
+  removerPista: (id: string) => void;
 
   /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
   rolarIniciativaTodos: () => void;
@@ -369,6 +375,10 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.npcs = estado.npcs.map((n: any) => ({ foto: null, ...n }));
   }
+  // v23 → v24: quadro de pistas/evidências (aba dedicada, fora da ficha).
+  if (versaoAnterior < 24) {
+    estado.pistas = estado.pistas ?? [];
+  }
   return estado as Store;
 }
 
@@ -623,6 +633,15 @@ export const useStore = create<Store>()(
           }
           return { npcs: [...s.npcs, copia] };
         }),
+
+      adicionarPista: () => {
+        const pista = criarPistaVazia();
+        set((s) => ({ pistas: [...s.pistas, pista] }));
+        return pista.id;
+      },
+      atualizarPista: (id, patch) =>
+        set((s) => ({ pistas: s.pistas.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
+      removerPista: (id) => set((s) => ({ pistas: s.pistas.filter((p) => p.id !== id) })),
 
       rolarIniciativaTodos: () => {
         const { fichas, npcs } = get();
@@ -985,10 +1004,10 @@ export const useStore = create<Store>()(
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, iniciativa, mapa, midia, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+        const { fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
           get();
         return JSON.stringify(
-          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, iniciativa, mapa, midia, log, rollsLog, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, log, rollsLog, config },
           null,
           2,
         );
@@ -1050,6 +1069,7 @@ export const useStore = create<Store>()(
             categoria: n.categoria ?? '',
           })),
           iniciativa: d.iniciativa ?? [],
+          pistas: d.pistas ?? [],
           mapa: {
             imagemDataUrl: d.mapa?.imagemDataUrl ?? null,
             tokens: (d.mapa?.tokens ?? []).map((t) => ({

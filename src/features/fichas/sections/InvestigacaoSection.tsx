@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KIT_INVESTIGACAO, type DefinicaoKitInvestigacao } from '../../../rules/data/kitInvestigacao';
+import { KIT_INVESTIGACAO, SERVICOS_RUA, type DefinicaoKitInvestigacao } from '../../../rules/data/kitInvestigacao';
 import type { KitInvestigacaoItem } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
@@ -86,6 +86,20 @@ export default function InvestigacaoSection({ ficha, onChange }: SecaoFichaProps
       <p className="vazio" style={{ marginTop: '0.4rem' }}>
         Etiquetas: Rastreável (rede sabe onde está) · Analógico (fora da rede, sobrevive à Correção) · Ilegal (ser pego é problema) · Óbvio (todo mundo nota)
       </p>
+
+      <h4 className="label" style={{ marginTop: '1rem' }}>
+        Serviços da rua (referência de preço)
+      </h4>
+      <table className="armas-tabela">
+        <tbody>
+          {SERVICOS_RUA.map((s) => (
+            <tr key={s.servico}>
+              <td>{s.servico}</td>
+              <td>{s.preco}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   );
 }

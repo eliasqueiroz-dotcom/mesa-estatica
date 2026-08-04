@@ -692,4 +692,30 @@ describe('migrate', () => {
     const estado = migrate({ fichas: [fichaAtual], npcs: [] }, 23);
     expect(estado.fichas[0]).toEqual(fichaAtual);
   });
+
+  it('v23 → v24: injeta pistas vazio quando ausente', () => {
+    const estado = migrate({ npcs: [] }, 23);
+    expect(estado.pistas).toEqual([]);
+  });
+});
+
+describe('adicionarPista/atualizarPista/removerPista', () => {
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+  });
+
+  it('adiciona uma pista vazia em "não descoberta" e permite editar e mover status', () => {
+    const id = useStore.getState().adicionarPista();
+    const pista = useStore.getState().pistas.find((p) => p.id === id);
+    expect(pista?.status).toBe('nao-descoberta');
+    expect(pista?.texto).toBe('');
+
+    useStore.getState().atualizarPista(id, { texto: 'sangue no elevador', status: 'descoberta' });
+    const atualizada = useStore.getState().pistas.find((p) => p.id === id);
+    expect(atualizada?.texto).toBe('sangue no elevador');
+    expect(atualizada?.status).toBe('descoberta');
+
+    useStore.getState().removerPista(id);
+    expect(useStore.getState().pistas.find((p) => p.id === id)).toBeUndefined();
+  });
 });

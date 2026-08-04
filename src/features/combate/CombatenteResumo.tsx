@@ -1,4 +1,4 @@
-import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import { efeitoCondicao, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { descricaoSurto } from '../../rules/data/surto';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 
@@ -108,7 +108,7 @@ export default function CombatenteResumo({
             </span>
           )}
           {condicoes.map((c) => (
-            <span key={c} className="combate-chip" title={c}>
+            <span key={c} className="combate-chip" title={efeitoCondicao(c)}>
               {nomeCondicao(c)}
             </span>
           ))}

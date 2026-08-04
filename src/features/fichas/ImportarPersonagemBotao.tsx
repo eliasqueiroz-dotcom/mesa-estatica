@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ANTECEDENTES } from '../../rules/data/antecedentes';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { useStore } from '../../state/store';
-import { importarFichasDeJSON, type ResultadoImportacao } from './importarPersonagem';
+import { encontrarFichaPorNome, importarFichasDeJSON, type ResultadoImportacao } from './importarPersonagem';
 
 const EXEMPLO = {
   nome: "Marta 'Sombra' Andrade",
@@ -68,11 +68,19 @@ export default function ImportarPersonagemBotao() {
   const aplicarResultados = (resultados: ResultadoImportacao[]) => {
     const linhas: string[] = [];
     for (const r of resultados) {
-      const id = adicionarFicha();
+      // reler a cada volta — uma ficha criada nesta mesma leva já entra na busca da próxima.
+      const fichasAtuais = useStore.getState().fichas;
+      const existenteId = encontrarFichaPorNome(fichasAtuais, r.patch.nome);
+      const id = existenteId ?? adicionarFicha();
       atualizarFicha(id, r.patch);
-      linhas.push(r.avisos.length === 0 ? `${r.nomeParaExibir}: importado sem avisos.` : `${r.nomeParaExibir}:\n  - ${r.avisos.join('\n  - ')}`);
+      const acao = existenteId ? 'sobrescrito (já existia um personagem com esse nome)' : 'importado';
+      linhas.push(
+        r.avisos.length === 0
+          ? `${r.nomeParaExibir}: ${acao}, sem avisos.`
+          : `${r.nomeParaExibir}: ${acao}.\n  - ${r.avisos.join('\n  - ')}`,
+      );
     }
-    window.alert(`${resultados.length} personagem(ns) importado(s).\n\n${linhas.join('\n\n')}`);
+    window.alert(`${resultados.length} personagem(ns) processado(s).\n\n${linhas.join('\n\n')}`);
     setTexto('');
     setErro(null);
     setStatus('fechado');

@@ -8,7 +8,7 @@ export interface DefinicaoKitInvestigacao {
 
 export const KIT_INVESTIGACAO: DefinicaoKitInvestigacao[] = [
   { nome: 'Celular descartável', preco: 'R$ 400', acesso: 'Comum', etiquetas: '—', nota: 'uma semana de ligações limpas, depois some' },
-  { nome: 'Gravador ou câmara analógica', preco: 'R$ 350', acesso: 'Comum', etiquetas: 'Analógico', nota: 'preserva o Ruído; mídia física vira tesouro' },
+  { nome: 'Gravador ou câmera analógica', preco: 'R$ 350', acesso: 'Comum', etiquetas: 'Analógico', nota: 'preserva o Ruído; mídia física vira tesouro' },
   { nome: 'Kit de arrombamento', preco: 'R$ 800', acesso: 'Restrito', etiquetas: 'Ilegal', nota: 'sem ele, fechaduras físicas: DT +5' },
   { nome: 'Clonador de crachás', preco: 'R$ 1.200', acesso: 'Restrito', etiquetas: 'Ilegal', nota: 'copia acesso com Tecnologia DT 15, 1 min de proximidade' },
   { nome: 'Rastreador magnético', preco: 'R$ 600', acesso: 'Marcado', etiquetas: 'Rastreável', nota: 'siga um veículo pelo app' },

@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
+import { exportarFichaDocx } from './exportarFichaDocx';
 import AnotacoesSection from './sections/AnotacoesSection';
 import ArmasSection from './sections/ArmasSection';
 import AtributosDerivadosSection from './sections/AtributosDerivadosSection';
@@ -14,10 +16,26 @@ import VinculosSection from './sections/VinculosSection';
 
 export default function FichaEditor({ ficha }: { ficha: Ficha }) {
   const atualizarFicha = useStore((s) => s.atualizarFicha);
+  const basePV = useStore((s) => s.config.basePV);
   const onChange = (patch: Partial<Ficha>) => atualizarFicha(ficha.id, patch);
+  const [exportando, setExportando] = useState(false);
+
+  const exportar = async () => {
+    setExportando(true);
+    try {
+      await exportarFichaDocx(ficha, basePV);
+    } finally {
+      setExportando(false);
+    }
+  };
 
   return (
     <div className="ficha-editor">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+        <button onClick={exportar} disabled={exportando} title="baixar a ficha em .docx — pra editar em Word ou guardar fora do app">
+          {exportando ? 'gerando…' : 'exportar .docx'}
+        </button>
+      </div>
       <IdentidadeSection ficha={ficha} onChange={onChange} />
       <VinculosSection ficha={ficha} onChange={onChange} />
       <AtributosDerivadosSection ficha={ficha} onChange={onChange} />

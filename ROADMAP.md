@@ -224,6 +224,8 @@ compilam sem erro.
 
 ## Checklist do dia da sessão (25/07) — executar na máquina final
 
+*(histórico — sessão de 25/07 já passou; ver seção "Próximos passos — sessão de 29/08/2026" abaixo para o que vem agora)*
+
 - [ ] `npm run build` + `npm run preview` funcionando **offline** (desligar wifi e testar)
 - [ ] Export JSON de backup salvo fora do navegador
 - [ ] Fichas dos jogadores conferidas contra as fichas de papel deles
@@ -231,3 +233,24 @@ compilam sem erro.
 - [ ] Discord: compartilhar a **janela** do navegador (não a tela), 1080p, modo "otimizar para vídeo" desligado
 - [ ] Determinação de todos resetada para 1 ("abrir turno")
 - [ ] d20 físico na mesa por garantia — *fé no rolador do navegador, mas o papel não esquece*
+
+## Próximos passos — sessão de 29/08/2026 (concluído em 04/08)
+
+Ordem definida pelo usuário (dev entre 04/08 e a sessão) — os 6 itens abaixo foram implementados e verificados (testes + navegador):
+
+1. ~~**Limpar raiz do repo**~~ — removidos `fix.js`, `fix.ps1`, `fix.py`, `read_pdf.py`, `dev.log`, `.playwright-mcp/`, `test-results/`, `tests/`; mantido só `estatica-equipamentos.pdf` (referência).
+2. ~~**Fechar o Kit de Investigação**~~ — conferido contra o PDF de equipamentos: corrigido typo ("câmara" → "câmera"), tabela de Serviços da rua passou a aparecer na ficha, removido `src/rules/data/investigacao.ts` (arquivo órfão duplicado, nunca importado). De brinde: preço/etiqueta do Colete tático em `armas.ts` também corrigido.
+3. ~~**Quadro de pistas/evidências (investigation board)**~~ — aba "Pistas" nova (GM-only, com aviso visual disso), 3 colunas (não descobertas/descobertas/compartilhadas), estado novo `pistas: Pista[]` com migração de schema (v24).
+4. ~~**Glossário de condições de combate**~~ — painel expansível em `IniciativaPanel.tsx` com as 8 condições + efeito; corrigido de brinde um bug de tooltip em `CombatenteResumo.tsx` que mostrava o id cru em vez do efeito (afetava a visão do jogador também).
+5. ~~**Atalhos de teclado para ações comuns do GM**~~ — auditoria mostrou que avançar turno (espaço/N) já existia; adicionado atalho `C` pra abrir a janela de controle secreta (mesmo destino do clique no título).
+6. ~~**Export de ficha em Word**~~ — botão "exportar .docx" no `FichaEditor` (aparece pro mestre e pro jogador); no import (fluxo docx→IA→JSON já existente), personagem com nome igual a um já existente agora sobrescreve em vez de duplicar.
+
+### Sugestões de próximos passos (não priorizado)
+
+Ideias levantadas junto com a lista acima, sem compromisso de ordem:
+
+- Recapitulação automática de sessão a partir do log narrativo (`rollsLog` + log de combate), para colar no grupo do Discord ou reler no início da próxima sessão.
+- "Relógio" de tensão visível ligado aos gauges de Ruído Narrativo/Ameaça já existentes em `AlertaOverlay.tsx`.
+- Gatilhos narrativos automáticos ao cruzar limiares de Ruído/Ameaça, puxando de eventos já tabelados em `rules/data/surto.ts`.
+- Handouts — compartilhar uma imagem/documento específico com os jogadores, parecido com o overlay de crachás no mapa.
+- Indicador sutil de Sanidade no lado do jogador sem revelar números exatos ao grupo (checar calibração da paridade do dia 25/07).

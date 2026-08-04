@@ -46,6 +46,16 @@ export interface ResultadoImportacao {
   avisos: string[];
 }
 
+/** Acha o id de uma ficha existente com o mesmo nome (comparação tolerante a acento/caixa,
+ *  mesmo critério de `normalizar` usada pro resto da importação) — pro reimport de um
+ *  personagem já criado sobrescrever em vez de duplicar. `null` se não achar ou se o nome
+ *  vier vazio (nunca casa "sem nome" contra um personagem sem nome de verdade). */
+export function encontrarFichaPorNome(fichas: { id: string; nome: string }[], nome: string | undefined): string | null {
+  if (!nome || !nome.trim()) return null;
+  const alvo = normalizar(nome);
+  return fichas.find((f) => f.nome && normalizar(f.nome) === alvo)?.id ?? null;
+}
+
 const normalizar = (s: string): string =>
   s
     .normalize('NFD')

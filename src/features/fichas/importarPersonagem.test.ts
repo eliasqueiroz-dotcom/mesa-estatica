@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { converterFichaImportada, importarFichasDeJSON } from './importarPersonagem';
+import { converterFichaImportada, encontrarFichaPorNome, importarFichasDeJSON } from './importarPersonagem';
 
 describe('converterFichaImportada', () => {
   it('campos de texto simples entram direto no patch', () => {
@@ -111,5 +111,29 @@ describe('importarFichasDeJSON', () => {
   it('formato inesperado (nem objeto nem lista de objetos) devolve erroGeral', () => {
     const { erroGeral } = importarFichasDeJSON(JSON.stringify(['string solta']), 20);
     expect(erroGeral).toBeTruthy();
+  });
+});
+
+describe('encontrarFichaPorNome', () => {
+  const fichas = [
+    { id: 'f1', nome: "Marta 'Sombra' Andrade" },
+    { id: 'f2', nome: '' },
+  ];
+
+  it('casa por nome exato', () => {
+    expect(encontrarFichaPorNome(fichas, "Marta 'Sombra' Andrade")).toBe('f1');
+  });
+
+  it('casa ignorando acento e caixa', () => {
+    expect(encontrarFichaPorNome(fichas, "MARTA 'sombra' ANDRADE")).toBe('f1');
+  });
+
+  it('não acha quando o nome não bate com nenhuma ficha', () => {
+    expect(encontrarFichaPorNome(fichas, 'Outro Nome')).toBeNull();
+  });
+
+  it('não casa nome vazio/indefinido contra ficha sem nome', () => {
+    expect(encontrarFichaPorNome(fichas, undefined)).toBeNull();
+    expect(encontrarFichaPorNome(fichas, '')).toBeNull();
   });
 });

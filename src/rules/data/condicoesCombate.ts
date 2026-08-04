@@ -22,3 +22,8 @@ export const CONDICOES_COMBATE: CondicaoCombate[] = [
 export function nomeCondicao(id: string): string {
   return CONDICOES_COMBATE.find((c) => c.id === id)?.nome ?? id;
 }
+
+/** Efeito de uma condição pelo id — pro tooltip/hover, sem precisar abrir outra aba. */
+export function efeitoCondicao(id: string): string {
+  return CONDICOES_COMBATE.find((c) => c.id === id)?.efeito ?? '';
+}
