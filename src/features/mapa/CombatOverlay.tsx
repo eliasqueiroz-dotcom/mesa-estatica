@@ -124,8 +124,8 @@ export default function CombatOverlay() {
     <div
       style={{
         position: 'sticky', top: 0, zIndex: 1, background: 'var(--concrete-1)',
-        marginBottom: '0.4rem', marginLeft: '-0.75rem', marginRight: '-0.75rem',
-        padding: '0 0.75rem 0.4rem',
+        marginBottom: '0.6rem', marginLeft: '-1rem', marginRight: '-1rem',
+        padding: '0 1rem 0.6rem',
       }}
     >
       <div
@@ -135,7 +135,7 @@ export default function CombatOverlay() {
         <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
           combate {modoCombate ? `· rodada ${iniciativa.rodada}` : ''}
         </h3>
-        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
           <button
             className="icone-botao"
             onClick={() => setVista((v) => (v === 'iniciativa' ? 'log' : 'iniciativa'))}
@@ -160,7 +160,7 @@ export default function CombatOverlay() {
         </div>
       </div>
       {vista === 'iniciativa' && modoCombate && combatenteAtual && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
           <div className="mono" style={{ fontSize: 11, flex: 1, minWidth: 0 }}>
             <span style={{ color: 'var(--rede)' }}>vez de {combatenteAtual.nome}</span>
             {proximoCombatente && (
@@ -196,10 +196,15 @@ export default function CombatOverlay() {
         <div
           ref={painelRef}
           className="secao"
-          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.5rem 0.75rem' }}
+          style={{ width: 'min(380px, calc(100% - 8px))', maxHeight: '70vh', overflowY: 'auto', marginBottom: '0.6rem', boxShadow: '0 4px 24px rgba(0,0,0,0.5)', padding: '0.75rem 1rem' }}
         >
           {vista === 'iniciativa' ? (
-            <IniciativaPanel hook={iniciativa} podeArrastar={true} header={headerConteudo} />
+            <IniciativaPanel
+              hook={iniciativa}
+              podeArrastar={true}
+              header={headerConteudo}
+              ocultarBotaoProximo={modoCombate && !!combatenteAtual}
+            />
           ) : (
             <>
               {headerConteudo}

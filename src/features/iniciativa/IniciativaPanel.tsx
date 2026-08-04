@@ -10,9 +10,13 @@ interface IniciativaPanelProps {
   banner?: ReactNode;
   estiloItem?: React.CSSProperties;
   podeArrastar?: boolean;
+  /** `CombatOverlay.tsx` já tem um "▶ próximo" fixo e maior no próprio header (C2 — sempre à
+   *  mão, não some ao rolar a lista) — sem isso, o botão "próximo" daqui embaixo duplicava o
+   *  mesmo comando. `NpcsTab.tsx` (header simples, sem essa duplicata) continua mostrando. */
+  ocultarBotaoProximo?: boolean;
 }
 
-export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true }: IniciativaPanelProps) {
+export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true, ocultarBotaoProximo = false }: IniciativaPanelProps) {
   const {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
     condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs,
@@ -49,9 +53,11 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
         )}
         {modoCombate ? (
           <>
-            <button className="icone-botao acento" onClick={avancarTurno}>
-              próximo
-            </button>
+            {!ocultarBotaoProximo && (
+              <button className="icone-botao acento" onClick={avancarTurno}>
+                próximo
+              </button>
+            )}
             <button className="icone-botao" onClick={encerrarModoCombate}>
               encerrar
             </button>
