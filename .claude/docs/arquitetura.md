@@ -4,114 +4,48 @@
 
 | Decisão | Escolha | Por quê |
 |---|---|---|
-| Build | **Vite** | dev server local rápido, `npm run build` gera pasta estática servível offline |
-| UI | **React 18 + TypeScript** | ficha é CRUD reativo denso; derivados (`PV = base + 5×Vigor`) caem de graça; caminho de menor risco para construir rápido e certo |
-| Estado | **Zustand + middleware `persist`** | localStorage automático, sem boilerplate, selectors evitam re-render da ficha inteira a cada tecla |
-| Dados 3D | **`@3d-dice/dice-box-threejs`** (Three.js + cannon-es) | ver "Rolagem forçada" abaixo: escolhido por suportar resultado forçado nativo (`1d20@X`), necessário pro modo determinístico do mestre. É a lib menos mantida (2022), mas Three vem bundlada nela (sem conflito com nosso Three 0.169) |
-| Tokens 3D | **cena Three.js própria, leve** (ver abaixo) | cena separada da dos dados. A dice-box-threejs bundla seu próprio Three; os tokens usam o Three 0.169 do projeto — duas instâncias, sem conflito (só um warning no console) |
-| Fontes | **@fontsource** (Barlow, Barlow Condensed, IBM Plex Mono) | self-host, zero dependência de internet na sessão |
-| Backend | **nenhum** | mestre único, screen share; `npm run dev` local ou `npx serve dist` |
+| Build | **Vite** | dev rápido; `build` gera pasta estática servível offline |
+| UI | **React 18 + TS** | ficha é CRUD reativo denso; derivados caem de graça |
+| Estado | **Zustand + `persist`** | localStorage sem boilerplate; selectors evitam re-render da ficha inteira a cada tecla |
+| Dados 3D | **`@3d-dice/dice-box-threejs`** | única com resultado forçado nativo (`1d20@X`) — ver abaixo. Menos mantida (2022), mas traz o próprio Three bundlado |
+| Tokens 3D | **cena Three.js própria** | separada da dos dados; usa o `three@0.169` do projeto. Duas instâncias de Three convivem (só um warning no console) |
+| Fontes | **@fontsource** self-host | zero dependência de CDN em runtime |
+| Backend | **nenhum próprio**; Supabase opcional | mestre único + screen share. Sync (Realtime/Edge Functions) é camada opcional: sem env vars o app roda 100% local |
 
-## Rolagem: honesta por padrão + modo forçado do mestre (decisão revertida)
+## Rolagem: honesta por padrão + modo forçado do mestre
 
-O plano original (e as primeiras versões deste doc) diziam "rolagem sempre honesta, nunca `1d20@X`". **O usuário reverteu isso**: quer poder forçar um resultado quando precisar, controlando de **fora** da janela compartilhada no Discord. Decisão atual:
+O plano original dizia "sempre honesta, nunca `1d20@X`". **O usuário reverteu**: quer forçar quando precisar, controlando de **fora** da janela compartilhada.
 
-- **Padrão: honesto.** UI monta o contexto do teste → `roll('1d20')` (física) → o motor soma modificadores, classifica → log. Física decide o dado; matemática decide o teste.
-- **Exceção: forçado.** Se o mestre enfileirar valores pela **janela de controle** (`#controle`, janela separada), a próxima rolagem usa a notação `1d20@X` — a lib faz *swap da face* do dado depois que a física assenta, então o dado **cai fisicamente no valor** escolhido, indistinguível de uma rolagem honesta na tela.
+- **Padrão honesto**: UI monta o contexto → `roll('1d20')` (física) → motor soma modificadores e classifica → log. Física decide o dado; matemática decide o teste.
+- **Exceção forçada**: valores enfileirados pela janela `#controle` viram notação `1d20@X` — a lib faz *swap da face* depois que a física assenta, então o dado cai fisicamente no valor escolhido, indistinguível na tela.
 
-Por que `dice-box-threejs` e não o `@3d-dice/dice-box` (Babylon) que usávamos até aqui: **só a versão threejs suporta `@` forçado nativo.** No Babylon, o valor vem de um raycast na face que a física assentou (`Dice.js` → `getRollResult`), e os dados rodam num web-worker offscreen com a cena encapsulada em campos privados — forçar exigiria forkar a lib. A versão threejs entrega isso de fábrica. Trade-off aceito pelo usuário: lib menos mantida (v0.0.12, 2022).
+Por que não o `@3d-dice/dice-box` (Babylon), usado antes: **só a versão threejs suporta `@` nativo.** No Babylon o valor vem de raycast na face assentada, em web-worker offscreen com a cena em campos privados — forçar exigiria forkar a lib.
 
-### Como o forçado flui (arquivos)
+### Fluxo do forçado
 
-- [`src/dice/forcarRolagem.ts`](../../src/dice/forcarRolagem.ts) — canal via **BroadcastChannel** (`estatica-forcar-dados`). A janela de controle chama `enviarForcados(valores, umaVez)`; a principal chama `consumirForcados(totalDados)` no momento da rolagem. `umaVez` (padrão) força só a próxima e volta ao honesto; sync é bidirecional (as duas janelas mostram o mesmo estado).
-- [`src/dice/useDiceBox.ts`](../../src/dice/useDiceBox.ts) — adapter: converte `RollTermo[]`/string → notação da lib, anexa `@v1,v2,...` se há força enfileirada, e **traduz o resultado da lib de volta pro shape `RollGroupResult[]`** que os quatro roladores já consumiam (evitou reescrever a UI). Valores forçados são o **valor bruto do dado**, um por dado na ordem da rolagem (a ficha soma os modificadores depois).
-- [`src/features/controle/ControlPanel.tsx`](../../src/features/controle/ControlPanel.tsx) — a janela secreta (rota por hash `#controle`, aberta via `window.open` pelo botão "controle" no header). Mesma origin → BroadcastChannel conecta sem backend, funciona offline.
-
-Validado ponta a ponta com duas janelas reais: força de 1 dado (teste → 1 natural), de 2 dados (surto 2d20 → 10/20), reversão automática após consumir, sem erros de console.
+- [`src/dice/forcarRolagem.ts`](../../src/dice/forcarRolagem.ts) — canal **BroadcastChannel** (`estatica-forcar-dados`). Controle chama `enviarForcados(valores, umaVez)`; janela principal chama `consumirForcados(totalDados)` ao rolar. `umaVez` (padrão) força só a próxima; sync bidirecional.
+- [`src/dice/useDiceBox.ts`](../../src/dice/useDiceBox.ts) — converte `RollTermo[]`/string → notação da lib, anexa `@v1,v2,…` se há força enfileirada, e traduz o resultado de volta pro shape que os roladores consomem. Valores forçados são o **valor bruto do dado**, um por dado na ordem (modificadores somam depois).
+- [`src/features/controle/ControlPanel.tsx`](../../src/features/controle/ControlPanel.tsx) — janela secreta (hash `#controle`, `window.open`). Mesma origin → BroadcastChannel sem backend, funciona offline.
 
 ### API da lib (não publica tipos — decl. à mão em `src/dice/dice-box-threejs.d.ts`)
 
-- Construtor **2 argumentos**: `new DiceBox('#seletor', { assetPath, theme_customColorset, ... })`.
-- `initialize()` async **precisa ser chamado e aguardado** antes de rolar.
-- `roll(notation)` → Promise com `{ notation, sets: [{ num, sides, rolls: [{value}], total }], modifier, total }`. Notação combinada suportada: `1d8+1d20`, forçada `1d8+1d20@5,15`.
-- **Cor dos números**: `theme_customColorset.foreground` (aqui: âmbar `#ffc400`); `background` = corpo do dado (ciano `#2a6d78`). Sem precisar recolorir textura (era o problema do Babylon). Definido inline no `useDiceBox`.
-- Assets (texturas envmap/superfícies + sons) em `node_modules/@3d-dice/dice-box-threejs/public/` → copiados p/ `public/assets/dice-box-threejs/` pelo [`scripts/copy-dice-assets.mjs`](../../scripts/copy-dice-assets.mjs) no `postinstall`. `assetPath: '/assets/dice-box-threejs/'`.
-- Three vem **bundlada** na lib (não importa `three` externo) → sem conflito com nosso `three@0.169` dos tokens.
+- Construtor de **2 argumentos**: `new DiceBox('#seletor', { assetPath, theme_customColorset, … })`.
+- `initialize()` async **precisa ser aguardado** antes de rolar.
+- `roll(notation)` → `{ notation, sets: [{ num, sides, rolls: [{value}], total }], modifier, total }`. Combinada: `1d8+1d20`; forçada: `1d8+1d20@5,15` — **um único `@`, no fim** (o parser quebra com mais de um).
+- Cor: `theme_customColorset.foreground` = números (âmbar), `background` = corpo (ciano). Sem recolorir textura.
+- Assets copiados de `node_modules/@3d-dice/dice-box-threejs/public/` para `public/assets/dice-box-threejs/` por [`scripts/copy-dice-assets.mjs`](../../scripts/copy-dice-assets.mjs) no `postinstall`.
 
-**Pendente do Dia 4** (herdado): a bandeja visual (`<div>`) ainda é maior que a área real de arremesso da física — reduzir a caixa ou ajustar escala quando desenhar a bandeja definitiva.
+## Convenções estruturais
 
-## Shell de abas e preservação de estado (sessão 18/07/2026)
+- **`src/rules/` é TS puro, sem React/Three** — testável com vitest, e é onde mora a fidelidade ao `regras.md`.
+- **Abas não desmontam**: o shell controla `visibility`/`pointer-events`, nunca render condicional. Desmontar zera o `useState` dos roladores e dispara o cleanup do `useDiceBox` (que faz `replaceChildren()` na bandeja — o dado sumia).
+- **Persistência**: zustand/persist com `version` + `migrate`; toda mudança de shape bumpa `SCHEMA_VERSION` (`factories.ts`) e ganha bloco `if (versaoAnterior < N)`.
+- **Público vs. privado**: o que só o mestre vê fica em `sessaoPrivada` e leva badge "privado" na UI. Roladores leem a DT da cena via `useDtDaCena()` sem exibir o número.
+- **Export/Import JSON é obrigatório** — localStorage é frágil (limpeza de navegador, perfil errado). Imagem de mapa como dataURL tem limite (~5MB): comprimida a ~1600px na importação.
 
-- O bug de regressão identificado na navegação entre abas veio de renderização condicional de `App.tsx`: ao trocar de "Dados & Regras" para outra aba, o componente de dados era desmontado.
-- Em React, isso faz o `useState` interno dos roladores (Surto, Trauma, Sanidade, rolagem livre) voltar ao valor inicial e também ativa o cleanup do hook de dados (`useDiceBox`), que `replaceChildren()` no container da bandeja — por isso o dado desaparecia.
-- Correção aplicada: não remover o componente de uma aba do arbore; manter o painel montado e controlar apenas `display`/visibilidade no shell principal. Isso preserva o estado local da seleção e da mesa de dados sem mudar a lógica do motor.
-- Efeito esperado e validado: ao voltar à aba de dados, as opções escolhidas e a bandeja continuam presentes. A correção foi confirmada com `npm run build` concluindo com êxito.
+## Dados, tokens e performance
 
-## Estrutura de pastas
-
-```
-src/
-  app/            # shell, abas, atalhos de teclado, camada de ruído
-  state/          # store zustand (slices: fichas, npcs, sessao, mapa, log) + schema + migrations
-  rules/          # motor puro, sem UI: testes, sanidade, surto, trauma, iniciativa, dinheiro
-  rules/data/     # tabelas do jogo tipadas: surto20, traumas20, armas, antecedentes, pericias15
-  dice/           # wrapper da dice-box: fila de rolagens, colorsets rede/ruido, fallback 2D
-  tokens3d/       # cena three dos tokens, loader .glb, fallback placa/crachá
-  features/       # uma pasta por aba: sessao/, fichas/, dados/, mapa/, npcs/, log/
-  styles/         # tokens.css, ruido.css, base.css
-assets/faces/     # .glb ou foto por personagem (opcional, fora do bundle)
-```
-
-Regra de ouro: **`rules/` é TypeScript puro, sem imports de React ou Three** — testável com vitest, e é onde mora a fidelidade ao `regras.md`.
-
-## Modelo de dados (resumo do shape persistido)
-
-```ts
-type EstadoGlobal = {
-  schemaVersion: number;          // migração explícita a cada mudança de shape (store.ts: migrate)
-  sessaoPublica: SessaoPublica;   // vai pra tela compartilhada: cena, clima, combate/turnos
-  sessaoPrivada: SessaoPrivada;   // só o mestre vê: o que realmente acontece, gauges, DT da cena
-  fichas: Ficha[];                // ver ficha.md — inclui reguladores/acessos/surto
-  fichaAtivaId: string | null;    // controla o tier de ruído global
-  npcs: Npc[];                    // nome, pv, defesa, notas, corVisual
-  iniciativa: EntradaIniciativa[];
-  mapa: EstadoMapa;               // imagemDataUrl, tokens, grade arrastável
-  log: EntradaLog[];              // append-only, timestamp + tipo + payload
-  config: { basePV: 10|20|30 };   // dial de letalidade
-};
-```
-
-- Persistência: zustand/persist em localStorage, com `version` + `migrate`. Toda mudança de shape bumpa `SCHEMA_VERSION` (factories.ts) e ganha um bloco `if (versaoAnterior < N)` em `store.ts`.
-- **Público vs. privado** (aba Sessão): campos que só o mestre pode ver (o que realmente acontece, próximo evento, gauges de tensão/ruído/ameaça, DT da cena) ficam em `sessaoPrivada` e levam badge "privado" na UI — mesma tela física, mas o mestre não deve compartilhar essa aba. Roladores leem a DT da cena via `useDtDaCena()` sem exibir o número (só o mestre define/vê).
-- **Export/Import JSON** obrigatório (botão "exportar"): localStorage é frágil (limpeza de navegador, perfil errado). Backup antes da sessão faz parte do checklist.
-- Imagem do mapa como dataURL tem limite (~5MB localStorage) — comprimir via canvas para máx. ~1600px de largura na importação.
-
-## Integração dice-box
-
-- Container próprio na aba Dados; também um overlay compacto invocável de qualquer aba (rolar da ficha sem trocar de tela).
-- Fila: uma rolagem por vez; inputs de rolagem desabilitados até `onRollComplete` (evita corrida no log).
-- Dois colorsets registrados: `rede` (vidro ciano) e `ruido` (âmbar/vermelho sujo) — Sanidade e Surto sempre em `ruido`.
-- **Fallback 2D**: se WebGL falhar ou a lib não inicializar, rolar com `crypto.getRandomValues` e animar o número em CSS. O jogo nunca pode travar por causa do 3D.
-- Surto = duas rolagens de d20 em sequência na fila, resultados lado a lado; iguais → banner "o destino insiste".
-
-## Tokens 3D sobre o mapa
-
-- Mapa: `<img>` 2D (`object-fit: contain`) + camada de tokens. Posição armazenada como fração (0–1) **relativa ao conteúdo da imagem** (não ao container). Helper `getImgRenderRect` calcula o retângulo renderizado da imagem dentro de `.mapa-area` em tempo real. Arrasto converte pixel → fração via retângulo da imagem; renderização (DOM + Three.js) converte fração → pixel via mesmo retângulo. Tudo recalculado no `ResizeObserver` — posição consistente entre resoluções e janelas diferentes (necessário para multiplayer).
-- Renderização: um `<canvas>` Three.js transparente sobre o mapa, câmera ortográfica; cada token é um mesh (cristal low-poly, ou `.glb` de `assets/faces/` se existir, ou placa com foto + shader scanline).
-- Animação idle (rotação/flutuação) roda em um único rAF; **pausar quando a aba Mapa não está visível** e quando `document.hidden`.
-- Corte barato pré-combinado: trocar a camada 3D por divs coloridas é uma mudança só em `tokens3d/` — a lógica de drag não muda.
-
-## Performance (budget para screen share)
-
-- 60fps ao arrastar token; rolagem de dados não pode travar a UI (dice-box já roda física fora do main thread na medida do possível; manter a bandeja com `devicePixelRatio` limitado a 1.5).
-- Camada de ruído: só `transform`/`opacity`, tiers discretos via `data-ruido` no `<html>`, nenhum JS por frame.
-- Log: virtualizar só se passar de ~500 entradas (não otimizar antes).
-
-## Comandos
-
-```bash
-npm run dev      # desenvolvimento
-npm run build    # gera dist/ estático
-npx serve dist   # servir offline no dia da sessão (documentado no README)
-npm test         # vitest sobre rules/
-```
+- Fila de rolagens: uma por vez, inputs travados até completar (`roll()` concorrente corrompe a lib). Colorsets `rede` (ciano) e `ruido` (âmbar/vermelho) — Sanidade e Surto sempre em `ruido`. **Fallback 2D** com `crypto.getRandomValues` se WebGL falhar: o jogo nunca trava por causa do 3D.
+- Mapa é `<img>` com `object-fit: contain` + camada de tokens; posição é fração 0–1 **relativa à imagem**, nunca ao container (`getImgRenderRect`), recalculada por `ResizeObserver` — consistente entre resoluções, requisito do multiplayer.
+- Canvas Three.js transparente por cima, câmera ortográfica. Animação idle num único rAF, pausada quando a aba não está visível.
+- Budget de screen share: 60fps ao arrastar, `devicePixelRatio` limitado a 1.5, camada de ruído só com `transform`/`opacity` e zero JS por frame. Virtualizar o log só acima de ~500 entradas.

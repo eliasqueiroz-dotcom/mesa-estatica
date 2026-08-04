@@ -1,9 +1,11 @@
 # Mesa de Estática — Multiplayer, Permissões e Melhorias
 
-> **Estado e restrições (ler antes de implementar qualquer parte):**
-> - **Atualizado 23/07** — decisão original ("multiplayer é pós-sessão") foi revista pelo usuário: Fases A e B (§11) já estão implementadas, testadas contra o Supabase real e **em produção** (`main`, deploy automático). Fases C e D estão construídas e testadas isoladamente, mas **desligadas** — C não está religada em `useDiceBox.ts`; D existe atrás da flag `VITE_FASE_D_ROLAGEM_REMOTA` (off por padrão). Nenhuma delas exige teste com 2 aparelhos físicos reais ainda — não ativar a flag da Fase D em produção antes disso. Ver ROADMAP.md, seção "Multiplayer — Fases A–D".
-> - A **Parte III é implementável já, local-first** (Zustand, sem Supabase) — ver a seção "Implementação local primeiro" no início da Parte III.
-> - Adotar Supabase **revoga o requisito "nada depende de internet em runtime" do CLAUDE.md**. A partir da Fase A esse requisito passa a valer só pro modo fallback GM-solo (risco "offline total", §13) — **já atualizado no CLAUDE.md**.
+> **Este doc é a spec de origem, hoje quase toda implementada — não leia inteiro.**
+> O estado atual resumido está no `ROADMAP.md`; venha aqui só pela seção que o código citar (comentários apontam `§N` / `Parte IV §N`), via Grep.
+>
+> **Estado**: Fases A e B em produção. Parte IV (separação mestre/jogador) e a paridade do app do jogador, completas. **Fase C construída mas não ligada**; **Fase D atrás de `VITE_FASE_D_ROLAGEM_REMOTA` (off)** — falta teste com 2 aparelhos físicos antes de ativar.
+>
+> Adotar Supabase **revogou o requisito "nada depende de internet em runtime"**: ele vale só pro fallback GM-solo (§13). Sem env vars, o app roda 100% local.
 
 ---
 

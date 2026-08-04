@@ -21,7 +21,7 @@ import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 
 /** O mestre não tem ficha própria — cor fixa de "mestre" pra régua, nunca a cor de um
- *  personagem (decisão fechada em PLANO_REGUA_E_COMBATE.md). */
+ *  personagem (decisão fechada). */
 const AUTOR_ID_MESTRE = 'mestre';
 const COR_REGUA_MESTRE = 'var(--rede)';
 

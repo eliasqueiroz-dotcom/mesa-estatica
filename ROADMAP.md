@@ -1,256 +1,73 @@
 # ROADMAP — Mesa de Estática
 
-> Painel de controle do mestre para a sessão de Estática: ficha viva, motor de regras real, dados 3D físicos, mapa com tokens, e uma interface que pertence ao mundo do jogo.
-> Sessão-alvo: **~25/07/2026** (uma semana). Docs de referência: [regras](.claude/docs/regras.md) · [ficha](.claude/docs/ficha.md) · [arte](.claude/docs/arte.md) · [arquitetura](.claude/docs/arquitetura.md).
+> Painel de mestre: ficha viva, motor de regras, dados 3D, mapa com tokens, app do jogador e sync via Supabase. Publicado no GitHub Pages.
+> Próxima sessão de jogo: **29/08/2026**. Docs: [regras](.claude/docs/regras.md) · [ficha](.claude/docs/ficha.md) · [arte](.claude/docs/arte.md) · [arquitetura](.claude/docs/arquitetura.md) · [multiplayer](mesa-estatica-multiplayer-completo.md).
+>
+> **Histórico detalhado fica no `git log`, não aqui.** Este arquivo guarda: estado atual, invariantes que não podem ser re-quebradas, e o que vem a seguir.
 
-## O que mudou em relação ao plano original (e por quê)
+## Estado atual
 
-1. **Erudição existe.** O plano listava 14 perícias; a ficha oficial tem **15** (Erudição, Intelecto). Corrigido em `ficha.md`.
-2. **Contradição dados 3D resolvida.** Decisão final (revertida a pedido do usuário): **honesta por padrão + modo forçado do mestre** via janela `#controle`. Detalhe em `arquitetura.md`.
-3. **Spike dos dados 3D antecipado para o Dia 1.** Era o maior risco técnico agendado para o Dia 4 — se a lib falhasse, sobrava 1 dia de folga. Agora falha cedo e barato.
-4. **Regras que o plano ignorou e a mesa vai usar**: Ferido dá **-2 mecânico** (não é só badge), Surto dispara com **perda ≥5 de uma vez**, Trauma tem teste Vontade DT 12 com escolha na falha, e a ficha oficial rastreia **neuro-reguladores** (doses, Dependência, contador de Acessos — ferramenta de mestre valiosíssima: "gasta na pior hora possível").
-5. **Tokens 3D não compartilham a cena dos dados.** A dice-box encapsula o próprio renderer; os tokens ganham uma cena Three.js leve e separada (mesma stack, cena própria). O plano prometia reaproveitamento que não existe.
-6. **Export/Import JSON obrigatório.** localStorage é frágil demais para ser o único guardião da sessão. Backup entra no checklist do dia.
-7. **Fallback 2D dos dados.** Se WebGL falhar no meio da sessão, rolagem via `crypto.getRandomValues` com animação CSS. O jogo nunca trava por causa do 3D.
-8. **Microcopy in-world como requisito, não enfeite** — é a arma principal contra a cara de "gerado por IA". Vocabulário canônico em `arte.md`.
-9. **A lib de dados mudou duas vezes.** Dia 1 trocou a abandonada `dice-box-threejs` pela Babylon `dice-box`; depois voltamos à `dice-box-threejs` porque só ela tem rolagem forçada nativa (`1d20@X`). Tipos escritos à mão. Detalhes em `arquitetura.md`.
+Tudo abaixo está implementado, testado e em produção salvo indicação em contrário.
 
----
+- **Ficha e regras**: ficha completa (`ficha.md`), motor em `src/rules/` puro e testado, indicadores mecânicos (Ferido, linha da Sanidade, Surto com perda ≥5, traumas), neuro-reguladores, dinheiro R$/P$ com câmbio, Kit de Investigação, export `.docx` + import via IA (sobrescreve por nome).
+- **Dados**: 3D com colorsets por tipo de rolagem, fila de rolagens, fallback 2D sem WebGL, rolagem rápida em qualquer aba. Honesta por padrão; forçada só pela janela `#controle`.
+- **Mapa/combate**: upload comprimido, tokens arrastáveis com cristal 3D, grade configurável, régua de medição, AoE (círculo/quadrado), `CombatOverlay` com iniciativa, condições, glossário e drag-and-drop.
+- **Sessão**: dashboard público/privado, gauges de Ruído Narrativo/Ameaça com reflexo visual site-wide, ruído de Sanidade por tiers, log narrativo + `rollsLog` separados com visibilidade, aba Pistas (GM-only), jukebox sincronizado.
+- **Multiplayer (Supabase)**: Fases A e B em produção (tokens; fichas com dono real via Anonymous Auth + RLS). App do jogador (`jogador.html`) com paridade: ficha própria editável, roladores, mapa, combate read-only, log, mídia.
+- **Fase C** (Edge Function `resolver-rolagem`) construída mas **não ligada** no caminho do mestre. **Fase D** atrás da flag `VITE_FASE_D_ROLAGEM_REMOTA` (**off por padrão**) — falta teste com 2 aparelhos físicos antes de ativar.
 
-## Concluído — Dias 1 a 4 + extras (detalhe completo no `git log`; decisões técnicas em `arquitetura.md`)
+## Invariantes — aprendidas na marra, não re-quebrar
 
-**Dia 1 — Fundação + spike ✅**: scaffold Vite/React/TS/Zustand, modelo de dados com export/import JSON, tabelas do jogo tipadas em `src/rules/data/`, spike de dados 3D validado (10 rolagens honestas). Node LTS via winget; Vite 8.1.5/Vitest 4.1.10 (0 vulns); git local sem remote.
+Cada uma custou um bug real em produção ou ao vivo numa sessão.
 
-**Dia 2 — Ficha completa ✅**: todos os campos de `ficha.md`; indicadores mecânicos (Ferido, linha da Sanidade só na transição descendo, Surto com perda ≥5, 3+ traumas — Surto e Trauma exibem os dois banners quando disparam juntos); multi-ficha; export/import na shell. Gate passou (ficha real só pela UI, sobreviveu a fechar/reabrir). **Lição: reiniciar o dev server a cada dia** — HMR longo corrompe o React ("Invalid hook call" sem bug de código).
+- **Exclusão nunca por diff.** Sync infere criação/edição por diff, mas remoção só propaga se a UI marcou de propósito (`multiplayer/remocaoExplicita.ts`). O `GM_TOKEN` é compartilhado — uma aba com lista desatualizada apagava fichas/NPCs/tokens de todo mundo.
+- **Flag de "aplicando remoto" é contador, não boolean.** Duas tabelas disparam dois eventos Realtime pro mesmo push; com boolean, o primeiro a terminar zera a flag e o segundo vaza como edição local → loop exponencial de requests.
+- **Coordenadas do mapa são % da IMAGEM renderizada**, nunca do container (`getImgRenderRect`/`retanguloGradeEmPx` em `mapaUtils.ts`) — edição E renderização. Container varia por dispositivo; misturar as duas bases desalinha mestre e jogador.
+- **Notação de dado forçado aceita um único `@` no fim** — o parser da lib quebra com mais de um. `consumirForcados` é exclusivo do `useDiceBox` (sorteio de trauma usa `Math.random` puro).
+- **Visibilidade de rolagem precisa existir no banco.** `registrarLog` (texto livre) e `registrarRoll` são canais paralelos: filtro client-side não basta, a coluna + RLS têm que existir, senão o eco do Realtime devolve a entrada sem visibilidade e vaza.
+- **Bundle do jogador não persiste em localStorage** (storage condicional no `persist`) — os dois bundles rodam na mesma origin e compartilhariam a chave `estatica-mesa`.
+- **Fallback de array em selector do Zustand precisa ser constante fora do componente** (`EMPTY_CONDICOES`) — `?? []` inline cria array novo a cada render e quebra com "getSnapshot should be cached".
+- **Canvas WebGL é criado via `document.createElement` e destruído no cleanup**, nunca um `<canvas>` fixo do JSX — um canvas aceita um contexto WebGL por vida inteira, e StrictMode/remount quebram nisso.
+- **Token em arrasto ignora eco remoto** (`tokensEmArrasto` em `tokensSync.ts`), senão a posição pula durante o arrasto.
+- **HMR longo corrompe o React**: "Invalid hook call" numa aba antiga depois de editar hook não é bug — abrir aba nova.
 
-**Dia 3 — Motor de regras + log ✅**: `rules/teste|sanidade|surto.ts` puros e testados; roladores Teste/Sanidade/Surto/Trauma + Rolagem Livre numa bandeja física única, com log automático. Gate passou (cena completa só por botões, log coerente).
+## Próximos passos — confiabilidade pós-publicação
 
-**Fora de ordem — Rolagem forçada + troca de lib ✅** (decisão revertida a pedido do usuário): honesta por padrão + modo forçado via janela `#controle` (BroadcastChannel em `forcarRolagem.ts`; abre clicando no título "Estática — Mesa"). Lib Babylon → `dice-box-threejs` (única com `1d20@X` nativo — swap de face, indistinguível na tela). Regras duras: **um único `@` no fim da notação combinada** (o parser da lib quebra com mais de um); `consumirForcados` é exclusivo do `useDiceBox` (sorteio de trauma na ficha usa Math.random puro — já foi bug).
+O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, build/deploy) levantou os gaps abaixo. **Fase 0 é a próxima a implementar**; o resto fica registrado.
 
-**Extras 18/07 ✅**: abas trocam por `display` sem desmontar (preserva bandeja/estados locais); log com filtros (personagem/tipo/busca); rolagem livre logada; ajuste manual de Acessos na ficha.
+### Fase 0 — evitar perda de dados ao vivo (próxima)
 
-**Dia 4 — Dados 3D integrados ✅**: colorsets `rede`/`ruído` por rolagem (`colorsets.ts`; `updateConfig` só quando muda); fila de rolagens (roll() concorrente corrompe a lib — cadeado + fila, nenhum clique se perde); overlay d20 rápido em qualquer aba (`QuickRollOverlay`); atalhos `1–6`/`R`/`S` (ignorados ao digitar); fallback 2D automático sem WebGL (`rolarFallback2D`, respeita forçados); bandeja escala com o container (achado do Dia 3 morreu com a troca de lib). Gate: 21 rolagens seguidas, zero erros, log 1:1 com a tela. **Pendente do usuário: teste de screen share real no Discord.**
+1. **Try/catch em `criarStorageComDebounce`** (`src/state/store.ts`) — `setItem/getItem/removeItem` não tratam `QuotaExceededError` nem localStorage indisponível (Safari privado); hoje a mesa pode sumir em silêncio.
+2. **Indicador visual de status** (salvo local / sync conectada) — os 12 módulos de `src/multiplayer/` tratam falha de rede só com `.catch(console.error)`; o mestre não descobre que parou de sincronizar. Reusar o padrão de badge (`EstadoMesaSection.tsx`) e o desacoplamento de `debounce.ts`.
+3. **Backup automático/periódico** — usar `exportarJSON` já existente, como última linha de defesa se local e Supabase falharem juntos.
 
-**Dia 5 — Mapa, tokens, NPCs, sessão ✅**: upload de mapa comprimido a 1600px/JPEG (`comprimirImagem.ts`); tokens arrastáveis via pointer events em coordenadas normalizadas (sobrevive a resize); cristal 3D por token (`tokens3d/TokenScene.tsx`, câmera ortográfica sincronizada com o layout DOM, jitter em Sanidade ≤25%) — canvas criado via `document.createElement` e removido inteiro no cleanup (não um `<canvas>` fixo do JSX), porque um canvas só aceita um contexto WebGL por vida inteira e StrictMode/remount real quebrariam nisso; NPCs (PV/Defesa/Agilidade/notas) + Iniciativa (`ordenarIniciativa` de `rules/teste.ts`, já existia e já era testada) numa tabela ordenada, log dedicado; aba Sessão com campos ao vivo. Gate passou (fluxo completo — NPC, rolar iniciativa, tokens no mapa, drag — em poucos cliques). **Achado**: erro de console "Canvas has an existing context" no load em dev já existia antes deste dia (dice-box-threejs + StrictMode) — confirmado via stash, não é regressão daqui.
+### Fase 1 — evitar a tela travar
 
-**Dia 6 — Identidade visual total ✅**: sistema de ruído por tiers (`features/ruido/RuidoOverlay.tsx` + `styles/ruido.css`) — `data-ruido="0..3"` no `<html>` calculado por `calcularTierRuido` (novo, testado) a partir da Sanidade da ficha ativa; grain via SVG `feTurbulence` inline, scanlines, chroma aberration nos headers (tier 2+), glitch `steps()` + vinheta (tier 3), burst de 1,5s no Surto (`ultimoSurtoEm` no store, decai via CSS transition — zero rAF, só opacity/transform). Barras segmentadas com linha da metade (`BarraSegmentada.tsx`) pra PV e Sanidade, esta última também rotulada por tier ("nível de ruído: limpo/interferência/ruído/colapso"). Passada de microcopy: confirmações de apagar ficha/NPC e alerta de linha cruzada agora na voz do mundo (`arte.md`); indicador `● registrado` no header. Colorsets dos dados (rede/ruído) e devicePixelRatio (tokens3d) já vinham corretos de dias anteriores — conferido, não mexido. Gate: verificado visualmente nos 4 tiers via preview (bars, overlay e alerta reagem juntos); teste real de screen share fica pendente do usuário, como nos dias 4-5.
+- Error Boundary React em `src/entries/mestre.tsx`/`jogador.tsx` (hoje `<StrictMode>` puro, sem fallback).
+- Handler global `window.onerror`/`unhandledrejection` (inexistente).
+- Validação de shape em `importarJSON` — hoje valida só a presença de 6 chaves; tipos errados passam e quebram depois.
 
-**Extras 19/07 ✅** (detalhe por commit no `git log`): dashboard da aba Sessão dividido em público/privado (`SessaoTab.tsx`); grid do mapa e rolagem rápida viram overlays minimizáveis (cantos opostos); `QuickRollOverlay` ganha modo perícia (teste completo, não só d20 solto); reflexo visual site-wide dos gauges de Ruído narrativo/Ameaça (`AlertaOverlay.tsx`, separado do ruído de Sanidade); `TokenOverlay` mostra painel compacto (perícias treinadas/veteranas, surto/trauma com tooltip de descrição, itens/armas/proteção/neuro-regulador); escolha de efeito do Surto passa de modal do mestre pra inline na própria ficha do personagem (`escolhaSurtoPendente`); Dificuldade da cena deixa de ser dropdown nos roladores (visível na tela compartilhada) e vira campo privado em "Sessão → cena atual", lido em silêncio via `useDtDaCena()`; conversor de câmbio R$↔P$; paleta de 10 cores + iniciais no token; rótulo "ruído sanidade" simplificado pra "sanidade". `schemaVersion` 3→6.
+### Fase 2 — segurança pós-publicação
 
-**Extras 20/07 ✅**: `CombatOverlay` reescrito com seleção de combatentes por checkbox + "selecionar todos" + opacidade 0.5 pra não selecionados + botão desabilitado se nenhum selecionado; `selecionadosIniciativa` movido pro store (`sessaoPrivada`, persistido via localStorage) — estado sobrevive a refresh e tabs; `NpcsTab` sincronizada com mesma lógica de seleção. Correção de tela preta: `condicoesCombate` vinha `undefined` do localStorage para dados com schema defasado — null guard no acesso (`MapaTab.tsx:220` com `(condicoesCombete ?? {})`), na action `alternarCondicaoCombate`, e na migração v7→v8 que agora reforça `condicoesCombete: {}` no `sessaoPublica`. `schemaVersion` 7→8.
+- Rate limit na Edge Function `vincular-mestre` — compara token por string simples, sem limite de tentativas.
+- Reavaliar RLS aberta em `tokens`/`forced_queue`/mídia — as migrations a justificam com "o link não é divulgado", premissa que mudou.
+- Aviso visível quando `supabase === null` em produção — hoje só `console.warn` em DEV; secrets erradas publicam sem multiplayer, em silêncio.
+- Auditoria de reuso de token em `vincular-jogador`.
 
-**Redesign Roll20 (prompt-combate-roll20.md)**: `CombatOverlay` redesenhado com layout compacto em linha (colapsado/expandido) — linha única por combatente: `×` + posição + `▶` (se ativo) + nome + barra PV horizontal fina + `atual/max` + `🛡defesa` (cor `--real`, âmbar). Combatente ativo expande automático; clique expande/colapsa manualmente. Expandido mostra chips de condição + steppers PV/Defesa + ações de NPC. Barra de ação: `resetar` (sempre visível) → `rolar inic.` (só aparece se alguém marcado) → `iniciar`/`próximo`/`encerrar`. `+ adicionar combatente` colapsável. Divisórias `2px`. Drag-and-drop para reordenar turnos (`reordenarIniciativa` no store, ajusta `indiceAtualTurno` se turno atual movido). `TokenOverlay`: mostra `🛡 defesa` (PC e NPC) + ações de NPC; `×` de fechar com `color: var(--ruido)`. `calcularDefesa` importado de `rules/derivados`.
+### Fase 3 — nice to have
 
-**Pós-redesign — Correções CombatOverlay**: largura do painel muda de `width: 380` fixo para `min(380px, calc(100% - 8px))` — encolhe quando o `mapa-area` é estreito, sem vazar. Clamp de arrasto corrigido: `maxX = rect.width - larguraPainel - 8` (antes ignorava a largura do painel, deixava a borda direita vazar). `minX` ajustável (`-30` a `8`) a gosto do usuário. Nome do combatente ganha `minWidth: 0` para truncar com ellipsis quando aperta. Botão ATK e × de fechar resetam panelPos para (8, 8).
+- Detecção de offline + fila de pendências · ESLint no CI · `404.html`/`robots.txt`.
 
-**Tokens com posição consistente entre resoluções**: `TokenMapa.x/y` passa a ser fração relativa à **imagem** do mapa (não ao container). Helper `getImgRenderRect` calcula o retângulo renderizado da imagem (`object-fit: contain`) dentro de `.mapa-area`. Arrasto de token converte pixel → fração via retângulo da imagem; renderização do token DOM e do cristal 3D (TokenScene) converte fração → pixel via mesmo retângulo. Ambos recalculados em tempo real pelo `ResizeObserver` existente.
+### Ideias sem prioridade
 
-**Rebalanceamento NPCs & Iniciativa**: grid da aba muda de `minmax(360px, 1fr) minmax(280px, 380px)` para `3fr 2fr` — mais espaço para a lista de iniciativa. Cards de NPC passam de lista vertical para grid responsivo de 2 colunas (`repeat(auto-fill, minmax(260px, 1fr))`). Grid de edição de NPC (`npc-card__grid`) muda de `repeat(4, 1fr)` para `repeat(2, 1fr)` para caber nos cards mais estreitos. Espaçamento vertical de combatentes e checkboxes na iniciativa aumentado.
+Recap automático de sessão a partir do log · relógio de tensão ligado aos gauges · gatilhos narrativos ao cruzar limiares de Ruído/Ameaça · handouts (compartilhar imagem/documento) · indicador sutil de Sanidade no jogador.
 
-**NPCs — Ações e duplicação**: tipo `NpcAcao` (id, nome, bonus, dano) — ações roláveis com atalho de dano nos chips de combate e no overlay do token. Botão `⊞ duplicar` na aba NPCs, com null guard (`acoes ?? []`) para NPCs de schema anterior. Migração v8→v9 adiciona `visivel`, `notasMestre`, `categoria`, `acoes: []`.
+## Checklist do dia da sessão
 
-**Log de rolagens dedicado**: tipo `EntradaRoll` + `rollsLog` no store (persistido, exportado). Ações `registrarRoll`/`revelarRoll` (toggle privado→público). Aba Log exibe rolagens separadas do log narrativo, com filtro de visibilidade. Migração v9→v10.
-
-**Refatoração iniciativa 21/07 ✅**: lógica de combate/iniciativa extraída de `CombatOverlay.tsx` e `NpcsTab.tsx` para um hook compartilhado `src/hooks/useIniciativa.ts` + componente `src/features/iniciativa/IniciativaPanel.tsx`. Elimina duplicação de PV/Defesa/seleção/drag-and-drop/ações de NPC entre as duas abas. **ControlPanel** (`#controle`) agora também aceita NPCs como alvo de rolagem forçada (antes só PCs). DT da cena não aceita mais valor zero (`Math.max(1, ...)`). Fila de forçados usa `assinar`/`filaAtual` do módulo em vez de Zustand como fonte primária, com merge na sincronização BroadcastChannel (`fila = [...msg.fila, ...fila]`). `TokenOverlay` adiciona label `nível {n}` nos checkboxes de Determinação.
-
-## Multiplayer — Fases A–D (23/07)
-
-Implementação de `mesa-estatica-multiplayer-completo.md` (Supabase, RLS real, Edge Functions), decisão do usuário de adiantar pra antes do dia 25 apesar do aviso original do doc. Cada fase numa branch própria, testada contra o Supabase real (não mock) antes de ir pra `main`.
-
-- **Fase A ✅ em produção**: sincronização de posição de token via Realtime. `src/multiplayer/tokensSync.ts` + `tokensDiff.ts` (testado). RLS aberto nesta fase — aceitável só pra posição, não pra dado sensível.
-- **Fase B ✅ em produção**: fichas com dono real. Anonymous Auth + Edge Functions `vincular-jogador`/`vincular-mestre` + tabela `mestres`/`is_gm()`; `characters_publico`/`characters_privado` (Parte IV do doc — ficha dividida em superfície pública e resto privado). Validado: mestre vê/edita tudo, jogador vinculado só a própria ficha, jogador não cria ficha nem lê/escreve a de outro — bloqueado pelo RLS, não só escondido na UI.
-- **Fase C ✅ construída, não ligada**: Edge Function `resolver-rolagem` — honesta (`crypto`, não `Math.random`) e forçada via `forced_queue`, decisão sempre no servidor. Infra pronta e testada isoladamente (notação `1d20@N` confirmada); `useDiceBox.ts` continua no caminho local de sempre.
-- **Fase D ✅ construída, atrás de flag desligada**: `resolverRolagemRemota` religado em `montarNotacao`/`rolarFallback2D`/`ControlPanel` (via `useFilaForcada.ts`), atrás de `VITE_FASE_D_ROLAGEM_REMOTA` (off por padrão — comportamento local não muda). Validado ponta a ponta contra o Supabase real e confirmado visualmente (dado caindo na bandeja 3D com a flag ligada). Falta teste com 2 aparelhos físicos reais antes de ativar em produção.
-
-Doc `mesa-estatica-multiplayer-completo.md` ganhou **Parte IV** (separação de visualização mestre/jogador — bundle separado, sigilo em 3 camadas) e **Parte V** (operacional — como colocar no ar: config/segredos, seed, links, Storage, migrações, Realtime, fallback offline).
-
-**Extras da mesma sessão**: rolagem de NPC (chips de ação em `TokenOverlay`/`IniciativaPanel`/`NpcsTab`) agora sempre privada por padrão — só o `rollsLog` tem controle de privacidade de verdade, o log narrativo nunca teve. `QuickRollOverlay` no modo NPC não exige mais selecionar um NPC pra rolar (mesma flexibilidade que `RolagemLivre` já tinha). Corrigidos 6 bugs em `store.test.ts` que quebravam `npm run build` — alguns eram crash de verdade em runtime (`converterDinheiro` sem criar ficha antes), não só erro de tipo.
-
-### Parte IV — separação de visualização (em andamento, sem pressa pro dia 25)
-
-Branch `multiplayer/parte-iv-view-jogador`, sem prazo — decisão do usuário de construir com calma em vez de forçar caber antes da sessão. Ordem do plano: extrair componentes de leitura (`*View`) primeiro, único passo adiantável sem Supabase/bundle separado; cada um verificado ao vivo (montagem temporária numa aba existente, revertida antes do commit) sem tocar no app do mestre.
-
-- **`FichaPublicaView` ✅**: superfície de mesa de um PC alheio (nome, cor, PV, ferido, surto) a partir do tipo `FichaPublica` já existente (Fase B).
-- **`NpcPublicaView` ✅**: superfície de mesa de um NPC revelado (nome, cor, PV, Defesa, Agilidade, categoria, notas, lista de ações só-exibição). Nunca `notasMestre`; recusa renderizar se `visivel` for falso, mesmo que quem chama esqueça de filtrar.
-- **`SessaoPublicaView` ✅**: situação da sessão + parte pública da cena atual (atmosfera, "o que os jogadores veem") + mini log. Nunca `sessaoPrivada` (gauges, lembretes, "o que realmente acontece", próximo evento, dificuldade da cena) — nem chega como prop.
-- **Split de bundle Vite ✅**: `index.html`→`src/entries/mestre.tsx` (app completo) e `jogador.html`→`src/entries/jogador.tsx`→`PlayerApp` (só as `*View`, abas Sessão/Personagens/NPCs). `vite.config.ts` com `build.rollupOptions.input` nas duas entradas. Validado por build real: chunk do jogador (7,5kB) sem nenhuma string exclusiva de mestre (`#controle`, `forcarRolagem`, `forced_queue`, `resolver-rolagem`) presentes no chunk do mestre; confirmado ao vivo nos dois bundles. `PlayerApp` ainda lê do store local (mesma origem do app de mestre) — vira Realtime filtrado por RLS na próxima fase.
-- **Geração de links do jogador ✅**: o `owner_token` já era gerado na criação da ficha (`fichasSync.ts`, Fase B) mas nunca ficava acessível na UI. Ícones 🔗/↻ por ficha em `FichasTab` (`LinkJogadorBotao.tsx` + `multiplayer/links.ts`) buscam o token em `characters_privado`, montam `<base>/jogador.html?t=<token>` e copiam pro clipboard; ↻ regenera o token (mitigação de link vazado, doc §13) sem afetar as outras fichas. GM-only, fora do bundle do jogador (chunk seguiu em 7,45kB). Caminho feliz completo (Supabase real + GM vinculado) não testado nesta sessão — exige o `gm_token` do projeto; o caminho de erro (ficha ainda não sincronizada) foi validado e degrada sem travar.
-
-- **Hidratação do `PlayerApp` via Realtime ✅**: duas tabelas novas — migrações `0003_npcs.sql` (`npcs_publico`/`npcs_privado`, mesmo split de `characters_*`, `visivel` como RLS de linha) e `0004_sessao_publica.sql` (linha singleton `id='sessao'` — esta implementação não tem `session_id`). `npcsSync.ts`/`sessaoPublicaSync.ts` (GM, push+pull) ligados em `App.tsx`; `hidratacaoJogador.ts` (jogador, só leitura) alimenta o `PlayerApp` — `sessaoPublica` vai pro `useStore` compartilhado (os componentes já leem de lá), `fichas`/`npcs` ficam em estado local do componente. **Testado ponta a ponta contra o Supabase real**: migrações aplicadas (`supabase migration repair` + `db push` — 0001/0002 já existiam fora do rastreio da CLI, precisou reparar o histórico antes), dados semeados via `supabase db query --linked`, `jogador.html` local apontando pro projeto real mostrou sessão/NPC corretos, `notasMestre` nunca apareceu, e uma alteração de PV via SQL propagou pro navegador **sem reload** (Realtime de verdade, não só fetch inicial). Dados de teste removidos depois.
-- **Própria ficha do jogador editável ✅** (`minhaFicha.ts`): resolve "qual é a minha ficha" via `characters_privado` sem filtro de id — a RLS já restringe pra 1 linha. Popula o `useStore` com essa ficha e liga `iniciarSyncFichas`, o MESMO módulo do `GmApp` — reusa `FichaEditor` completo sem modificação, incluindo actions especializadas que algumas sections chamam direto do store (não via prop `onChange`). Achados/correções desta sessão: (1) bug real de corrida StrictMode em dev — `useMinhaFicha` fazia trabalho async antes de ligar `iniciarSyncFichas` sem checar `cancelado` bem antes dessa chamada, deixando duas assinaturas ativas ao mesmo tempo (uma tentava INSERT numa linha que a outra já tinha criado → RLS 42501), corrigido; (2) `store.ts` ganhou `storage` condicional no `persist` (localStorage real só no `GmApp`, no-op no bundle do jogador) — os dois bundles rodando na mesma origem compartilhavam a mesma chave `estatica-mesa`, contaminando o `PlayerApp` com estado do `GmApp`. Testado ponta a ponta: GM criou ficha pela UI real, jogador abriu o link real numa sessão anônima genuinamente separada, editou, valor confirmado no banco por query direta.
-
-- **Rolagem do jogador via `resolver-rolagem` ✅** (Fase 6): trouxe pra esta branch as Fases C/D via merge de `multiplayer/fase-d-controle-remoto` (nunca tinham sido mescladas a `main`, apesar do ROADMAP já descrever como prontas) — migração da Fase C renumerada 0003→0005 (colidia com `0003_npcs.sql` desta branch), aplicada no Supabase real. `resolverRolagemJogador` (nova, em `rolagemRemota.ts`) chama `resolver-rolagem` sempre, sem o gate `VITE_FASE_D_ROLAGEM_REMOTA` (o jogador não tem `#controle`, então não existe "caminho local" pra rolagem forçada fazer sentido); `montarNotacao`/`rolarFallback2D`/`useDiceBox` ganharam um parâmetro `resolverRemoto` injetável, default preserva 100% o comportamento do mestre. `RoladorTesteJogador` + `DadosTabJogador` (aba nova no `PlayerApp`): só a própria ficha, sem sucesso/falha (a DT mora em `sessaoPrivada`, nunca chega no bundle do jogador) — só d20+modificador=total, mestre narra. Separado `filaRemota.ts` (GM-only) de `rolagemRemota.ts` pra tirar o nome da Edge Function `gerenciar-fila-forcada` do bundle do jogador (camada "código" do doc). **Testado ponta a ponta contra o Supabase real**: GM criou ficha pela UI, jogador rolou honesto (bateu com `rolls_log`); simulei o mestre forçando o próximo valor (insert em `forced_queue`, equivalente ao `#controle`) — o próximo roll do jogador saiu exatamente nesse valor, sem nenhum indício de que foi forçado, confirmando o mecanismo central do doc (§5).
-
-- **Roladores completos, QuickRoll e combate do jogador ✅** (Fase 7): Sanidade/Surto/Trauma pra própria ficha. Surto e Trauma são automação completa (mesmas actions do store) — nenhum dos dois depende de DT secreta (Surto compara 2d20 entre si; Trauma usa DT fixa 12, regra impressa). Sanidade é diferente de propósito: só mostra os dados brutos, não aplica a perda sozinha (depende do sucesso do teste, que depende da DT da cena — segredo de mestre que nunca chega no bundle do jogador); o mestre aplica a perda de verdade. `QuickRollOverlayJogador` com atalhos R/X. **Achado importante**: a ORDEM de turno (`iniciativa`) nunca tinha sincronização nenhuma, diferente de `sessaoPublica.modoCombate/rodada/condicoesCombate` que já sincronizavam — migração `0006_iniciativa.sql` (coluna `posicao` explícita) + `iniciativaSync.ts` + hidratação read-only. `CombateJogadorView` é componente novo (não uma versão parametrizada de `IniciativaPanel`, que expõe drag-and-drop/steppers/ações de NPC sem gate nenhum além de `podeArrastar`) — mostra ordem, turno atual, rodada, condições de todos, sem nenhuma escrita. Entra na aba NPCs (renomeada "NPCs & Combate"); sem `CombatOverlay` flutuante — não há aba Mapa no `PlayerApp` ainda pra ele flutuar sobre.
-
-  **Bug real encontrado e corrigido nesse meio-tempo** (não específico do jogador — vivia em `fichasSync.ts` desde a Fase B, sem nunca ter sido exercitado o suficiente pra aparecer): `characters_publico`/`characters_privado` disparam dois eventos Realtime separados pra um push só; com `aplicandoRemoto` como boolean simples, dois `aplicarRemoto` concorrentes se atropelam — o primeiro a terminar zera a flag enquanto o segundo ainda está em voo, e o setState do segundo vaza pro listener como se fosse edição local, reempurra, ecoa, reempurra... loop exponencial (reproduzido ao vivo: uma escolha de Surto virou milhares de requests em menos de um minuto, com a aba do mestre e a do jogador abertas ao mesmo tempo — o cenário normal de sessão real). Corrigido trocando o boolean por um contador em `fichasSync.ts`/`npcsSync.ts`/`sessaoPublicaSync.ts`/`iniciativaSync.ts`. **Testado ponta a ponta contra o Supabase real, com o cenário exato que expôs o bug** (mestre + jogador abertos simultaneamente): combate seedado via SQL apareceu certo no jogador, Surto rolado e escolhido bateu no mestre do outro lado, contagem de requests estável (4, não milhares).
-
-- **Aba Mapa do jogador ✅**: vê o tabuleiro (fundo + grade) e move só o próprio token. `tokens.ts` (Fase A) já sincronizava posição mas não tinha busca inicial — corrigido em `tokensSync.ts` (sem isso, uma sessão sem `localStorage`, como o bundle do jogador, só veria tokens a partir da próxima mudança, nunca os que já existiam; achado incidental que também fortalece o `GmApp` numa máquina limpa). Fundo/grade (`mapa.imagemDataUrl`/`grade`) não tinham sync nenhum — migração `0007_mapa_publico.sql` (linha singleton, mesmo padrão de `sessao_publica`) + `mapaPublicoSync.ts` (GM, push+pull, só essas duas chaves — `tokens` continua com tabela própria) + `useHidratarMapaPublico` (jogador, read-only). `MapaJogadorView.tsx` é componente novo, não uma versão parametrizada do `MapaTab` do mestre (arrasto de grid/toolbar/upload/`TokenOverlay` ficam só no `GmApp`) — reusa só o que é seguro reusar (`mapa.css`, `TokenScene`, e `getImgRenderRect`/`iniciaisToken` extraídos pra `mapaUtils.ts`). Um token cujo participante não resolve (NPC não `visivel`) não é desenhado — nem um "?" genérico, que já vazaria "tem algo aqui". Validado: build limpo, chunk do jogador sem strings de mestre, 137 testes verdes, migração aplicada no Supabase real (`supabase db push`) com leitura anônima confirmada (`curl` com a `anon key` lê a linha) e escrita anônima bloqueada pela RLS (`PATCH` retorna `[]`); UI local do `MapaTab`/`PlayerApp` conferida ao vivo. **Não testado**: arrasto do próprio token ponta a ponta com um jogador de verdade vinculado — esta sessão de dev não está autenticada como GM (falta exatamente o próximo item da lista).
-
-Faltam: corte do `#controle`/forçado pro transporte novo (Fase D ainda atrás da flag desligada no lado do mestre).
-
-## Polimento — importar personagem via IA (24/07)
-
-Pedido do usuário: os jogadores mandam a ficha em `.docx`; o GM quer converter isso pra dentro da mesa sem redigitar tudo. `ImportarPersonagemBotao.tsx` (GM-only, aba Personagens) abre um modal com um prompt pronto pra colar numa IA qualquer junto do `.docx` — o prompt descreve o formato JSON esperado, a lista das 15 perícias e dos 8 antecedentes, geradas a partir de `PERICIAS`/`ANTECEDENTES` (nunca hardcoded solto, não desalinha se a tabela mudar). O GM cola o JSON que a IA devolver (ou carrega como arquivo) e `importarPersonagem.ts` converte pra `Partial<Ficha>`.
-
-O parser é tolerante de propósito — quem preenche o JSON é uma IA lendo um Word, não o nosso código: antecedente e perícia casam por nome ou id, sem acento/caixa (`ex-policial`/`Ex-policial` tanto faz); grau de perícia aceita "treinado"/"T"/3 e variantes; atributo fora de 0–5 é clampado; PV/Sanidade atuais são calculados a partir dos atributos quando a IA não mandar (`calcularPvMaximo`/`calcularSanidadeMaxima` — evita herdar o default genérico de ficha vazia, que ignora o Vigor/Vontade reais); vínculo/trauma excedente (>3) trunca. Nada disso lança erro — vira aviso, mostrado num resumo ao final da importação; o personagem entra mesmo com campos não reconhecidos, o GM ajusta manualmente pela ficha normal. Reusa `adicionarFicha`/`atualizarFicha` (store) sem action nova.
-
-Testado: 15 testes unitários (casamento de antecedente/perícia, clamp de atributo, truncamento, JSON inválido/formato inesperado) + fluxo completo ao vivo (colar JSON → ficha nova com antecedente/atributos/perícias/derivados corretos, perícia inventada ignorada sem quebrar o resto). Confirmado fora do chunk do jogador (é só GM).
-
-## Vínculo de mestre, fixes de sincronização e jukebox (24–25/07)
-
-- **Tela de vínculo de mestre ✅**: até aqui, virar `is_gm()` só dava pra fazer editando a URL (`?gm=<token>`), sem retorno visual nenhum. `VinculoMestre.tsx` (cabeçalho do `GmApp`) — pill `○/● mestre` sempre visível, clique abre modal pra colar o token; salvo em `localStorage` (nunca na URL — a tela roda em screen share), reaplicado sozinho num reload se a sessão perder o vínculo. `auth.ts` ganhou `vincularComoMestre()`/`consultarIsGm()` (RPC pra `is_gm()`) sem tocar em `executar()`/`promessaEmVoo`. Testado com o `GM_TOKEN` real, inclusive reproduzindo de propósito o incidente que motivou a feature (limpar só a sessão do Supabase mantendo o token salvo → vínculo se refaz sozinho no reload).
-- **Lag ao digitar/arrastar, corrigido ✅**: cada tecla numa ficha ou `pointermove` arrastando um token disparava um push completo pro Supabase E uma escrita de toda a mesa no `localStorage` — o eco do Realtime voltando atrasado por cima do que acabou de ser digitado é o que sentia como lag (o próprio `fichasSync.ts` já previa isso: "revisitar se incomodar na prática" — incomodou). `criarDebouncePorChave` (`debounce.ts`, testado) aplicado ao push de fichas/npcs (400ms) e tokens (150ms) — edição local continua instantânea, só a rede/disco espera uma pausa de verdade. `store.ts` ganhou o mesmo tratamento pro `localStorage.setItem`, com flush forçado em `pagehide`/`visibilitychange`.
-- **"Link inválido" pra sessão de mestre, corrigido ✅**: bug real, achado com um link de jogador de verdade. `characters_privado` tem RLS "dono OU mestre" — a busca de "minha ficha" não filtrava nada, contando só com a RLS pra sobrar 1 linha. Com a tela de vínculo tornando comum estar vinculado como mestre E abrir um link de jogador no mesmo navegador, e 2+ fichas no banco, a RLS libera todas pra uma sessão de mestre e `.maybeSingle()` quebra (`PGRST116`) em vez de devolver `null`. Reproduzido direto contra o banco antes de corrigir; `minhaFicha.ts` agora filtra `characters_privado` por `auth_uid = <meu auth.uid()>` explícito.
-- **Aba Mídia — jukebox sincronizado ✅** (pedido do usuário, priorizado antes da sessão): GM sobe faixas de áudio, controla playback (tocar/pausar/±10s/próxima/anterior/loop faixa-ou-playlist), todo jogador conectado ouve o mesmo, sincronizado. Escopo deliberadamente estreito — só o tocador, não a galeria de imagens/pastas GM-Geral que o doc do multiplayer descreve em outro lugar (item separado, futuro). `<audio>` tocando um mp4/m4a naturalmente só reproduz som — resolve "mostrar só o áudio" sem nenhuma lógica de extração.
-  - Migração `0008_midia.sql`: `midia_faixas` (lista, padrão de `tokens`) + `midia_estado` (singleton de playback, padrão de `mapa_publico`) + bucket **público** do Storage (`midia` — mesma postura de segurança já aceita em `tokens`: grupo fechado é a fronteira real, não URL assinada). Primeiro uso de Supabase Storage no projeto.
-  - Sincronização de posição sem broadcast contínuo — só em ações discretas (play/pause/seek/trocar faixa/loop); cada cliente projeta `posicaoSegundos + (agora − atualizadoEm)` e só resincroniza acima de 1,5s de desvio (`posicaoMidia.ts`, testado) — evita microssaltos audíveis a cada eco do Realtime.
-  - `MidiaPlayerGM.tsx`/`MidiaPlayerJogador.tsx` montam na raiz de `App.tsx`/`PlayerApp.tsx` (irmãos de `<main>`, mesmo lugar de `RuidoOverlay`/`AlertaOverlay`) — não dentro da aba, pra não depender da aba estar aberta pro áudio continuar/pro auto-avanço (`onEnded`) funcionar. `MidiaTab.tsx` (GM) só despacha ações; não tem `<audio>` próprio, evitando duas fontes de verdade tocando ao mesmo tempo. Autoplay bloqueado pelo navegador é tratado dos dois lados — inclusive o próprio GM, se recarregar no meio de uma faixa.
-  - Validado: 172 testes no total (`posicaoMidia`/`midiaFaixasDiff`/ações do store novos), build limpo, chunk do jogador sem strings de mestre; migração aplicada no Supabase real com leitura pública confirmada por `curl` sem nenhum header de auth e escrita anônima bloqueada pela RLS (403); sincronização ponta a ponta testada ao vivo entre aba de mestre e aba de jogador (faixa inserida via SQL apareceu na playlist do mestre via Realtime, "tocar" propagou o nome da faixa pro widget do jogador). **Não testado**: som de verdade tocando (upload real via arquivo não é automatizável por aqui), sincronismo audível entre dois aparelhos físicos, autoplay num navegador mobile de verdade — só o usuário consegue validar isso.
-
-## Paridade do lado do jogador (25/07) — Partes 1-4 de 4, completo
-
-Usando a mesa ao vivo, o GM achou vários gaps no lado do jogador. Plano em 4 partes com checkpoint entre cada uma (pedido do usuário) — todas concluídas, incluindo a maior peça (log/rolagens).
-
-- **Parte 1 — fixes triviais ✅**: `RuidoOverlay` (ruído visual de Sanidade) nunca tinha sido montado em `PlayerApp.tsx` — só existia no `App.tsx` do mestre, apesar do hook já ler a ficha ativa genericamente. `MapaJogadorView.tsx` só desenhava a moldura tracejada da grade (`.mapa-grade-caixa`), nunca as linhas de verdade (`.mapa-grade`) — faltava portar um `<div>`. Os dois confirmados ao vivo (Sanidade baixa → `data-ruido="2"` no jogador; grid ativado pelo mestre → linhas aparecem no mapa do jogador).
-- **Parte 2 — log + rolagens sincronizados ✅** (o maior pedaço até agora): confirmado 0% sincronizado antes — `registrarLog`/`registrarRoll`/`limparLog`/`revelarRoll` só mexiam em Zustand local, mestre e cada jogador numa bolha separada. O doc classifica "log coerente" como não-cortável.
-  - Migrações novas `log_publico`/`rolls_publicas` (`0009_log_rolls_publicos.sql`) — de propósito SEPARADAS de `rolls_log` (Fase C/D, sistema de rolagem forçada, sem coluna de visibilidade). `rolls_publicas` tem RLS de verdade: pública pra todos, ou mestre, ou o dono da rolagem (via `characters_privado.auth_uid`) — testado direto contra o banco antes de mexer na UI (outro jogador não vê rolagem privada alheia; dono vê a própria; só mestre revela/limpa).
-  - `logRollsSync.ts` — único módulo de sync verdadeiramente **simétrico** do projeto (mesmo padrão de `tokensSync.ts`, não os GM-only-push): mestre e jogador chamam as mesmas actions no mesmo store, os dois precisam empurrar e puxar. Sem debounce (evento discreto, não rajada). `limparLog` vira `DELETE` em massa server-side (detectado por `log.length === 0` vindo de um array não-vazio).
-  - `LogView.tsx` extraído de `LogTab.tsx` (mesmo idioma de `podeArrastar` em `IniciativaPanel`) — prop `podeLimpar` esconde "limpar log" e filtra rolagens privadas no lado do jogador (defesa em profundidade, a RLS já deveria ter barrado antes). Nova aba "Log" no `PlayerApp.tsx`.
-  - Validado ao vivo, ponta a ponta: rolagem privada seedada não aparecia pro jogador; mestre clicou "revelar" → propagou pro jogador via Realtime sem reload; "limpar log" propagou nos dois lados sem apagar as rolagens (comportamento correto — `limparLog` só zera o narrativo).
-- **Parte 3 — Defesa pública + detalhe de combate + overlay do próprio token ✅**: `FichaPublica` ganhou `defesa` (calculada em `dividirFicha`, coluna nova `characters_publico.defesa` — migração `0010_defesa_publica.sql` + backfill `0011` pras fichas já existentes, senão ficavam travadas no default até o próximo push). `CombatenteResumo.tsx` novo (componente compartilhado, nome/PV/Defesa/condição/surto, `editavel` liga steppers de PV/Sanidade) — reusado em `CombateJogadorView.tsx` (agora mostra PV/Defesa de cada combatente, não só nome) e no `TokenOverlayJogador.tsx` novo (abre ao clicar num token no mapa do jogador — três ramos: próprio PC editável, PC alheio e NPC read-only). Bug real pego no teste ao vivo: `TokenOverlayJogador` quebrava a mesa inteira do jogador com "getSnapshot should be cached" — fallback `condicoesCombate[id] ?? []` criava array novo a cada render, mesma armadilha que `TokenOverlay.tsx` (mestre) já tinha resolvido com uma constante `EMPTY_CONDICOES` fora do componente; só faltou replicar. Validado ao vivo: Defesa 11 idêntica nos dois lados, combate sincronizado com PV/Defesa por linha, overlay do próprio token ajustando PV propagou pro mestre via Supabase.
-- **Parte 4 — Ameaça/Ruído Narrativo visual ✅**: `AlertaOverlay.tsx` já implementava o sistema visual inteiro (tiers, `data-alerta-*` no `<html>`, CSS distinto por fonte) — só faltava levar os 2 números pro jogador sem nunca virar gauge/número na UI. `sessao_publica` ganhou `ameaca`/`ruido_narrativo` (migração `0012`, reusa o canal singleton já existente em vez de tabela nova — baixa frequência de escrita, caso de uso exato desse padrão). `atualizarSessaoPrivada` (store.ts) espelha os 2 campos em `sessaoPublica` no mesmo `set()` quando vêm no patch — `tensao` nunca é espelhada porque não existe em `SessaoPublica`, então fica de fora por construção, não por checagem. `AlertaOverlayJogador.tsx` novo (irmão de `AlertaOverlay.tsx`, não parametrizado — pequeno demais pra valer a indireção), lê `sessaoPublica` em vez de `sessaoPrivada`. Validado ao vivo: Ameaça a 80% → tier 3 idêntico nos dois lados; Ruído Narrativo a 60% → tier 2; Tensão a 90% → nenhuma mudança no jogador, "Tensão" nem aparece na UI dele; nenhum número visível, só o efeito.
-
-## 5 bugs achados ao vivo pós-paridade (25/07)
-
-Nova rodada de teste ao vivo achou 5 problemas, todos investigados a fundo (3 agentes de pesquisa + leitura direta) antes de mexer em código.
-
-- **Barra de status do jogador**: `DestaqueSuperior.tsx` (Sessão/Local/Objetivo/Sanidade, já existia e já era 100% derivado de dados que o jogador já tinha) só estava montado em `App.tsx` — faltava `<DestaqueSuperior />` em `PlayerApp.tsx`. Fix de 1 linha.
-- **Grid do mapa desalinhado no jogador**: `.mapa-grade`/`.mapa-grade-caixa` eram posicionados em % bruta do container, enquanto a imagem (`object-fit: contain`) e os tokens já usavam a área REAL renderizada (`getImgRenderRect`) — inconsistência latente nos dois lados (`MapaTab.tsx` e `MapaJogadorView.tsx`), só visível quando o container tem proporção diferente da imagem (o `.mapa-area` do mestre é mais curto por causa da `.mapa-toolbar` acima). Novo helper `retanguloGradeEmPx` (`mapaUtils.ts`) unifica os dois com a mesma fórmula dos tokens.
-- **Token do jogador dessincroniza do cursor ao arrastar**: duas causas — (a) `getBoundingClientRect()` bruto (border-box) usado no cálculo de arrasto vs `ResizeObserver` (content-box) usado pra renderizar, ~2px de erro que cresce com a distância do canto do container (novo helper `retanguloConteudo`); (b) eco do Realtime da própria escrita sobrescrevendo a posição local mais recente durante um arrasto rápido — `tokensSync.ts` ganhou um registro `tokensEmArrasto` (`marcarTokenEmArrasto`/`desmarcarTokenEmArrasto`) que pula update remoto pro token em arrasto ativo. Medido ao vivo: `.mapa-area` tem border-box 1232×585 vs content-box 1230×583 — a discrepância era real.
-- **Rolagens privadas vazando pro jogador (o mais sério)**: `registrarLog` (texto livre) e `registrarRoll` (mecanismo com `visibilidade`, já correto) eram canais paralelos desacoplados — todo rolador chamava os dois, mas só `registrarRoll` recebia a visibilidade; o texto livre sempre embutia o número, mesmo privado. Corrigido nos 6 call sites (`QuickRollOverlay.tsx` x3, `RoladorTeste.tsx` x2, `RolagemLivre.tsx` x1) + filtro em `LogView.tsx`/`SessaoPublicaView.tsx`. **Achado crítico durante o teste ao vivo**: o filtro sozinho não bastava — `log_publico` (Supabase) não tinha coluna `visibilidade`, então o campo se perdia no INSERT e o eco do Realtime devolvia a entrada sem ela, reabrindo o vazamento pra qualquer jogador real (não só numa simulação local). Migração `0013_log_publico_visibilidade.sql` adiciona a coluna + RLS de verdade (mesmo padrão de `rolls_publicas`, não só filtro client-side). Validado ao vivo com uma rolagem privada seedada via SQL: mestre vê, jogador não vê em lugar nenhum, RLS bloqueia a leitura no servidor.
-- **Player de mídia "mudo/volume não faz nada"**: investigado ao vivo antes de mexer em qualquer código (a ligação `onClick`/`onChange` → `<audio>` já estava correta por leitura). Reproduzido com áudio genuinely tocando: mute funcionou perfeitamente (`audio.muted` virou `true`, em sincronia com o botão). O primeiro teste tinha pego a faixa de 30s já tendo terminado (`paused: true`, `currentTime === duration`) — não tinha nada tocando pra silenciar, não é bug de código. Nenhuma mudança feita.
-- **CombatOverlay faltando na aba Mapa do jogador** (reportado depois, mesma rodada): o mestre tem um botão flutuante "ATK" na aba Mapa que abre um painel arrastável com o combate por cima do mapa (`CombatOverlay.tsx`) — não existia equivalente pro jogador. `CombatOverlayJogador.tsx` novo espelha a mesma chrome flutuante/arrastável, mas renderiza `CombateJogadorView` (já 100% read-only, criado na Parte 3) em vez de `IniciativaPanel`. Validado ao vivo com combate real rodando: painel abre, mostra rodada/turno/PV/Defesa/surto de todos os combatentes, sem vazamento no bundle.
-- **Overlay de token mostrava "sem nome"**: `CombatenteResumo` recebia `nome=""` de propósito (nome já aparece no cabeçalho do overlay/linha da iniciativa), mas o fallback `nome || 'sem nome'` tratava string vazia como personagem sem nome de verdade. Linha de nome some inteira quando vazia, em vez de mostrar o placeholder errado.
-
-## Volume da música — só o GM controla (25/07, pedido do usuário)
-
-Decisão de produto: volume da mídia deixa de ser local por jogador e vira sincronizado, controlado só pelo GM — mudo continua local (cada jogador silencia só pra si, sem depender do mestre). `EstadoMidia` ganha `volume` (migração `0014_midia_volume.sql`, coluna em `midia_estado`), threading em `midiaEstadoSync.ts` (Linha/PatchEstadoMidia/mappers/diff local). `MidiaTab.tsx` (GM) ganha um slider "volume (todos)"; `MidiaPlayerGM.tsx` e `MidiaPlayerJogador.tsx` aplicam `midia.volume` no próprio `<audio>` via `useEffect`. `MidiaPlayerJogador.tsx` perde o slider de volume local (só o botão de mudo continua). `SCHEMA_VERSION` 15→16 com bloco `migrate` (default 0.8 pra estado já persistido sem o campo). Validado ao vivo: GM ajusta o slider → volume do jogador muda em sincronia; mudo do jogador continua isolado (não afeta o GM nem outros jogadores).
-
-## Correção real no fix do gridline (25/07) — bug que o fix anterior não resolvia de verdade
-
-Usuário reportou que o gridline ainda desalinhava entre mestre e jogador mesmo depois do fix anterior (`retanguloGradeEmPx`). Investigação achou um erro de semântica introduzido naquele fix: `GradeMapa.x/y/largura/altura` sempre foram definidos como **% de `.mapa-area`** (o container, documentado no próprio tipo) — o fix anterior mudou só a RENDERIZAÇÃO pra tratar esses valores como % da IMAGEM, sem atualizar a EDIÇÃO (arrastar/redimensionar o grid em `MapaTab.tsx` ainda calculava em % do container via `posPercentual`). Container varia por dispositivo (mestre tem `.mapa-toolbar` acima, encolhendo a altura; jogador não) — grid em % de container nunca poderia alinhar com a imagem de forma consistente entre os dois, não importa a proporção.
-
-Fix de verdade: `posPercentual` (`MapaTab.tsx`) agora calcula em % da IMAGEM renderizada (mesma base de `retanguloGradeEmPx` e dos tokens), não do container — sistema de coordenadas consistente ponta a ponta (edição e renderização). Tipo `GradeMapa` documentado de novo pra refletir isso. **Efeito colateral aceito**: qualquer grid já configurado precisa ser reposicionado uma vez (os números salvos tinham o significado antigo).
-
-Bug relacionado achado durante a verificação ao vivo: `imgNatural` (dimensão natural da imagem, usada pro cálculo `getImgRenderRect`) dependia só do evento `onLoad` do `<img>` — perde a corrida quando o navegador já decodificou a imagem antes do React religar o listener (comum em `data:` URI, decodificação quase síncrona), deixando `imgNatural` `null` pra sempre e o grid preso no fallback de % do container (exatamente o bug que o fix de coordenadas queria matar). `MapaJogadorView.tsx`/`MapaTab.tsx` ganharam um `useEffect` que checa `img.complete` direto, cobrindo o caso de cache-hit que o `onLoad` sozinho perde.
-
-Validado ao vivo com dois containers de proporção bem diferentes (mestre 927×773 com toolbar, jogador com outra altura) — grid calculado bate exatamente (4 casas decimais) com o esperado nos dois lados.
-
-## CRÍTICO: fichas/NPCs/tokens sendo apagados por sessões de mestre desatualizadas (25/07)
-
-Usuário reportou "jogador não vê token de outro jogador no mapa". Investigando com um segundo personagem de teste, achei que a ficha dele tinha sido **apagada do banco inteiro** minutos depois de criada, sem nenhuma ação do usuário — o problema nunca foi renderização.
-
-Causa raiz: `fichasSync.ts`/`npcsSync.ts`/`tokensSync.ts`/`midiaFaixasSync.ts` inferiam exclusão comparando a lista local atual com um snapshot anterior — "sumiu um id daqui? apaga no servidor". Isso é seguro só se toda sessão conectada como mestre estiver sempre com a lista 100% atualizada. Mas o `GM_TOKEN` é compartilhado (dá pra vincular como mestre em mais de uma aba/dispositivo ao mesmo tempo) — se UMA dessas sessões tiver uma lista desatualizada (aba em segundo plano que perdeu o Realtime, recarregamento em timing ruim), a PRÓXIMA edição qualquer nela reinterpreta "um item que essa aba não conhece" como "foi removido" e apaga de verdade, pra todo mundo. Reproduzido ao vivo.
-
-Fix: `src/multiplayer/remocaoExplicita.ts` novo — exclusão só propaga pro servidor quando o próprio botão "remover"/"excluir" da UI marcou o id de propósito (`marcarRemocaoExplicita`), nunca por inferência de diff (`eraRemocaoExplicita` consome a marca). Aplicado nos 4 módulos de sync com esse padrão + os 4 pontos de UI que removem algo (`FichasTab.tsx`, `NpcsTab.tsx`, `MapaTab.tsx` — token —, `MidiaTab.tsx` — faixa). Validado ao vivo: criar ficha + editar não aciona delete nenhum; clicar "remover" continua apagando do servidor normalmente.
-
-## Vínculo de jogador quebrava com auth_uid duplicado (25/07)
-
-Usuário reportou que clicar no link do jogador não vinculava a ficha. `vincular-jogador` só faz `UPDATE ... WHERE owner_token = X`, nunca limpa `auth_uid` de outra linha — qualquer navegador que já tivesse vinculado a uma ficha antes (teste do próprio mestre, ou o jogador clicando em mais de um link) e depois vinculasse a outra deixava **duas fichas com o mesmo `auth_uid`**. `minhaFicha.ts` buscava "minha ficha" só por `auth_uid`, e essa duplicidade lançava `PGRST116` (múltiplas linhas) — "link inválido" com um link perfeitamente válido.
-
-Fix: quando a URL trouxer `?t=<owner_token>`, filtrar por ele (é `unique` no banco) em vez de `auth_uid` — determinístico independente de quantas fichas aquele `auth_uid` acabou vinculado. Sem `?t=` (revisita sem o link), continua caindo no filtro por `auth_uid`. Validado ao vivo contra produção: forcei duas fichas com o mesmo `auth_uid` de propósito e confirmei que o link correto ainda carrega a ficha certa (campos da ficha conferidos, não só o nome no log público).
-
-## Schema mismatch: `surtosAtivos` undefined → `.some()` crash no mestre (26/07)
-
-Após aplicar a restrição de dados públicos (`ef466ef`, que reduziu `FichaPublica` a
-só `id/nome/corVisual`), o bundle do mestre começou a crashar com
-`Cannot read properties of undefined (reading 'some')` no chunk `alerta-sessao`.
-
-**Causa raiz**: o commit `ef466ef` mudou `FichaPrivadaDados` de
-`Omit<Ficha, 'id' | 'nome' | 'corVisual' | 'pvAtual' | 'surtosAtivos'>` para
-`Omit<Ficha, 'id' | 'nome' | 'corVisual'>`. Com isso, `pvAtual`/`surtosAtivos`
-deixaram de ser destruturados em `dividirFicha` e passaram a ser salvos em
-`characters_privado.dados`. Mas a RECONSTRUÇÃO da Ficha (`buscarEMontar`,
-`buscarTodas`, `minhaFicha.ts`) sempre dependeu de `paraFichaPublica` para ler
-esses campos de `characters_publico` — e `paraFichaPublica` parou de mapeá-los
-junto com a restrição. Resultado: dados antigos no Supabase (escritos antes da
-mudança) não tinham `pvAtual`/`surtosAtivos` em `characters_privado.dados` *nem*
-eram mapeados de `characters_publico`, produzindo `undefined` no store.
-
-**Fix em 2 camadas**:
-1. Reconstrução: `buscarEMontar`, `buscarTodas` e `minhaFicha.ts` agora mesclam
-   `pvAtual`/`surtosAtivos` de `characters_publico` por cima de
-   `characters_privado.dados` — para dados novos o valor é o mesmo (override
-   inócuo), para antigos fornece o fallback. `montarFicha`/`paraFichaPublica`
-   não precisaram mudar.
-2. Defesa em profundidade: `personagemEstaEmSurto` em `surto.ts` ganhou
-   `(surtosAtivos ?? []).some(...)` — protege contra undefined vindo de
-   qualquer caminho futuro.
-
-Validado: 171 testes, build limpo, ambas as entradas (mestre + jogador)
-compilam sem erro.
-
-- [ ] Simular uma sessão inteira sozinho (investigação → combate → surto → downtime), corrigindo o que atritar.
-- [ ] README com o comando de subir offline (`npm run preview`) e o checklist do dia.
-- [ ] Folga real — é o buffer se o Dia 4 ou 5 estourar.
-
----
-
-## Ordem de corte (se o tempo apertar)
-
-1. Rostos `.glb` escaneados (fica o cristal/crachá — já é ótimo)
-2. Tokens 3D → divs coloridas (só troca a camada visual; drag não muda)
-3. NPCs/Iniciativa vira lista simples
-4. **Não se cortam**: identidade visual + ruído, dados (3D ou fallback digno), motor de regras fiel, log.
-
-## Riscos
-
-| Risco | Mitigação |
-|---|---|
-| lib de dados 3D incompatível/abandonada | mitigado: `dice-box-threejs` validada em produção + fallback 2D automático implementado no Dia 4 |
-| localStorage apagado antes da sessão | export JSON no checklist; autosave testado no Dia 2 |
-| Screen share derrete performance | teste real no Discord nos gates dos Dias 4 e 6 |
-| Ruído visual atrapalha leitura | tiers discretos; regra de legibilidade em `arte.md` |
-| Escopo crescer no meio da semana | Fase 2 (cenas Marble/World Labs) só depois do Dia 7 — é upside, não meta |
-| **A máquina da sessão é OUTRA** — algo depender de estado local da máquina de dev | postinstall recria assets 3D; caminhos absolutos fora do git; estado migra via export/import JSON; setup no README. **Migrar e testar na máquina final no Dia 6 ou 7, nunca no dia 25** |
-
-## Migração para a máquina da sessão (fazer no Dia 6–7, não na véspera)
-
-1. Instalar Node.js LTS na máquina final (`winget install OpenJS.NodeJS.LTS` no Windows)
-2. `git clone` (ou copiar a pasta sem `node_modules`) + `npm install` — assets 3D vêm sozinhos via postinstall
-3. Exportar o JSON da mesa na máquina de dev → importar na máquina final
-4. Rodar o checklist abaixo **na máquina final**
-
-## Checklist do dia da sessão (25/07) — executar na máquina final
-
-*(histórico — sessão de 25/07 já passou; ver seção "Próximos passos — sessão de 29/08/2026" abaixo para o que vem agora)*
-
-- [ ] `npm run build` + `npm run preview` funcionando **offline** (desligar wifi e testar)
+- [ ] `npm run build` + `npm run preview` funcionando (e o site publicado abrindo)
 - [ ] Export JSON de backup salvo fora do navegador
-- [ ] Fichas dos jogadores conferidas contra as fichas de papel deles
-- [ ] Mapa(s) do caso já importado(s), NPCs pré-cadastrados
-- [ ] Discord: compartilhar a **janela** do navegador (não a tela), 1080p, modo "otimizar para vídeo" desligado
-- [ ] Determinação de todos resetada para 1 ("abrir turno")
+- [ ] Fichas conferidas contra as dos jogadores; mapas importados, NPCs pré-cadastrados
+- [ ] Links de jogador enviados; vínculo de mestre ativo (pill `● mestre`)
+- [ ] Discord: compartilhar a **janela** do navegador (não a tela), 1080p, "otimizar para vídeo" desligado
+- [ ] Determinação de todos resetada para 1
 - [ ] d20 físico na mesa por garantia — *fé no rolador do navegador, mas o papel não esquece*
-
-## Próximos passos — sessão de 29/08/2026 (concluído em 04/08)
-
-Ordem definida pelo usuário (dev entre 04/08 e a sessão) — os 6 itens abaixo foram implementados e verificados (testes + navegador):
-
-1. ~~**Limpar raiz do repo**~~ — removidos `fix.js`, `fix.ps1`, `fix.py`, `read_pdf.py`, `dev.log`, `.playwright-mcp/`, `test-results/`, `tests/`; mantido só `estatica-equipamentos.pdf` (referência).
-2. ~~**Fechar o Kit de Investigação**~~ — conferido contra o PDF de equipamentos: corrigido typo ("câmara" → "câmera"), tabela de Serviços da rua passou a aparecer na ficha, removido `src/rules/data/investigacao.ts` (arquivo órfão duplicado, nunca importado). De brinde: preço/etiqueta do Colete tático em `armas.ts` também corrigido.
-3. ~~**Quadro de pistas/evidências (investigation board)**~~ — aba "Pistas" nova (GM-only, com aviso visual disso), 3 colunas (não descobertas/descobertas/compartilhadas), estado novo `pistas: Pista[]` com migração de schema (v24).
-4. ~~**Glossário de condições de combate**~~ — painel expansível em `IniciativaPanel.tsx` com as 8 condições + efeito; corrigido de brinde um bug de tooltip em `CombatenteResumo.tsx` que mostrava o id cru em vez do efeito (afetava a visão do jogador também).
-5. ~~**Atalhos de teclado para ações comuns do GM**~~ — auditoria mostrou que avançar turno (espaço/N) já existia; adicionado atalho `C` pra abrir a janela de controle secreta (mesmo destino do clique no título).
-6. ~~**Export de ficha em Word**~~ — botão "exportar .docx" no `FichaEditor` (aparece pro mestre e pro jogador); no import (fluxo docx→IA→JSON já existente), personagem com nome igual a um já existente agora sobrescreve em vez de duplicar.
-
-### Sugestões de próximos passos (não priorizado)
-
-Ideias levantadas junto com a lista acima, sem compromisso de ordem:
-
-- Recapitulação automática de sessão a partir do log narrativo (`rollsLog` + log de combate), para colar no grupo do Discord ou reler no início da próxima sessão.
-- "Relógio" de tensão visível ligado aos gauges de Ruído Narrativo/Ameaça já existentes em `AlertaOverlay.tsx`.
-- Gatilhos narrativos automáticos ao cruzar limiares de Ruído/Ameaça, puxando de eventos já tabelados em `rules/data/surto.ts`.
-- Handouts — compartilhar uma imagem/documento específico com os jogadores, parecido com o overlay de crachás no mapa.
-- Indicador sutil de Sanidade no lado do jogador sem revelar números exatos ao grupo (checar calibração da paridade do dia 25/07).

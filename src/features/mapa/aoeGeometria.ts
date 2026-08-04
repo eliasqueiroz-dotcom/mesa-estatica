@@ -2,7 +2,7 @@ import type { GradeMapa } from '../../state/types';
 import { tamanhoCelula, type Ponto } from './mapaUtils';
 
 /** Círculo e Quadrado só — Cone e Linha exigem matemática de ângulo/segmento que não coube
- *  neste corte (PLANO_REGUA_E_COMBATE.md Fase 4, escopo reduzido). */
+ *  neste corte (escopo reduzido de propósito). */
 export type FormaAoE = 'circulo' | 'quadrado';
 
 export interface TemplateAoE {

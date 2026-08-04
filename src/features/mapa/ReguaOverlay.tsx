@@ -4,7 +4,7 @@ import type { GradeMapa } from '../../state/types';
 import { distanciaEmCelulas, distanciaTotal, formatarDistancia, type Ponto } from './mapaUtils';
 
 /** Uma régua fica plenamente visível por `MS_ATE_SUMIR` depois do último ponto (pointerup) e
- *  então se apaga em `MS_FADE` — ver 1.5 do PLANO_REGUA_E_COMBATE.md. Réguas ainda `ativa`
+ *  então se apaga em `MS_FADE`. Réguas ainda `ativa`
  *  (sendo arrastadas) nunca entram nessa contagem. */
 const MS_ATE_SUMIR = 4000;
 const MS_FADE = 600;

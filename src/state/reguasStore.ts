@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Ponto } from '../features/mapa/mapaUtils';
 
 /** Uma medição da régua de medição do mapa. Efêmera de propósito — some sozinha alguns
- *  segundos depois de terminar (ver `mapa-estatica` PLANO_REGUA_E_COMBATE.md Parte 1). */
+ *  segundos depois de terminar. */
 export interface ReguaViva {
   /** = `autorId` — uma régua viva por autor, nunca acumula rastro de medições antigas. */
   id: string;
