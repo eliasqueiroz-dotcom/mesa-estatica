@@ -185,7 +185,6 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <RuidoOverlay />
       <AlertaOverlay />
-      <MidiaPlayerGM />
       <header
         style={{
           display: 'flex',
@@ -225,6 +224,7 @@ export default function App() {
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <MidiaPlayerGM />
           <VinculoMestre />
           <ExportarImportar abrirControle={abrirControle} />
         </div>

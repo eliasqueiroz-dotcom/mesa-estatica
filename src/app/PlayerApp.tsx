@@ -157,6 +157,7 @@ export default function PlayerApp() {
             })}
           </nav>
         </div>
+        <MidiaPlayerJogador />
       </header>
       <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
@@ -280,7 +281,6 @@ export default function PlayerApp() {
           <LogTabJogador />
         </div>
       </main>
-      <MidiaPlayerJogador />
       {possuiFicha && minhaFicha && (
         <QuickRollOverlayJogador
           ficha={minhaFicha}

@@ -4,12 +4,15 @@ import { calcularPosicaoEsperada, precisaResincronizar } from '../../multiplayer
 import { useStore } from '../../state/store';
 
 /**
- * Motor de playback do lado do mestre — monta na raiz do `App.tsx` (irmão de `<main>`,
- * mesmo lugar de `RuidoOverlay`/`AlertaOverlay`), não dentro da aba Mídia. Prender o
- * `<audio>` ao componente de UMA aba seria frágil (um refactor futuro que desmonte a aba
- * mataria o áudio sem aviso) e o auto-avanço (`onEnded`) precisa rodar mesmo com o mestre
- * em outra aba. Sem UI de transporte visível — isso é `MidiaTab.tsx`, que só despacha ações
- * no store; este componente só espelha `s.midia` no `<audio>` de verdade.
+ * Motor de playback do lado do mestre — renderizado dentro do `<header>` do `App.tsx` (não
+ * dentro da aba Mídia). Prender o `<audio>` ao componente de UMA aba seria frágil (um refactor
+ * futuro que desmonte a aba mataria o áudio sem aviso) e o auto-avanço (`onEnded`) precisa
+ * rodar mesmo com o mestre em outra aba. Sem UI de transporte visível — isso é `MidiaTab.tsx`,
+ * que só despacha ações no store; este componente só espelha `s.midia` no `<audio>` de verdade.
+ *
+ * O aviso de bloqueio/erro já foi `position: fixed` no canto inferior esquerdo — cobria o fim
+ * de listas longas em outras abas (mesmo bug do lado do jogador, `MidiaPlayerJogador.tsx`).
+ * Morar no header evita colidir com o conteúdo rolável de qualquer aba.
  */
 export default function MidiaPlayerGM() {
   const midia = useStore((s) => s.midia);
@@ -92,18 +95,15 @@ export default function MidiaPlayerGM() {
         <div
           className="mono"
           style={{
-            position: 'fixed',
-            bottom: '1rem',
-            left: '1rem',
-            zIndex: 70,
             background: 'var(--concrete-1)',
             border: '1px solid var(--ruido-dim)',
             borderRadius: '2px',
-            padding: '0.5em 0.8em',
-            fontSize: '12px',
+            padding: '0.3em 0.6em',
+            fontSize: '11px',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.6rem',
+            gap: '0.5rem',
+            maxWidth: '260px',
           }}
         >
           {bloqueado ? (
