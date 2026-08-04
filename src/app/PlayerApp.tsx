@@ -22,6 +22,7 @@ import {
 } from '../multiplayer/hidratacaoJogador';
 import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
+import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
@@ -77,16 +78,19 @@ export default function PlayerApp() {
   useEffect(() => {
     let pararTokens = () => {};
     let pararLogRolls = () => {};
+    let pararReguas = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
       pararTokens = iniciarSyncTokens();
       pararLogRolls = iniciarSyncLogRolls();
+      pararReguas = iniciarSyncReguas();
     });
     return () => {
       cancelado = true;
       pararTokens();
       pararLogRolls();
+      pararReguas();
     };
   }, []);
 

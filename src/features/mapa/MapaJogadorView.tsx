@@ -10,9 +10,11 @@ import type { EntradaIniciativa, Ficha } from '../../state/types';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
 import CombatOverlayJogador from './CombatOverlayJogador';
+import ReguaOverlay from './ReguaOverlay';
 import TokenOverlayJogador from './TokenOverlayJogador';
 import './mapa.css';
 import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import { useRegua } from './useRegua';
 
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup no próprio token conta como clique, não arrasto
 
@@ -123,6 +125,15 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
     : null;
 
+  const regua = useRegua({
+    autorId: minhaFicha.id,
+    cor: minhaFicha.corVisual,
+    grade: mapa.grade,
+    containerRef,
+    imgRef,
+    bloqueado: arrastandoRef.current,
+  });
+
   const posicaoDoPonteiro = (e: React.PointerEvent) => {
     const rect = retanguloConteudo(containerRef.current!);
     const imgEl = imgRef.current;
@@ -164,9 +175,11 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
       <div
         ref={containerRef}
         className="mapa-area"
-        onPointerMove={mover}
-        onPointerUp={soltar}
-        onPointerCancel={soltar}
+        onPointerDown={regua.onPointerDown}
+        onPointerMove={(e) => { mover(e); regua.onPointerMove(e); }}
+        onPointerUp={(e) => { soltar(e); regua.onPointerUp(); }}
+        onPointerCancel={(e) => { soltar(e); regua.onPointerCancel(); }}
+        onContextMenu={regua.onContextMenu}
       >
         {mapa.imagemDataUrl ? (
           <img
@@ -226,6 +239,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             </div>
           );
         })}
+        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
       </div>
 

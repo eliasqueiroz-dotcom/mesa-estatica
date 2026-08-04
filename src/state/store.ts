@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
@@ -88,6 +89,11 @@ interface Acoes {
   rolarIniciativaTodos: () => void;
   /** Rola iniciativa apenas para os IDs de participante selecionados (PC ou NPC). */
   rolarIniciativa: (participanteIds: string[]) => void;
+  /** Rerrola só UM combatente já na lista (d20+Agilidade, mesma regra) e reinsere na posição
+   *  ordenada — mantém `indiceAtualTurno` grudado em quem estiver na vez, mesmo que a
+   *  reordenação desloque índices. Reordena por `valor` (perde o desempate por Agilidade da
+   *  rolagem original, que não fica guardado por entrada — aceitável pra um rerrol pontual). */
+  rerolarIniciativaDe: (participanteId: string) => void;
   removerDaIniciativa: (id: string) => void;
   limparIniciativa: () => void;
   /** Reordena a lista de iniciativa (drag-and-drop). Ajusta `indiceAtualTurno` se o turno atual for movido. */
@@ -101,6 +107,9 @@ interface Acoes {
   encerrarModoCombate: () => void;
   /** Liga/desliga uma condição de combate (`CONDICOES_COMBATE`) num combatente. */
   alternarCondicaoCombate: (participanteId: string, condicaoId: string) => void;
+  /** Duração em rodadas de uma condição JÁ ativa — `null`/`0` volta a manual/persistente (sem
+   *  prazo). Decrementa sozinha no fim do turno do afetado (`avancarTurno`). */
+  definirDuracaoCondicao: (participanteId: string, condicaoId: string, rodadas: number | null) => void;
 
   atualizarMapa: (patch: Partial<EstadoMapa>) => void;
   atualizarGrade: (patch: Partial<GradeMapa>) => void;
@@ -518,6 +527,29 @@ export const useStore = create<Store>()(
         set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
         get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
       },
+      rerolarIniciativaDe: (participanteId) => {
+        const s = get();
+        const entrada = s.iniciativa.find((e) => e.participanteId === participanteId);
+        if (!entrada) return;
+        const ficha = s.fichas.find((f) => f.id === participanteId);
+        const npc = s.npcs.find((n) => n.id === participanteId);
+        const agilidade = ficha?.atributos.agilidade ?? npc?.agilidade ?? 0;
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const novoValor = d20 + agilidade;
+        const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
+        const reordenada = s.iniciativa
+          .map((e) => (e.participanteId === participanteId ? { ...e, valor: novoValor } : e))
+          .sort((a, b) => b.valor - a.valor);
+        const novoIndice = participanteIdNaVez ? reordenada.findIndex((e) => e.participanteId === participanteIdNaVez) : -1;
+        set({
+          iniciativa: reordenada,
+          sessaoPublica: {
+            ...s.sessaoPublica,
+            indiceAtualTurno: novoIndice >= 0 ? novoIndice : s.sessaoPublica.indiceAtualTurno,
+          },
+        });
+        get().registrarLog('iniciativa', `${entrada.nome} rerrolou iniciativa — d20+${agilidade}=${novoValor}`);
+      },
       removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
       limparIniciativa: () => set({ iniciativa: [] }),
       reordenarIniciativa: (de, para) =>
@@ -548,22 +580,48 @@ export const useStore = create<Store>()(
         set((s) => {
           const total = s.iniciativa.length;
           if (total === 0) return s;
+          const participanteAtual = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
           const proximo = (s.sessaoPublica.indiceAtualTurno + 1) % total;
           const rodada = proximo === 0 ? s.sessaoPublica.rodada + 1 : s.sessaoPublica.rodada;
-          return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada } };
+          // decrementa a duração das condições de quem TERMINOU o turno agora — chega a 0,
+          // some sozinha (decrementarDuracoesCombate em rules/combate.ts).
+          const { condicoesCombate, condicaoDuracao } = participanteAtual
+            ? decrementarDuracoesCombate(s.sessaoPublica.condicoesCombate, s.sessaoPublica.condicaoDuracao ?? {}, participanteAtual)
+            : { condicoesCombate: s.sessaoPublica.condicoesCombate, condicaoDuracao: s.sessaoPublica.condicaoDuracao };
+          return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada, condicoesCombate, condicaoDuracao } };
         }),
       encerrarModoCombate: () =>
-        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {} } })),
+        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {}, condicaoDuracao: {} } })),
       alternarCondicaoCombate: (participanteId, condicaoId) =>
         set((s) => {
           const condicoesMap = { ...(s.sessaoPublica.condicoesCombate ?? {}) };
           const atuais = condicoesMap[participanteId] ?? [];
-          const proximas = atuais.includes(condicaoId)
-            ? atuais.filter((c) => c !== condicaoId)
-            : [...atuais, condicaoId];
+          const desligando = atuais.includes(condicaoId);
+          const proximas = desligando ? atuais.filter((c) => c !== condicaoId) : [...atuais, condicaoId];
           if (proximas.length === 0) delete condicoesMap[participanteId];
           else condicoesMap[participanteId] = proximas;
-          return { sessaoPublica: { ...s.sessaoPublica, condicoesCombate: condicoesMap } };
+
+          // desligou manualmente — a duração associada (se houver) fica órfã, limpa junto.
+          let condicaoDuracao = s.sessaoPublica.condicaoDuracao ?? {};
+          if (desligando && condicaoDuracao[participanteId]?.[condicaoId] !== undefined) {
+            const doParticipante = { ...condicaoDuracao[participanteId] };
+            delete doParticipante[condicaoId];
+            condicaoDuracao = { ...condicaoDuracao };
+            if (Object.keys(doParticipante).length === 0) delete condicaoDuracao[participanteId];
+            else condicaoDuracao[participanteId] = doParticipante;
+          }
+
+          return { sessaoPublica: { ...s.sessaoPublica, condicoesCombate: condicoesMap, condicaoDuracao } };
+        }),
+      definirDuracaoCondicao: (participanteId, condicaoId, rodadas) =>
+        set((s) => {
+          const mapa = { ...(s.sessaoPublica.condicaoDuracao ?? {}) };
+          const doParticipante = { ...(mapa[participanteId] ?? {}) };
+          if (rodadas === null || rodadas <= 0) delete doParticipante[condicaoId];
+          else doParticipante[condicaoId] = rodadas;
+          if (Object.keys(doParticipante).length === 0) delete mapa[participanteId];
+          else mapa[participanteId] = doParticipante;
+          return { sessaoPublica: { ...s.sessaoPublica, condicaoDuracao: mapa } };
         }),
 
       atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
@@ -774,7 +832,12 @@ export const useStore = create<Store>()(
         const base = criarEstadoInicial();
         const normalizar = (d: Partial<EstadoGlobal>): EstadoGlobal => ({
           schemaVersion: d.schemaVersion ?? 0,
-          sessaoPublica: { ...base.sessaoPublica, ...d.sessaoPublica, condicoesCombate: d.sessaoPublica?.condicoesCombate ?? {} },
+          sessaoPublica: {
+            ...base.sessaoPublica,
+            ...d.sessaoPublica,
+            condicoesCombate: d.sessaoPublica?.condicoesCombate ?? {},
+            condicaoDuracao: d.sessaoPublica?.condicaoDuracao ?? {},
+          },
           sessaoPrivada: { ...base.sessaoPrivada, ...d.sessaoPrivada, estatisticas: { ...base.sessaoPrivada.estatisticas, ...d.sessaoPrivada?.estatisticas }, eventos: d.sessaoPrivada?.eventos ?? [], lembretes: d.sessaoPrivada?.lembretes ?? [], selecionadosIniciativa: d.sessaoPrivada?.selecionadosIniciativa ?? [] },
           fichas: (d.fichas ?? []).map((f) => ({
             ...base.fichas[0] ?? criarFichaVazia(),
@@ -974,6 +1037,14 @@ export const useStore = create<Store>()(
         // v18 → v19: observacaoCombate em cada ficha
         if (versaoAnterior < 19 && estado.fichas) {
           estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, observacaoCombate: f.observacaoCombate ?? '' }));
+        }
+        // v19 → v20: escala/unidade na grade do mapa (régua de medição).
+        if (versaoAnterior < 20 && estado.mapa?.grade) {
+          estado.mapa.grade = { escala: 1.5, unidade: 'm', ...estado.mapa.grade };
+        }
+        // v20 → v21: duração opcional por condição de combate.
+        if (versaoAnterior < 21 && estado.sessaoPublica) {
+          estado.sessaoPublica = { condicaoDuracao: {}, ...estado.sessaoPublica };
         }
         return estado as Store;
       },

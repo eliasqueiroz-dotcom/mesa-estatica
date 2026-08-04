@@ -20,6 +20,7 @@ import { iniciarSyncMapaPublico } from '../multiplayer/mapaPublicoSync';
 import { iniciarSyncMidiaEstado } from '../multiplayer/midiaEstadoSync';
 import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
+import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import LogTab from './LogTab';
@@ -121,6 +122,7 @@ export default function App() {
     let pararMidiaFaixas = () => {};
     let pararMidiaEstado = () => {};
     let pararLogRolls = () => {};
+    let pararReguas = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -133,6 +135,7 @@ export default function App() {
       pararMidiaFaixas = iniciarSyncMidiaFaixas();
       pararMidiaEstado = iniciarSyncMidiaEstado();
       pararLogRolls = iniciarSyncLogRolls();
+      pararReguas = iniciarSyncReguas();
     });
     return () => {
       cancelado = true;
@@ -145,6 +148,7 @@ export default function App() {
       pararMidiaFaixas();
       pararMidiaEstado();
       pararLogRolls();
+      pararReguas();
     };
   }, []);
 

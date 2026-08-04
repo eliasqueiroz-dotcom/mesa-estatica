@@ -548,3 +548,44 @@ describe('midia', () => {
     });
   });
 });
+
+describe('rerolarIniciativaDe', () => {
+  const montarIniciativa = () => {
+    const npc1 = { id: 'n1', nome: 'Alvo', corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 3, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
+    const npc2 = { id: 'n2', nome: 'Fixo', corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 1, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
+    useStore.setState({
+      npcs: [npc1, npc2],
+      iniciativa: [
+        { id: 'e1', participanteId: 'n1', tipo: 'npc', nome: 'Alvo', valor: 20 },
+        { id: 'e2', participanteId: 'n2', tipo: 'npc', nome: 'Fixo', valor: 10 },
+      ],
+      sessaoPublica: { ...useStore.getState().sessaoPublica, modoCombate: true, indiceAtualTurno: 1 },
+    });
+  };
+
+  it('atualiza o valor e reordena a lista', () => {
+    montarIniciativa();
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 = 1
+    useStore.getState().rerolarIniciativaDe('n1'); // 1 + agilidade(3) = 4, cai abaixo do Fixo (10)
+    const iniciativa = useStore.getState().iniciativa;
+    expect(iniciativa.map((e) => e.participanteId)).toEqual(['n2', 'n1']);
+    expect(iniciativa.find((e) => e.participanteId === 'n1')?.valor).toBe(4);
+    vi.restoreAllMocks();
+  });
+
+  it('mantém indiceAtualTurno grudado em quem estava na vez, mesmo com a reordenação', () => {
+    montarIniciativa(); // indiceAtualTurno=1 → 'n2' (Fixo) está na vez
+    vi.spyOn(Math, 'random').mockReturnValue(0); // d20 = 1 → n1 cai pra depois de n2
+    useStore.getState().rerolarIniciativaDe('n1');
+    const s = useStore.getState();
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('n2');
+    vi.restoreAllMocks();
+  });
+
+  it('participanteId fora da iniciativa não faz nada', () => {
+    montarIniciativa();
+    const antes = useStore.getState().iniciativa;
+    useStore.getState().rerolarIniciativaDe('nao-existe');
+    expect(useStore.getState().iniciativa).toBe(antes);
+  });
+});

@@ -203,6 +203,12 @@ export interface SessaoPublica {
   /** Condições de combate por combatente (participanteId → ids de `CONDICOES_COMBATE`). Lembrete
    *  visual pro mestre, não modificador automático (Parte II §4). Limpo ao encerrar o combate. */
   condicoesCombate: Record<string, string[]>;
+  /** Duração opcional (em rodadas) por condição ativa — participanteId → condicaoId →
+   *  rodadasRestantes. Ausência de entrada = condição manual/persistente (comportamento
+   *  original, sem prazo). Decrementa no fim do turno do AFETADO (não de quem aplicou);
+   *  chega a 0 → remove a condição sozinha. Limpo ao encerrar o combate, junto de
+   *  `condicoesCombate`. */
+  condicaoDuracao: Record<string, Record<string, number>>;
 
   /** Cópia de `sessaoPrivada.ameaca`/`.ruidoNarrativo` (espelhada em `atualizarSessaoPrivada`) —
    *  `sessaoPrivada` continua a fonte de edição do GM. Nunca renderizado como número/gauge pro
@@ -252,6 +258,8 @@ export interface EstadoConfig {
   basePV: BasePV;
 }
 
+export type UnidadeMedida = 'm' | 'km';
+
 export interface GradeMapa {
   ativa: boolean;
   // % da IMAGEM renderizada (object-fit: contain), não de .mapa-area — container varia por
@@ -263,6 +271,8 @@ export interface GradeMapa {
   altura: number; // %
   colunas: number; // nº de células na horizontal, >=1
   linhas: number; // nº de células na vertical, >=1
+  escala: number; // unidades por célula (régua) — ex: 1.5
+  unidade: UnidadeMedida;
 }
 
 export interface EstadoMapa {

@@ -14,6 +14,8 @@ export const CONDICOES_COMBATE: CondicaoCombate[] = [
   { id: 'escondido', nome: 'Escondido', efeito: 'Atacando escondido, o alvo conta como Exposto.' },
   { id: 'coberto', nome: 'Coberto', efeito: '+2 na Defesa contra tiros (cobertura parcial).' },
   { id: 'surpresa', nome: 'Surpresa', efeito: 'Não age na 1ª rodada e fica Exposto.' },
+  { id: 'estavel', nome: 'Estável', efeito: 'Socorrido (Medicina DT 15) a 0 PV — acorda com 1 PV no fim da cena.' },
+  { id: 'aguardando', nome: 'Aguardando', efeito: 'Adiou a ação — foi pro fim da ordem desta rodada.' },
 ];
 
 /** Nome curto de uma condição pelo id — pros badges compactos. */

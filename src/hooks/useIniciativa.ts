@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
+import { resolverEstabilizar } from '../rules/combate';
+import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
 import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
 import { useStore } from '../state/store';
 
@@ -27,6 +28,8 @@ export function useIniciativa() {
   const rodada = useStore((s) => s.sessaoPublica.rodada);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
+  const condicaoDuracao = useStore((s) => s.sessaoPublica.condicaoDuracao);
+  const definirDuracaoCondicao = useStore((s) => s.definirDuracaoCondicao);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
   const basePV = useStore((s) => s.config.basePV);
@@ -34,6 +37,7 @@ export function useIniciativa() {
   const atualizarSessaoPrivada = useStore((s) => s.atualizarSessaoPrivada);
   const rolarIniciativaTodos = useStore((s) => s.rolarIniciativaTodos);
   const rolarIniciativa = useStore((s) => s.rolarIniciativa);
+  const rerolarIniciativaDe = useStore((s) => s.rerolarIniciativaDe);
   const limparIniciativa = useStore((s) => s.limparIniciativa);
   const removerDaIniciativa = useStore((s) => s.removerDaIniciativa);
   const reordenarIniciativa = useStore((s) => s.reordenarIniciativa);
@@ -62,6 +66,9 @@ export function useIniciativa() {
   const [adicionarAberto, setAdicionarAberto] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
+  /** Seleção pra "aplicar a N" (dano em área) — separada de `selecionadosIniciativa` (que é
+   *  pra ANTES de rolar iniciativa). Só existe depois que o combate já começou. */
+  const [selecionadosAplicar, setSelecionadosAplicar] = useState<Set<string>>(new Set());
 
   const toggleSelecionado = (id: string) => {
     const novo = selecionadosIniciativa.includes(id)
@@ -94,6 +101,7 @@ export function useIniciativa() {
     atualizarSessaoPrivada({ selecionadosIniciativa: [] });
     setExpandidos(new Set());
     setAdicionarAberto(false);
+    setSelecionadosAplicar(new Set());
     if (modoCombate) encerrarModoCombate();
     if (iniciativa.length > 0) limparIniciativa();
   };
@@ -113,7 +121,19 @@ export function useIniciativa() {
       return {
         atual: ficha.pvAtual,
         maximo: calcularPvMaximo(basePV, ficha.atributos.vigor),
-        aplicar: (delta) => ajustarPvAtual(ficha.id, ficha.pvAtual + delta),
+        aplicar: (delta) => {
+          // "Ver aliado cair a 0 PV" — teste de Sanidade (Vontade, 1d4), regras.md §Sanidade.
+          // Lembrete, não rolagem automática: cada PC rola a própria Vontade quando o mestre
+          // decidir quem estava vendo.
+          if (ficha.pvAtual > 0 && ficha.pvAtual + delta <= 0) {
+            registrarLog(
+              'sanidade',
+              `${ficha.nome || 'personagem'} caiu a 0 PV — lembrar teste de Sanidade (Vontade, 1d4) pros PCs que viram.`,
+              null,
+            );
+          }
+          ajustarPvAtual(ficha.id, ficha.pvAtual + delta);
+        },
       };
     }
     const npc = npcs.find((n) => n.id === participanteId);
@@ -146,11 +166,90 @@ export function useIniciativa() {
     usarAcaoNpcCompartilhada(npcId, nome, acao, registrarLog, registrarRoll);
   };
 
+  const toggleSelecionadoAplicar = (id: string) => {
+    setSelecionadosAplicar((prev) => {
+      const novo = new Set(prev);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  };
+
+  const limparSelecaoAplicar = () => setSelecionadosAplicar(new Set());
+
+  /** Dano (delta negativo) ou ajuste (delta positivo — nunca "cura": regras.md "não existe
+   *  cura em combate", o app só corrige erro de digitação) em todos os selecionados de uma vez.
+   *  1 clique em vez de 1 por alvo — é a granada em 4 combatentes virando 1 ação, não 40. */
+  const aplicarDanoEmMassa = (delta: number) => {
+    if (selecionadosAplicar.size === 0 || delta === 0) return;
+    const nomes: string[] = [];
+    for (const e of iniciativa) {
+      if (!selecionadosAplicar.has(e.participanteId)) continue;
+      const pv = pvDoCombatente(e.participanteId, e.tipo);
+      if (!pv) continue;
+      pv.aplicar(delta);
+      nomes.push(e.nome);
+    }
+    if (nomes.length > 0) {
+      const sinal = delta > 0 ? '+' : '';
+      registrarLog('dano', `dano em área — ${nomes.join(', ')}: ${sinal}${delta} PV`, null);
+    }
+  };
+
+  // sem log — mesmo comportamento do toggle individual (`alternarCondicaoCombate`): lembrete
+  // visual pro mestre, não um evento narrativo (condicoesCombate.ts).
+  const aplicarCondicaoEmMassa = (condicaoId: string) => {
+    if (selecionadosAplicar.size === 0) return;
+    for (const e of iniciativa) {
+      if (!selecionadosAplicar.has(e.participanteId)) continue;
+      const ativas = (condicoesCombate ?? {})[e.participanteId] ?? [];
+      if (ativas.includes(condicaoId)) continue;
+      alternarCondicaoCombate(e.participanteId, condicaoId);
+    }
+  };
+
+  /** Ficha.id escolhida como socorrista, por alvo (participanteId de quem está a 0 PV) —
+   *  um alvo de cada vez, não precisa ser um Set. */
+  const [socorristaPorAlvo, setSocorristaPorAlvoState] = useState<Record<string, string>>({});
+  const definirSocorrista = (alvoId: string, fichaId: string) =>
+    setSocorristaPorAlvoState((prev) => ({ ...prev, [alvoId]: fichaId }));
+
+  /** Medicina (Intelecto) DT 15 estabiliza quem está a 0 PV (regras.md). Sucesso liga a
+   *  condição 'estavel' (lembrete visual — acorda com 1 PV no fim da cena, o mestre aplica na
+   *  hora certa); falha só fica no log, o jogador tenta de novo depois. */
+  const tentarEstabilizar = (alvoId: string) => {
+    const socorristaId = socorristaPorAlvo[alvoId];
+    const socorrista = fichas.find((f) => f.id === socorristaId);
+    if (!socorrista) return;
+    const pvMaximoSocorrista = calcularPvMaximo(basePV, socorrista.atributos.vigor);
+    const ferido = estaFerido(socorrista.pvAtual, pvMaximoSocorrista);
+    const grauMedicina = socorrista.pericias['medicina'] ?? 0;
+    const d20 = Math.floor(Math.random() * 20) + 1;
+    const resultado = resolverEstabilizar({ d20, intelecto: socorrista.atributos.intelecto, grauMedicina, socorristaFerido: ferido });
+    const alvoNome = iniciativa.find((e) => e.participanteId === alvoId)?.nome ?? '?';
+    const nomeSocorrista = socorrista.nome || 'personagem';
+    const { teste, estabilizou } = resultado;
+    registrarLog(
+      'teste',
+      `${nomeSocorrista} tenta estabilizar ${alvoNome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${estabilizou ? 'estabilizou' : 'falhou'}`,
+      socorrista.id,
+    );
+    registrarRoll({
+      origem: nomeSocorrista,
+      personagemId: socorrista.id,
+      formula: `d20${teste.modificador >= 0 ? '+' : ''}${teste.modificador}`,
+      total: teste.total,
+      bruto: d20,
+      visibilidade: 'publica',
+    });
+    if (estabilizou) alternarCondicaoCombate(alvoId, 'estavel');
+  };
+
   return {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
-    condicoesCombate, fichas, npcs, basePV,
+    condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs, basePV,
     selecionadosIniciativa,
-    removerDaIniciativa, reordenarIniciativa,
+    removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
     iniciarModoCombate, avancarTurno, encerrarModoCombate,
     alternarCondicaoCombate,
     participantesDisponiveis, disponiveis, todosSelecionados, nenhumSelecionado, adicionarDisponiveis,
@@ -158,5 +257,8 @@ export function useIniciativa() {
     setDragIndex, setDropIndex, setAdicionarAberto,
     toggleSelecionado, toggleTodos, rolarSelecionados, resetar, toggleExpandido,
     pvDoCombatente, defesaDoCombatente, usarAcaoNpc,
+    selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
+    aplicarDanoEmMassa, aplicarCondicaoEmMassa,
+    socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
   };
 }

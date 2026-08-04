@@ -79,7 +79,7 @@ export function criarNpcVazio(): Npc {
 }
 
 export function criarGradeInicial(): GradeMapa {
-  return { ativa: false, x: 0, y: 0, largura: 100, altura: 100, colunas: 10, linhas: 10 };
+  return { ativa: false, x: 0, y: 0, largura: 100, altura: 100, colunas: 10, linhas: 10, escala: 1.5, unidade: 'm' };
 }
 
 export function criarSessaoPublica(): SessaoPublica {
@@ -99,6 +99,7 @@ export function criarSessaoPublica(): SessaoPublica {
     indiceAtualTurno: 0,
     rodada: 1,
     condicoesCombate: {},
+    condicaoDuracao: {},
     ameaca: 0,
     ruidoNarrativo: 0,
   };
@@ -132,7 +133,7 @@ export function criarEstadoMidia(): EstadoMidia {
   };
 }
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 21;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

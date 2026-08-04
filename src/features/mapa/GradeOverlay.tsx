@@ -101,6 +101,28 @@ export default function GradeOverlay() {
                   onChange={(e) => atualizarGrade({ altura: clamp(Number(e.target.value) || 0, 0, 100) })}
                 />
               </div>
+              <div>
+                <label htmlFor="grade-escala">escala (por célula)</label>
+                <input
+                  id="grade-escala"
+                  type="number"
+                  min={0.1}
+                  step={0.1}
+                  value={grade.escala}
+                  onChange={(e) => atualizarGrade({ escala: Math.max(0.1, Number(e.target.value) || 0.1) })}
+                />
+              </div>
+              <div>
+                <label htmlFor="grade-unidade">unidade</label>
+                <select
+                  id="grade-unidade"
+                  value={grade.unidade}
+                  onChange={(e) => atualizarGrade({ unidade: e.target.value as 'm' | 'km' })}
+                >
+                  <option value="m">metros (m)</option>
+                  <option value="km">quilômetros (km)</option>
+                </select>
+              </div>
             </div>
           )}
         </div>

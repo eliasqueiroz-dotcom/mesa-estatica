@@ -23,6 +23,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
   const { modoCombate, indiceAtualTurno, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
+  const minhaVez = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === minhaFicha.id;
 
   const conteudo = !modoCombate ? (
     semMoldura ? (
@@ -41,6 +42,19 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
             Combate
           </h3>
           <span className="vazio mono">rodada {rodada}</span>
+        </div>
+      )}
+
+      {minhaVez && (
+        <div
+          className="mono"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem',
+            padding: '0.4rem 0.6rem', border: '1px solid var(--rede)', background: 'var(--rede-glow)',
+            color: 'var(--rede)', fontSize: 12, fontWeight: 600,
+          }}
+        >
+          ▶ sua vez
         </div>
       )}
 

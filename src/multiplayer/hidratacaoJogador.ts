@@ -78,7 +78,9 @@ export function useHidratarMapaPublico(): void {
       .then(({ data }) => {
         if (cancelado || !data) return;
         const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
-        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: linha.grade } }));
+        // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
+        // existirem em GradeMapa) não pode apagar os defaults locais desses campos.
+        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
       });
 
     const canal = cliente
@@ -86,7 +88,7 @@ export function useHidratarMapaPublico(): void {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, (payload) => {
         if (payload.eventType === 'DELETE') return;
         const linha = payload.new as { imagem_data_url: string | null; grade: GradeMapa };
-        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: linha.grade } }));
+        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
       })
       .subscribe();
 

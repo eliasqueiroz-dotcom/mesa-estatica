@@ -23,6 +23,7 @@ export interface Linha {
   indice_atual_turno: number;
   rodada: number;
   condicoes_combate: SessaoPublica['condicoesCombate'];
+  condicao_duracao: SessaoPublica['condicaoDuracao'] | null | undefined;
   ameaca: number;
   ruido_narrativo: number;
 }
@@ -43,6 +44,7 @@ const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
   indice_atual_turno: s.indiceAtualTurno,
   rodada: s.rodada,
   condicoes_combate: s.condicoesCombate,
+  condicao_duracao: s.condicaoDuracao,
   ameaca: s.ameaca,
   ruido_narrativo: s.ruidoNarrativo,
 });
@@ -63,6 +65,9 @@ export const paraSessaoPublica = (r: Linha): SessaoPublica => ({
   indiceAtualTurno: r.indice_atual_turno,
   rodada: r.rodada,
   condicoesCombate: r.condicoes_combate,
+  // fallback pro caso da migração 0015 (coluna condicao_duracao) ainda não ter rodado no banco
+  // remoto — sem isso, uma resposta sem essa coluna deixaria `condicaoDuracao` undefined.
+  condicaoDuracao: r.condicao_duracao ?? {},
   ameaca: r.ameaca,
   ruidoNarrativo: r.ruido_narrativo,
 });

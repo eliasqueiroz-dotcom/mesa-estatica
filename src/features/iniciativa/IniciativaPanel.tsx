@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { personagemEstaEmSurto, type EstadoSessaoParaSurto } from '../../rules/surto';
@@ -15,9 +15,9 @@ interface IniciativaPanelProps {
 export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true }: IniciativaPanelProps) {
   const {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
-    condicoesCombate, fichas, npcs,
+    condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs,
     selecionadosIniciativa,
-    removerDaIniciativa, reordenarIniciativa,
+    removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
     iniciarModoCombate, avancarTurno, encerrarModoCombate,
     alternarCondicaoCombate,
     disponiveis, todosSelecionados, nenhumSelecionado, adicionarDisponiveis,
@@ -25,7 +25,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     setDragIndex, setDropIndex, setAdicionarAberto,
     toggleSelecionado, toggleTodos, rolarSelecionados, resetar, toggleExpandido,
     pvDoCombatente, defesaDoCombatente, usarAcaoNpc,
+    selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
+    aplicarDanoEmMassa, aplicarCondicaoEmMassa,
+    socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
   } = hook;
+
+  const [danoEmMassa, setDanoEmMassa] = useState('');
+  const [condicaoEmMassa, setCondicaoEmMassa] = useState('');
 
   return (
     <>
@@ -95,6 +101,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const pv = pvDoCombatente(e.participanteId, e.tipo);
             const defesa = defesaDoCombatente(e.participanteId, e.tipo);
             const ativas = (condicoesCombate ?? {})[e.participanteId] ?? [];
+            const duracoes = (condicaoDuracao ?? {})[e.participanteId] ?? {};
             const pvPct = pv ? pv.atual / pv.maximo : 0;
             const sessaoSurto: EstadoSessaoParaSurto = { modoCombate, contadorCena, rodada };
             const fichaSurtos = e.tipo === 'pc' ? fichas.find((f) => f.id === e.participanteId)?.surtosAtivos ?? [] : [];
@@ -109,6 +116,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             return (
               <div
                 key={e.id}
+                data-ativo={naVez}
                 draggable={podeArrastar}
                 onDragStart={() => { setDragIndex(i); setDropIndex(null); }}
                 onDragOver={(ev) => { ev.preventDefault(); setDropIndex(i); }}
@@ -131,6 +139,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     padding: '0.15rem 0',
                   }}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selecionadosAplicar.has(e.participanteId)}
+                    onChange={() => toggleSelecionadoAplicar(e.participanteId)}
+                    onClick={(ev) => ev.stopPropagation()}
+                    title="selecionar pra aplicar dano/condição em área"
+                    style={{ flexShrink: 0 }}
+                  />
                   <span
                     className="icone-botao"
                     role="button"
@@ -141,6 +157,32 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     ×
                   </span>
+                  <span
+                    className="icone-botao"
+                    role="button"
+                    tabIndex={0}
+                    onClick={(ev) => { ev.stopPropagation(); rerolarIniciativaDe(e.participanteId); }}
+                    title="rerrolar iniciativa (d20+Agilidade)"
+                    style={{ padding: '0.1em 0.3em', fontSize: 10, lineHeight: 1, flexShrink: 0 }}
+                  >
+                    🎲
+                  </span>
+                  {iniciativa.length > 1 && i < iniciativa.length - 1 && (
+                    <span
+                      className="icone-botao"
+                      role="button"
+                      tabIndex={0}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        reordenarIniciativa(i, iniciativa.length - 1);
+                        alternarCondicaoCombate(e.participanteId, 'aguardando');
+                      }}
+                      title="adiar — vai pro fim da ordem desta rodada"
+                      style={{ padding: '0.1em 0.3em', fontSize: 10, lineHeight: 1, flexShrink: 0 }}
+                    >
+                      ⏭
+                    </span>
+                  )}
                   <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 14 }}>
                     {i + 1}
                   </span>
@@ -160,6 +202,28 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                       </svg>
+                    </span>
+                  )}
+                  {pv && pv.atual <= 0 && (
+                    <span
+                      className="badge"
+                      title={
+                        ativas.includes('estavel')
+                          ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
+                          : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).'
+                      }
+                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, flexShrink: 0, padding: '0.1em 0.35em' }}
+                    >
+                      {ativas.includes('estavel') ? 'estável' : 'fora de combate'}
+                    </span>
+                  )}
+                  {pv && pv.atual > 0 && pvPct <= 0.25 && (
+                    <span
+                      className="badge"
+                      title="PV em 25% ou menos do máximo"
+                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, flexShrink: 0, padding: '0.1em 0.35em' }}
+                    >
+                      crítico
                     </span>
                   )}
                   {pv && (
@@ -229,25 +293,58 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     <div className="combate-condicoes" style={{ marginBottom: '0.25rem' }}>
                       {CONDICOES_COMBATE.map((c) => {
                         const ligada = ativas.includes(c.id);
+                        const rodadasRestantes = duracoes[c.id];
                         return (
-                          <button
-                            key={c.id}
-                            className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
-                            title={c.efeito}
-                            onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
-                          >
-                            {c.nome}
-                          </button>
+                          <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                            <button
+                              className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                              title={c.efeito}
+                              onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
+                            >
+                              {c.nome}
+                              {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
+                            </button>
+                            {ligada && (
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="∞"
+                                title="rodadas até acabar sozinha — vazio = manual/persistente"
+                                value={rodadasRestantes ?? ''}
+                                onChange={(ev) => {
+                                  const valor = ev.target.value === '' ? null : Number(ev.target.value);
+                                  definirDuracaoCondicao(e.participanteId, c.id, valor);
+                                }}
+                                style={{ width: 28, fontSize: 9, padding: '0.05em 0.15em' }}
+                              />
+                            )}
+                          </span>
                         );
                       })}
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       {pv && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'wrap' }}>
                           <span className="vazio" style={{ fontSize: 10 }}>PV</span>
-                          <button className="icone-botao" onClick={() => pv.aplicar(-1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(-10)} title="−10 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−10</button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(-5)} title="−5 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−5</button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="−1 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−1</button>
                           <span className="mono" style={{ fontSize: 11, minWidth: 32, textAlign: 'center' }}>{pv.atual}</span>
-                          <button className="icone-botao" onClick={() => pv.aplicar(1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(1)} title="+1 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+1</button>
+                          <button className="icone-botao" onClick={() => pv.aplicar(5)} title="+5 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+5</button>
+                          <input
+                            type="number"
+                            placeholder="dano"
+                            title="dano livre — Enter aplica"
+                            style={{ width: 44, fontSize: 10, padding: '0.1em 0.25em' }}
+                            onKeyDown={(ev) => {
+                              if (ev.key !== 'Enter') return;
+                              const alvo = ev.target as HTMLInputElement;
+                              const valor = Number(alvo.value);
+                              if (valor) pv.aplicar(-Math.abs(valor));
+                              alvo.value = '';
+                            }}
+                          />
                         </div>
                       )}
                       {defesa && (
@@ -259,11 +356,103 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                         </div>
                       )}
                     </div>
+                    {pv && pv.atual <= 0 && !ativas.includes('estavel') && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+                        <span className="vazio" style={{ fontSize: 10 }}>socorro:</span>
+                        <select
+                          value={socorristaPorAlvo[e.participanteId] ?? ''}
+                          onChange={(ev) => definirSocorrista(e.participanteId, ev.target.value)}
+                          style={{ fontSize: 10 }}
+                        >
+                          <option value="">quem tenta?</option>
+                          {fichas.map((f) => (
+                            <option key={f.id} value={f.id}>{f.nome || 'sem nome'}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="icone-botao"
+                          disabled={!socorristaPorAlvo[e.participanteId]}
+                          onClick={() => tentarEstabilizar(e.participanteId)}
+                          title="Medicina (Intelecto) DT 15 — estabiliza a 0 PV (regras.md)"
+                          style={{ fontSize: 10 }}
+                        >
+                          estabilizar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
+          {selecionadosAplicar.size > 0 && (
+            <div
+              style={{
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.35rem',
+                borderTop: '1px solid var(--rede-dim)', padding: '0.4rem 0', marginTop: '0.15rem',
+              }}
+            >
+              <span className="mono" style={{ fontSize: 11, color: 'var(--rede)' }}>
+                aplicar a {selecionadosAplicar.size}:
+              </span>
+              <input
+                type="number"
+                placeholder="dano"
+                value={danoEmMassa}
+                onChange={(ev) => setDanoEmMassa(ev.target.value)}
+                style={{ width: 52, fontSize: 11, padding: '0.1em 0.3em' }}
+              />
+              <button
+                className="icone-botao"
+                title="aplica como dano (negativo) nos selecionados"
+                onClick={() => {
+                  const valor = Number(danoEmMassa);
+                  if (valor) aplicarDanoEmMassa(-Math.abs(valor));
+                  setDanoEmMassa('');
+                }}
+                style={{ fontSize: 10 }}
+              >
+                dano
+              </button>
+              <button
+                className="icone-botao"
+                title="ajuste — não é cura (regras.md: não existe cura em combate)"
+                onClick={() => {
+                  const valor = Number(danoEmMassa);
+                  if (valor) aplicarDanoEmMassa(Math.abs(valor));
+                  setDanoEmMassa('');
+                }}
+                style={{ fontSize: 10 }}
+              >
+                ajuste
+              </button>
+              <select
+                value={condicaoEmMassa}
+                onChange={(ev) => setCondicaoEmMassa(ev.target.value)}
+                style={{ fontSize: 10 }}
+              >
+                <option value="">condição…</option>
+                {CONDICOES_COMBATE.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+              <button
+                className="icone-botao"
+                disabled={!condicaoEmMassa}
+                onClick={() => { if (condicaoEmMassa) aplicarCondicaoEmMassa(condicaoEmMassa); }}
+                style={{ fontSize: 10 }}
+              >
+                aplicar
+              </button>
+              <button
+                className="icone-botao"
+                onClick={limparSelecaoAplicar}
+                style={{ fontSize: 10, marginLeft: 'auto', color: 'var(--ink-dim)' }}
+              >
+                limpar seleção
+              </button>
+            </div>
+          )}
           {!modoCombate && (
             <div style={{ borderTop: '1px solid var(--concrete-2)', paddingTop: '0.3rem', marginTop: '0.15rem' }}>
               <button

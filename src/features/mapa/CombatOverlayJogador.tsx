@@ -10,9 +10,17 @@ interface Props {
 }
 
 export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap }: Props) {
-  const { modoCombate, rodada } = useStore((s) => s.sessaoPublica);
+  const { modoCombate, rodada, indiceAtualTurno } = useStore((s) => s.sessaoPublica);
 
   const [aberto, setAberto] = useState(false);
+  const minhaVez = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === minhaFicha.id;
+
+  // o painel se abre sozinho quando o turno vira pro jogador — ele não precisa lembrar de
+  // clicar em "ATK" pra ver que é a vez dele. Só dispara na TRANSIÇÃO (deps: [minhaVez]) — se
+  // o jogador fechar o painel de novo durante o próprio turno, não volta a abrir sozinho.
+  useEffect(() => {
+    if (minhaVez) setAberto(true);
+  }, [minhaVez]);
   const [panelPos, setPanelPos] = useState({ x: 8, y: 8 });
   const [arrastando, setArrastando] = useState<{ origemX: number; origemY: number; painelX: number; painelY: number } | null>(null);
   const painelRef = useRef<HTMLDivElement>(null);

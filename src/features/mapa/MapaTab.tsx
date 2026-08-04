@@ -6,14 +6,22 @@ import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
 import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import AoEOverlay from './AoEOverlay';
 import { comprimirImagem } from './comprimirImagem';
 import CombatOverlay from './CombatOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import ReguaOverlay from './ReguaOverlay';
 import TokenOverlay from './TokenOverlay';
+import { useRegua } from './useRegua';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
+
+/** O mestre não tem ficha própria — cor fixa de "mestre" pra régua, nunca a cor de um
+ *  personagem (decisão fechada em PLANO_REGUA_E_COMBATE.md). */
+const AUTOR_ID_MESTRE = 'mestre';
+const COR_REGUA_MESTRE = 'var(--rede)';
 
 const LARGURA_ALTURA_MINIMA = 2; // % — evita a caixa do grid colapsar a zero arrastando uma alça
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup em um token conta como clique, não arrasto
@@ -265,6 +273,15 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
     : null;
 
+  const regua = useRegua({
+    autorId: AUTOR_ID_MESTRE,
+    cor: COR_REGUA_MESTRE,
+    grade: mapa.grade,
+    containerRef,
+    imgRef,
+    bloqueado: arrastoRef.current !== null,
+  });
+
   return (
     <div className="mapa-tab">
       <div className="mapa-toolbar">
@@ -296,9 +313,11 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
       <div
         ref={containerRef}
         className="mapa-area"
-        onPointerMove={moverArrasto}
-        onPointerUp={soltarArrasto}
-        onPointerCancel={soltarArrasto}
+        onPointerDown={regua.onPointerDown}
+        onPointerMove={(e) => { moverArrasto(e); regua.onPointerMove(e); }}
+        onPointerUp={(e) => { soltarArrasto(e); regua.onPointerUp(); }}
+        onPointerCancel={(e) => { soltarArrasto(e); regua.onPointerCancel(); }}
+        onContextMenu={regua.onContextMenu}
       >
         {mapa.imagemDataUrl ? (
           <img ref={imgRef} src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false}
@@ -377,6 +396,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
             </div>
           );
         })}
+        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} containerRef={containerRef} imgRef={imgRef} />
         <CombatOverlay />
       </div>
 
