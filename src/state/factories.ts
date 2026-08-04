@@ -25,6 +25,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
   return {
     id: gerarId(),
     corVisual: CORES_PERSONAGEM[corIndex % CORES_PERSONAGEM.length],
+    foto: null,
     nome: '',
     jogador: '',
     antecedenteId: null,
@@ -66,6 +67,8 @@ export function criarNpcVazio(): Npc {
     id: gerarId(),
     nome: '',
     corVisual: COR_NPC_PADRAO,
+    silhueta: null,
+    foto: null,
     pvAtual: 10,
     pvMaximo: 10,
     defesa: 10,
@@ -133,7 +136,7 @@ export function criarEstadoMidia(): EstadoMidia {
   };
 }
 
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 23;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

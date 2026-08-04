@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import Avatar from '../../components/Avatar';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { personagemEstaEmSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
@@ -10,12 +11,15 @@ const EMPTY_CONDICOES: string[] = [];
 interface Props {
   minhaFicha: Ficha;
   nome: string;
+  cor: string;
+  foto: string | null;
+  silhueta: string | null;
   /** null = é o próprio PC (mostra detalhes); qualquer string = restrito */
   idFora: string | null;
   onFechar: () => void;
 }
 
-export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar }: Props) {
+export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhueta, idFora, onFechar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
@@ -48,7 +52,10 @@ export default function TokenOverlayJogador({ minhaFicha, nome, idFora, onFechar
     >
       <div className="secao" style={{ width: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h3 style={{ margin: 0 }}>{nome || 'sem nome'}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <Avatar nome={nome} cor={cor} foto={foto} silhueta={silhueta} bordaCor={cor} tamanho={40} ampliavel />
+            <h3 style={{ margin: 0 }}>{nome || 'sem nome'}</h3>
+          </div>
           <button className="icone-botao" onClick={onFechar} title="fechar (Esc)" style={{ color: 'var(--ruido)' }}>
             ×
           </button>

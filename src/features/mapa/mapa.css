@@ -320,8 +320,9 @@
    forma (AoEOverlay.tsx); z-index acima da régua (3) pra não brigar com ela quando ambas ativas. */
 .mapa-aoe-toolbar {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 41;
   display: flex;
   gap: 0.3rem;

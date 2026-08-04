@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Avatar from '../../components/Avatar';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
 import { personagemEstaEmSurto } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
@@ -7,11 +8,12 @@ import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
 import { nomeCondicao } from '../../rules/data/condicoesCombate';
 import AoEOverlay from './AoEOverlay';
-import { comprimirImagem } from './comprimirImagem';
+import { comprimirImagem } from '../../lib/comprimirImagem';
 import CombatOverlay from './CombatOverlay';
+import CrachasOverlay from './CrachasOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
-import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlay from './TokenOverlay';
 import { useRegua } from './useRegua';
@@ -109,10 +111,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
   const participantePorId = (id: string) => {
     const ficha = fichas.find((f) => f.id === id);
-    if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, ficha };
+    if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, ficha };
     const npc = npcs.find((n) => n.id === id);
-    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, ficha: null as null };
-    return { nome: '?', cor: COR_NPC_PADRAO, ficha: null as null };
+    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, ficha: null as null };
+    return { nome: '?', cor: COR_NPC_PADRAO, foto: null as string | null, silhueta: null as string | null, ficha: null as null };
   };
 
   const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,7 +265,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const surtoEscolha = surtoAtivo ? surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
     const turnoAtivo = participanteNaVez === t.participanteId;
     const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
-    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome };
+    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome, foto: p.foto, silhueta: p.silhueta };
   });
 
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
@@ -379,7 +381,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
               onPointerDown={iniciarArrastoToken(t.id)}
               title={partesTitulo.join(' — ')}
             >
-              <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
+              <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={30} />
               {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
               <span
                 className="mapa-token__remover"
@@ -399,6 +401,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} containerRef={containerRef} imgRef={imgRef} />
         <CombatOverlay />
+        <CrachasOverlay />
       </div>
 
       <GradeOverlay />

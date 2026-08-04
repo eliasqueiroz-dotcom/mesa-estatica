@@ -551,8 +551,8 @@ describe('midia', () => {
 
 describe('rerolarIniciativaDe', () => {
   const montarIniciativa = () => {
-    const npc1 = { id: 'n1', nome: 'Alvo', corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 3, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
-    const npc2 = { id: 'n2', nome: 'Fixo', corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 1, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
+    const npc1 = { id: 'n1', nome: 'Alvo', corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 3, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
+    const npc2 = { id: 'n2', nome: 'Fixo', corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 1, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
     useStore.setState({
       npcs: [npc1, npc2],
       iniciativa: [
@@ -592,7 +592,7 @@ describe('rerolarIniciativaDe', () => {
 
 describe('rolarIniciativaGrupo', () => {
   const criarNpc = (id: string, nome: string, agilidade: number) => ({
-    id, nome, corVisual: '#fff', pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
+    id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
     notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [],
   });
 

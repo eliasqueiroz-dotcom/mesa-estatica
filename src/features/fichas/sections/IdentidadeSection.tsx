@@ -1,8 +1,28 @@
+import { useState } from 'react';
+import Avatar from '../../../components/Avatar';
+import { comprimirImagemAvatar } from '../../../lib/comprimirImagem';
 import { ANTECEDENTES } from '../../../rules/data/antecedentes';
 import SeletorCor from '../SeletorCor';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) {
+  const [comprimindo, setComprimindo] = useState(false);
+
+  const handleFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo) return;
+    setComprimindo(true);
+    try {
+      const dataUrl = await comprimirImagemAvatar(arquivo);
+      onChange({ foto: dataUrl });
+    } catch {
+      window.alert('sinal corrompido — não foi possível ler essa imagem.');
+    } finally {
+      setComprimindo(false);
+    }
+  };
+
   const selecionarAntecedente = (id: string) => {
     const def = ANTECEDENTES.find((a) => a.id === id);
     if (!def) {
@@ -40,6 +60,21 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
     <section className="secao">
       <h3 className="label">Identidade</h3>
       <div className="campos-grid">
+        <div>
+          <label>Foto</label>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <Avatar nome={ficha.nome} cor={ficha.corVisual} foto={ficha.foto} bordaCor={ficha.corVisual} tamanho={48} />
+            <label className="mapa-upload-botao" style={{ fontSize: 11 }}>
+              {comprimindo ? 'comprimindo…' : ficha.foto ? 'trocar' : 'carregar'}
+              <input type="file" accept="image/*" hidden onChange={handleFoto} disabled={comprimindo} />
+            </label>
+            {ficha.foto && (
+              <button type="button" className="icone-botao" onClick={() => onChange({ foto: null })} title="remover foto">
+                ×
+              </button>
+            )}
+          </div>
+        </div>
         <div>
           <label htmlFor="ficha-nome">Nome</label>
           <input

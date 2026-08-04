@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import Avatar from '../../components/Avatar';
 import { corPv, useIniciativa } from '../../hooks/useIniciativa';
+import { comprimirImagemAvatar } from '../../lib/comprimirImagem';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { NpcAcao } from '../../state/types';
 import IniciativaPanel from '../iniciativa/IniciativaPanel';
 import './npcs.css';
+import SeletorSilhueta from './SeletorSilhueta';
 
 function InlineAcaoEditor({ acao, onSalvar, onCancelar }: {
   acao: NpcAcao;
@@ -59,6 +62,7 @@ export default function NpcsTab() {
   const [editandoNpcs, setEditandoNpcs] = useState<Set<string>>(new Set());
   const [acaoEditandoId, setAcaoEditandoId] = useState<Record<string, string | null>>({});
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [comprimindoFotoIds, setComprimindoFotoIds] = useState<Set<string>>(new Set());
 
   const iniciativa = useIniciativa();
   const npcs = useStore((s) => s.npcs);
@@ -82,6 +86,25 @@ export default function NpcsTab() {
   const novoNpc = () => {
     const id = adicionarNpc();
     setEditandoNpcs((prev) => new Set(prev).add(id));
+  };
+
+  const handleFoto = (id: string) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo) return;
+    setComprimindoFotoIds((prev) => new Set(prev).add(id));
+    try {
+      const dataUrl = await comprimirImagemAvatar(arquivo);
+      atualizarNpc(id, { foto: dataUrl });
+    } catch {
+      window.alert('sinal corrompido — não foi possível ler essa imagem.');
+    } finally {
+      setComprimindoFotoIds((prev) => {
+        const novo = new Set(prev);
+        novo.delete(id);
+        return novo;
+      });
+    }
   };
 
   const toggleEditando = (id: string) => {
@@ -267,6 +290,25 @@ export default function NpcsTab() {
                         />
                       </div>
 
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.3rem' }}>
+                        <span className="vazio" style={{ fontSize: 11 }}>foto</span>
+                        <Avatar nome={n.nome} cor={n.corVisual} foto={n.foto} silhueta={n.silhueta} bordaCor={n.corVisual} tamanho={36} />
+                        <label className="mapa-upload-botao" style={{ fontSize: 10 }}>
+                          {comprimindoFotoIds.has(n.id) ? 'comprimindo…' : n.foto ? 'trocar' : 'carregar'}
+                          <input type="file" accept="image/*" hidden onChange={handleFoto(n.id)} disabled={comprimindoFotoIds.has(n.id)} />
+                        </label>
+                        {n.foto && (
+                          <button className="icone-botao" onClick={() => atualizarNpc(n.id, { foto: null })} title="remover foto" style={{ fontSize: 10 }}>
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.3rem' }}>
+                        <span className="vazio" style={{ fontSize: 11 }}>silhueta</span>
+                        <SeletorSilhueta valor={n.silhueta} onEscolher={(slug) => atualizarNpc(n.id, { silhueta: slug })} />
+                      </div>
+
                       <div style={{ marginTop: '0.4rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                           <span className="vazio" style={{ fontSize: 11 }}>ações</span>
@@ -325,6 +367,7 @@ export default function NpcsTab() {
                   ) : (
                     <>
                       <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginBottom: '0.3rem' }}>
+                        <Avatar nome={n.nome} cor={n.corVisual} foto={n.foto} silhueta={n.silhueta} tamanho={20} />
                         <span className="mono" style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>
                           {n.nome || 'sem nome'}
                         </span>

@@ -1075,6 +1075,22 @@ export const useStore = create<Store>()(
         if (versaoAnterior < 21 && estado.sessaoPublica) {
           estado.sessaoPublica = { condicaoDuracao: {}, ...estado.sessaoPublica };
         }
+        // v21 → v22: foto de perfil do PC (upload) e silhueta pré-instalada de NPC (Avatar.tsx).
+        if (versaoAnterior < 22) {
+          if (estado.fichas) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            estado.fichas = estado.fichas.map((f: any) => ({ foto: null, ...f }));
+          }
+          if (estado.npcs) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            estado.npcs = estado.npcs.map((n: any) => ({ silhueta: null, ...n }));
+          }
+        }
+        // v22 → v23: foto de perfil real do NPC (upload do mestre, precedência sobre silhueta).
+        if (versaoAnterior < 23 && estado.npcs) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          estado.npcs = estado.npcs.map((n: any) => ({ foto: null, ...n }));
+        }
         return estado as Store;
       },
     },

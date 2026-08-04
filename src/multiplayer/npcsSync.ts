@@ -13,6 +13,8 @@ export interface LinhaPublico {
   id: string;
   nome: string;
   cor_visual: string;
+  silhueta: string | null;
+  foto: string | null;
   pv_atual: number;
   pv_maximo: number;
   defesa: number;
@@ -33,6 +35,8 @@ export interface NpcPublico {
   id: string;
   nome: string;
   corVisual: string;
+  silhueta: string | null;
+  foto: string | null;
   visivel: boolean;
 }
 
@@ -40,6 +44,8 @@ const paraLinhaPublico = (n: Npc): LinhaPublico => ({
   id: n.id,
   nome: n.nome,
   cor_visual: n.corVisual,
+  silhueta: n.silhueta ?? null,
+  foto: n.foto ?? null,
   pv_atual: n.pvAtual,
   pv_maximo: n.pvMaximo,
   defesa: n.defesa,
@@ -54,6 +60,8 @@ export const paraNpcSemNotasMestre = (r: LinhaPublico): Omit<Npc, 'notasMestre'>
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
+  silhueta: r.silhueta ?? null,
+  foto: r.foto ?? null,
   pvAtual: r.pv_atual,
   pvMaximo: r.pv_maximo,
   defesa: r.defesa,
@@ -68,6 +76,8 @@ export const paraNpcPublico = (r: LinhaPublico): NpcPublico => ({
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
+  silhueta: r.silhueta ?? null,
+  foto: r.foto ?? null,
   visivel: r.visivel,
 });
 

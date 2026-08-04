@@ -56,6 +56,8 @@ export interface DoseRegulador {
 export interface Ficha {
   id: string;
   corVisual: string;
+  /** data URL (JPEG, ~256px) do upload de foto — null = fallback iniciais+cor (Avatar.tsx). */
+  foto: string | null;
 
   // identidade
   nome: string;
@@ -113,6 +115,10 @@ export interface Npc {
   id: string;
   nome: string;
   corVisual: string;
+  /** slug de uma silhueta pré-instalada (src/assets/silhuetas/silhuetas.tsx) — null = fallback iniciais+cor. */
+  silhueta: string | null;
+  /** data URL (JPEG, ~256px) do upload de foto real pelo mestre — precedência sobre `silhueta`; null = cai pra silhueta ou iniciais (Avatar.tsx). */
+  foto: string | null;
   pvAtual: number;
   pvMaximo: number;
   defesa: number;

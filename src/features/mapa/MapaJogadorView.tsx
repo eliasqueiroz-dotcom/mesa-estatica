@@ -9,11 +9,13 @@ import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
+import Avatar from '../../components/Avatar';
 import CombatOverlayJogador from './CombatOverlayJogador';
+import CrachasOverlayJogador from './CrachasOverlayJogador';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlayJogador from './TokenOverlayJogador';
 import './mapa.css';
-import { getImgRenderRect, iniciaisToken, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
 import { useRegua } from './useRegua';
 
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup no próprio token conta como clique, não arrasto
@@ -78,6 +80,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
       return {
         nome: minhaFicha.nome || 'sem nome',
         cor: minhaFicha.corVisual,
+        foto: minhaFicha.foto,
+        silhueta: null as string | null,
         sanidadeCritica,
         surtosAtivos: minhaFicha.surtosAtivos,
         tipo: 'pc' as const,
@@ -85,11 +89,11 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     }
     const ficha = outrasFichas.find((f) => f.id === id);
     if (ficha) {
-      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const };
+      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const };
     }
     const npc = npcs.find((n) => n.id === id);
     if (npc) {
-      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const };
+      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const };
     }
     return null;
   };
@@ -110,6 +114,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         x: t.x,
         y: t.y,
         cor: p.cor,
+        foto: p.foto,
+        silhueta: p.silhueta,
         sanidadeCritica: p.sanidadeCritica,
         surtoAtivo,
         surtoEscolha,
@@ -234,13 +240,14 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
               onClick={t.podeMover ? undefined : () => setOverlay({ tipo: t.tipo, participanteId: t.participanteId })}
               title={partesTitulo.join(' — ')}
             >
-              <span className="mapa-token__inicial">{iniciaisToken(t.nome)}</span>
+              <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={30} />
               {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
             </div>
           );
         })}
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
+        <CrachasOverlayJogador minhaFicha={minhaFicha} outrasFichas={outrasFichas} />
       </div>
 
       {overlay && (() => {
@@ -251,6 +258,9 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
           <TokenOverlayJogador
             minhaFicha={minhaFicha}
             nome={p.nome}
+            cor={p.cor}
+            foto={p.foto}
+            silhueta={p.silhueta}
             idFora={souEu ? null : overlay.participanteId}
             onFechar={() => setOverlay(null)}
           />

@@ -15,6 +15,7 @@ export interface LinhaPublico {
   id: string;
   nome: string;
   cor_visual: string;
+  foto: string | null;
   pv_atual: number;
   pv_maximo: number;
   defesa: number;
@@ -32,6 +33,7 @@ const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
   id: ficha.id,
   nome: ficha.nome,
   cor_visual: ficha.corVisual,
+  foto: ficha.foto ?? null,
   pv_atual: ficha.pvAtual,
   pv_maximo: calcularPvMaximo(basePV, ficha.atributos.vigor),
   defesa: calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa),
@@ -42,6 +44,7 @@ export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
   id: r.id,
   nome: r.nome,
   corVisual: r.cor_visual,
+  foto: r.foto ?? null,
 });
 
 async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null> {

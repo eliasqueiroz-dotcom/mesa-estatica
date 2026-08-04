@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import Avatar from '../../components/Avatar';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PROTECOES } from '../../rules/data/armas';
 import { PERICIAS } from '../../rules/data/pericias';
@@ -131,7 +132,18 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
     >
       <div className="secao" style={{ width: 320, boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h3 style={{ margin: 0 }}>{(tipo === 'pc' ? ficha!.nome : npc!.nome) || 'sem nome'}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <Avatar
+              nome={tipo === 'pc' ? ficha!.nome : npc!.nome}
+              cor={tipo === 'pc' ? ficha!.corVisual : npc!.corVisual}
+              foto={tipo === 'pc' ? ficha!.foto : npc!.foto}
+              silhueta={tipo === 'npc' ? npc!.silhueta : null}
+              bordaCor={tipo === 'pc' ? ficha!.corVisual : npc!.corVisual}
+              tamanho={40}
+              ampliavel
+            />
+            <h3 style={{ margin: 0 }}>{(tipo === 'pc' ? ficha!.nome : npc!.nome) || 'sem nome'}</h3>
+          </div>
           <button className="icone-botao" onClick={onFechar} title="fechar (Esc)" style={{ color: 'var(--ruido)' }}>
             ×
           </button>
