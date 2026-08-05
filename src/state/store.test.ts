@@ -361,6 +361,31 @@ describe('importarJSON', () => {
     expect(() => useStore.getState().importarJSON(json)).toThrow('Campo obrigatório ausente: mapa');
   });
 
+  // antes disto, um `traumas: "oops"` (tipo errado, mas as 6 chaves obrigatórias presentes)
+  // passava batido aqui e só quebrava depois, num TypeError sem contexto no render de uma
+  // ficha — validarTiposEstado pega isso ANTES de mexer no estado.
+  it('lança erro com formato inválido quando um campo tem o tipo errado (não trava sozinho na chave obrigatória)', () => {
+    const json = JSON.stringify({
+      fichas: [{ nome: 123, traumas: 'oops' }],
+      npcs: [],
+      mapa: {},
+      iniciativa: [],
+      log: [],
+      config: {},
+    });
+    expect(() => useStore.getState().importarJSON(json)).toThrow(/formato inválido/);
+    expect(() => useStore.getState().importarJSON(json)).toThrow(/fichas\[0\]\.nome/);
+    expect(() => useStore.getState().importarJSON(json)).toThrow(/fichas\[0\]\.traumas/);
+  });
+
+  it('formato inválido não mexe no estado (falha antes de aplicar qualquer mudança)', () => {
+    useStore.getState().resetarEstado();
+    const antes = useStore.getState().fichas;
+    const json = JSON.stringify({ fichas: 'oops', npcs: [], mapa: {}, iniciativa: [], log: [], config: {} });
+    expect(() => useStore.getState().importarJSON(json)).toThrow();
+    expect(useStore.getState().fichas).toBe(antes);
+  });
+
   it('roundtrip: exporta -> importa mantém dados', () => {
     useStore.getState().resetarEstado();
     useStore.getState().adicionarFicha();

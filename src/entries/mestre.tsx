@@ -1,7 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../app/App';
+import ErrorBoundary from '../app/ErrorBoundary';
 import ControlPanel from '../features/controle/ControlPanel';
+import { instalarHandlerGlobalDeErro } from '../lib/globalErrorHandler';
 import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/barlow/400.css';
@@ -17,6 +19,10 @@ import '../styles/alerta-sessao.css';
 // janela principal compartilhada no Discord. Mesma origin → BroadcastChannel conecta as duas.
 const ehControle = window.location.hash === '#controle';
 
+instalarHandlerGlobalDeErro();
+
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{ehControle ? <ControlPanel /> : <App />}</StrictMode>,
+  <StrictMode>
+    <ErrorBoundary>{ehControle ? <ControlPanel /> : <App />}</ErrorBoundary>
+  </StrictMode>,
 );

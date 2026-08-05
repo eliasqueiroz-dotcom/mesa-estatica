@@ -41,11 +41,11 @@ O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, 
 2. ~~**Indicador visual de status**~~ — novo `lib/statusMesa.ts` (store efêmero, fora do `persist`) + `StatusIndicador.tsx` no header do mestre: "● registrado"/"⚠ não salvou local" e "● sync ok"/"⚠ sync com erro"/"— local". Cada um dos 11 módulos de sync do lado do mestre reporta pelo callback de status do `.subscribe()` do Realtime (`assinarStatusCanal`/`desconectarCanal`) — não foi mexido nos ~25 pontos individuais de `.catch(console.error)` dos pushes, o canal já é o sinal agregado que importa. Lado do jogador não tem o indicador de propósito (os canais de `hidratacaoJogador.ts` não foram instrumentados — mostrar status ali seria enganoso).
 3. ~~**Backup — lembrete, não automático**~~ — download automático via script se choca com o bloqueio de "múltiplos downloads" do navegador depois do primeiro; virou lembrete visual no botão "exportar" (some ao clicar) a cada 15min, exige o clique real que o navegador sempre permite.
 
-### Fase 1 — evitar a tela travar
+### Fase 1 — evitar a tela travar (concluída em 04/08)
 
-- Error Boundary React em `src/entries/mestre.tsx`/`jogador.tsx` (hoje `<StrictMode>` puro, sem fallback).
-- Handler global `window.onerror`/`unhandledrejection` (inexistente).
-- Validação de shape em `importarJSON` — hoje valida só a presença de 6 chaves; tipos errados passam e quebram depois.
+- ~~**Error Boundary React**~~ (`app/ErrorBoundary.tsx`) — envolve `<App>`/`<PlayerApp>` nos dois entries. Fallback oferece "baixar backup agora" (chama `exportarJSON` direto do `useStore.getState()`, imperativo — não depende de nenhum componente quebrado) e "recarregar". Testado ao vivo: corrompi `fichas[0].traumas` pra string no localStorage — sem o boundary a tela toda travava; com ele, só aparece o fallback, dado intacto.
+- ~~**Handler global `window.onerror`/`unhandledrejection`**~~ (`lib/globalErrorHandler.ts`) — não tenta recuperar nada, só acende `⚠ erro inesperado` no `StatusIndicador` (clique dispensa) via `statusMesa.ts`.
+- ~~**Validação de shape em `importarJSON`**~~ (`state/validarImportacao.ts`) — além da presença das 6 chaves (já existia), agora confere o TIPO de campos aninhados (`fichas[].traumas` deveria ser lista, `.atributos` deveria ser objeto, etc.) antes de tocar no estado. Reproduzi o cenário exato do bug (traumas como string): sem a validação, quebra no render de `TraumasSection` sem contexto nenhum; com ela, `importarJSON` lança `formato inválido: "fichas[0].traumas" deveria ser uma lista` antes de mudar qualquer coisa.
 
 ### Fase 2 — segurança pós-publicação
 

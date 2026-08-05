@@ -9,6 +9,10 @@ interface StatusMesaState {
    *  canal caiu, só se pelo menos um está de pé e se algum está com erro. */
   canaisConectados: Set<string>;
   canaisComErro: Set<string>;
+  /** Erro fora do ciclo de render (Promise rejeitada sem `.catch`, exceção síncrona num
+   *  callback/timer) — não passa pelo Error Boundary, que só pega erro de render. Mensagem
+   *  crua, só pra dar contexto no tooltip; `null` = nada pendente. */
+  erroRuntime: string | null;
 }
 
 /** Store efêmero, fora do `persist` de propósito — é sinal de runtime (gravou agora? o
@@ -18,6 +22,7 @@ export const useStatusMesa = create<StatusMesaState>(() => ({
   local: 'ok',
   canaisConectados: new Set(),
   canaisComErro: new Set(),
+  erroRuntime: null,
 }));
 
 export function marcarLocalOk(): void {
@@ -69,4 +74,12 @@ export function statusSincronizacao(s: Pick<StatusMesaState, 'canaisConectados' 
   if (s.canaisComErro.size > 0) return 'erro';
   if (s.canaisConectados.size > 0) return 'conectado';
   return 'sem-config';
+}
+
+export function marcarErroRuntime(mensagem: string): void {
+  useStatusMesa.setState({ erroRuntime: mensagem });
+}
+
+export function limparErroRuntime(): void {
+  useStatusMesa.setState({ erroRuntime: null });
 }

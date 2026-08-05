@@ -1,4 +1,4 @@
-import { statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
+import { limparErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
 
 /**
  * Substitui o "● registrado" estático que sempre dizia "salvo", mesmo quando a gravação
@@ -6,12 +6,15 @@ import { statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
  * a sincronização com os jogadores estava caída — o mestre só descobria ao vivo, quando um
  * jogador reclamava que não via nada atualizado.
  *
- * Dois sinais independentes: `local` (localStorage deste navegador — sempre relevante, mesmo
- * 100% offline) e `sync` (Realtime com os jogadores — só existe com Supabase configurado).
+ * Três sinais independentes: `local` (localStorage deste navegador — sempre relevante, mesmo
+ * 100% offline), `sync` (Realtime com os jogadores — só existe com Supabase configurado) e
+ * `erroRuntime` (algo quebrou fora do ciclo de render — `globalErrorHandler.ts` — sem passar
+ * pelo Error Boundary; só aparece quando existe, clique reconhece e some).
  */
 export default function StatusIndicador() {
   const local = useStatusMesa((s) => s.local);
   const sync = useStatusMesa(statusSincronizacao);
+  const erroRuntime = useStatusMesa((s) => s.erroRuntime);
 
   const corLocal = local === 'ok' ? 'var(--rede)' : 'var(--ruido)';
   const textoLocal = local === 'ok' ? '● registrado' : '⚠ não salvou local';
@@ -37,6 +40,17 @@ export default function StatusIndicador() {
       <span style={{ color: corSync }} title={tituloSync}>
         {textoSync}
       </span>
+      {erroRuntime && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={() => limparErroRuntime()}
+          style={{ color: 'var(--ruido)', cursor: 'pointer' }}
+          title={`${erroRuntime} — clique pra dispensar`}
+        >
+          ⚠ erro inesperado
+        </span>
+      )}
     </span>
   );
 }

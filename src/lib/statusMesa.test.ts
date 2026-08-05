@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { assinarStatusCanal, desconectarCanal, marcarLocalErro, marcarLocalOk, statusSincronizacao, useStatusMesa } from './statusMesa';
+import {
+  assinarStatusCanal,
+  desconectarCanal,
+  limparErroRuntime,
+  marcarErroRuntime,
+  marcarLocalErro,
+  marcarLocalOk,
+  statusSincronizacao,
+  useStatusMesa,
+} from './statusMesa';
 
 describe('statusMesa', () => {
   beforeEach(() => {
-    useStatusMesa.setState({ local: 'ok', canaisConectados: new Set(), canaisComErro: new Set() });
+    useStatusMesa.setState({ local: 'ok', canaisConectados: new Set(), canaisComErro: new Set(), erroRuntime: null });
   });
 
   it('começa ok/sem-config', () => {
@@ -56,5 +65,13 @@ describe('statusMesa', () => {
     assinarStatusCanal('tokens-sync')('CHANNEL_ERROR');
     desconectarCanal('tokens-sync');
     expect(statusSincronizacao(useStatusMesa.getState())).toBe('sem-config');
+  });
+
+  it('marcarErroRuntime/limparErroRuntime controlam o aviso de erro fora do render', () => {
+    expect(useStatusMesa.getState().erroRuntime).toBeNull();
+    marcarErroRuntime('Cannot read properties of undefined');
+    expect(useStatusMesa.getState().erroRuntime).toBe('Cannot read properties of undefined');
+    limparErroRuntime();
+    expect(useStatusMesa.getState().erroRuntime).toBeNull();
   });
 });

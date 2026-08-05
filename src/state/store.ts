@@ -6,6 +6,7 @@ import { resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
 import { marcarLocalErro, marcarLocalOk } from '../lib/statusMesa';
+import { validarTiposEstado } from './validarImportacao';
 import {
   COR_NPC_PADRAO,
   criarEstadoInicial,
@@ -1104,6 +1105,10 @@ export const useStore = create<Store>()(
         // validação estrutural mínima
         const chavesObrigatorias = ['fichas', 'npcs', 'mapa', 'iniciativa', 'log', 'config'] as const;
         for (const k of chavesObrigatorias) if (!(k in dados)) throw new Error(`Campo obrigatório ausente: ${k}`);
+        // tipo dos campos aninhados — presença sozinha não impede um `traumas: "oops"` de
+        // passar batido e só quebrar depois, no render de uma ficha (validarImportacao.ts)
+        const problemasDeTipo = validarTiposEstado(dados as unknown as Record<string, unknown>);
+        if (problemasDeTipo.length > 0) throw new Error(`formato inválido:\n- ${problemasDeTipo.join('\n- ')}`);
         const base = criarEstadoInicial();
         const normalizar = (d: Partial<EstadoGlobal>): EstadoGlobal => ({
           schemaVersion: d.schemaVersion ?? 0,
