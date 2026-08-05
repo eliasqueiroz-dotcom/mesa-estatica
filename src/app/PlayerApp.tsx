@@ -12,6 +12,7 @@ import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
+import { iniciarSyncAoE } from '../multiplayer/aoeSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
   useFichasPublicas,
@@ -83,6 +84,7 @@ export default function PlayerApp() {
     let pararLogRolls = () => {};
     let pararReguas = () => {};
     let pararSoundpad = () => {};
+    let pararAoE = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -92,6 +94,9 @@ export default function PlayerApp() {
       // mesmo módulo do mestre: aqui ele é só leitura na prática (o jogador não tem UI de
       // soundpad, e a RLS só deixa o GM escrever).
       pararSoundpad = iniciarSyncSoundpad();
+      // idem — só o AoEOverlay.tsx (GM-only, fora deste bundle) escreve no aoeStore; aqui é
+      // sempre leitura.
+      pararAoE = iniciarSyncAoE();
     });
     return () => {
       cancelado = true;
@@ -99,6 +104,7 @@ export default function PlayerApp() {
       pararLogRolls();
       pararReguas();
       pararSoundpad();
+      pararAoE();
     };
   }, []);
 

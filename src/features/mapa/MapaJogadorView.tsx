@@ -10,6 +10,7 @@ import type { EntradaIniciativa, Ficha } from '../../state/types';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
 import TokenScene from '../../tokens3d/TokenScene';
 import Avatar from '../../components/Avatar';
+import AoEViewOverlay from './AoEViewOverlay';
 import CombatOverlayJogador from './CombatOverlayJogador';
 import CrachasOverlayJogador from './CrachasOverlayJogador';
 import ReguaOverlay from './ReguaOverlay';
@@ -246,6 +247,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
           );
         })}
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
         <CrachasOverlayJogador minhaFicha={minhaFicha} outrasFichas={outrasFichas} />
       </div>

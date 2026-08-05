@@ -1,19 +1,22 @@
 /*
- * Reflexo visual dos gauges de "Estado da mesa" (Ruído narrativo, Ameaça) — controlado só por
- * `data-alerta-ruido`/`data-alerta-ameaca` no <html>, escritos por
- * features/sessao/AlertaOverlay.tsx. Deliberadamente separado de styles/ruido.css (esse é o
- * sistema de ruído ligado à Sanidade, arte.md) — cor e forma diferentes, pra não se confundir.
+ * Reflexo visual do gauge de Ameaça ("Estado da mesa") — controlado só por `data-alerta-ameaca`
+ * no <html>, escrito por features/sessao/AlertaOverlay.tsx (mestre) e AlertaOverlayJogador.tsx
+ * (jogador). Deliberadamente separado de styles/ruido.css (esse é o sistema de ruído ligado à
+ * Sanidade, arte.md) — cor e forma diferentes, pra não se confundir.
+ *
+ * Ruído Narrativo já morou aqui (`data-alerta-ruido`, vinheta ciano) — foi migrado pra usar o
+ * mesmo `data-ruido` da Sanidade (ver RuidoOverlay.tsx), um único efeito visual em vez de dois
+ * competindo pelo mesmo gauge entre mestre e jogador. As regras antigas foram removidas daqui.
  */
 
-.alerta-ameaca-overlay,
-.alerta-ruido-narrativo-overlay {
+.alerta-ameaca-overlay {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 40;
 }
 
-/* Ameaça — vinheta vermelha nas bordas, mesma intensidade do Ruído narrativo. */
+/* Ameaça — vinheta vermelha nas bordas. */
 .alerta-ameaca-overlay {
   opacity: 0;
   background: transparent;
@@ -40,64 +43,4 @@ html[data-alerta-ameaca='3'] .alerta-ameaca-overlay {
   50% {
     opacity: 1;
   }
-}
-
-/* Ruído narrativo — vinheta ciano nas bordas + estática craquelê + glitch em headers (tier 2+)
-   e body (tier 3). A cor ciano (vs cinza+vermelho da Sanidade) e a ausência de scanlines
-   distinguem os dois sistemas — propósito: pressionar jogadores a agir. */
-.alerta-ruido-narrativo-overlay {
-  opacity: 0;
-  transition: opacity 1.2s ease;
-}
-html[data-alerta-ruido='1'] .alerta-ruido-narrativo-overlay {
-  opacity: 1;
-  background: radial-gradient(ellipse at center, transparent 55%, color-mix(in srgb, var(--rede) 12%, transparent) 150%);
-}
-html[data-alerta-ruido='2'] .alerta-ruido-narrativo-overlay {
-  opacity: 1;
-  background:
-    radial-gradient(ellipse at center, transparent 45%, color-mix(in srgb, var(--rede) 25%, transparent) 120%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/svg%3E");
-  background-blend-mode: normal, overlay;
-}
-html[data-alerta-ruido='3'] .alerta-ruido-narrativo-overlay {
-  opacity: 1;
-  background:
-    radial-gradient(ellipse at center, transparent 35%, color-mix(in srgb, var(--rede) 40%, transparent) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/svg%3E");
-  background-blend-mode: normal, overlay;
-  animation: alerta-ruido-pulso 3s ease-in-out infinite;
-}
-
-@keyframes alerta-ruido-pulso {
-  0%, 100% {
-    opacity: 0.85;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* chroma aberration nos headers — tier 2+, só ciano (distinto da Sanidade que mescla
-   --rede e --ruido). */
-html[data-alerta-ruido='2'] h1,
-html[data-alerta-ruido='2'] h2,
-html[data-alerta-ruido='2'] h3,
-html[data-alerta-ruido='2'] .label,
-html[data-alerta-ruido='3'] h1,
-html[data-alerta-ruido='3'] h2,
-html[data-alerta-ruido='3'] h3,
-html[data-alerta-ruido='3'] .label {
-  text-shadow: 1.5px 0 var(--rede), -1.5px 0 color-mix(in srgb, var(--rede) 50%, transparent);
-}
-
-/* glitch ocasional no body — só tier 3, com timing diferente do ruído de Sanidade pra
-   não sincronizarem. */
-@keyframes alerta-ruido-glitch {
-  0%, 93%, 100% { transform: skewX(0deg); }
-  94% { transform: skewX(-0.8deg); }
-  95.5% { transform: skewX(0.6deg); }
-}
-html[data-alerta-ruido='3'] body {
-  animation: alerta-ruido-glitch 8s steps(1) infinite;
 }

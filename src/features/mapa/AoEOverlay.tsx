@@ -1,9 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { useIniciativa } from '../../hooks/useIniciativa';
+import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+import { useAoeStore } from '../../state/aoeStore';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
-import { pontoDentroTemplate, tamanhoTemplateEmCelulas, type FormaAoE, type TemplateAoE } from './aoeGeometria';
-import { centroDaCelula, formatarDistancia, getImgRenderRect, retanguloConteudo, tamanhoCelula, type Ponto } from './mapaUtils';
+import AoEViewOverlay from './AoEViewOverlay';
+import { pontoDentroTemplate, tamanhoTemplateEmCelulas, type FormaAoE } from './aoeGeometria';
+import { centroDaCelula, formatarDistancia, getImgRenderRect, retanguloConteudo, type Ponto } from './mapaUtils';
 
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
@@ -15,9 +18,11 @@ interface Props {
 
 /**
  * Template de área de efeito — Círculo e Quadrado só (Cone e Linha exigem matemática de
- * ângulo/segmento que não coube neste corte, ver aoeGeometria.ts). GM-only, sem sync
- * multiplayer: é uma ferramenta de cálculo de dano, não algo que o jogador precise ver na tela
- * dele. Reusa a mesma noção de "célula" da régua (`mapaUtils.ts`/`aoeGeometria.ts`).
+ * ângulo/segmento que não coube neste corte, ver aoeGeometria.ts). Só o mestre desenha (esta
+ * ferramenta, toolbar/captura/painel, é GM-only — nunca entra no bundle do jogador), mas os
+ * jogadores VEEM a área via `useAoeStore` + `aoeSync.ts` (broadcast, mesmo padrão da régua) —
+ * o desenho em si é `AoEViewOverlay.tsx`, compartilhado. Reusa a mesma noção de "célula" da
+ * régua (`mapaUtils.ts`/`aoeGeometria.ts`).
  *
  * Renderiza sua própria camada de captura de ponteiro (pointer-events só liga quando uma forma
  * está selecionada) — assim não precisa compor com os handlers de arrasto de token/grade/régua
@@ -28,11 +33,16 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
   const registrarLog = useStore((s) => s.registrarLog);
+  const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
+  const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const { pvDoCombatente } = useIniciativa();
 
+  const template = useAoeStore((s) => s.template);
+  const definirTemplate = useAoeStore((s) => s.definirTemplate);
+
   const [forma, setForma] = useState<FormaAoE | null>(null);
-  const [template, setTemplate] = useState<TemplateAoE | null>(null);
   const [danoInput, setDanoInput] = useState('');
+  const [condicaoInput, setCondicaoInput] = useState('');
   const desenhandoRef = useRef(false);
 
   const posicaoNormalizada = useCallback(
@@ -63,9 +73,9 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       const snap = centroDaCelula(p.x, p.y, grade);
       desenhandoRef.current = true;
-      setTemplate({ forma, origem: snap, alvo: snap });
+      definirTemplate({ forma, origem: snap, alvo: snap, ativa: true });
     },
-    [forma, grade, posicaoNormalizada],
+    [forma, grade, posicaoNormalizada, definirTemplate],
   );
 
   const onPointerMove = useCallback(
@@ -74,14 +84,21 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
       const p = posicaoNormalizada(e);
       if (!p) return;
       const snap = centroDaCelula(p.x, p.y, grade);
-      setTemplate((t) => (t ? { ...t, alvo: snap } : t));
+      // lê pelo getState (não pela variável `template` do render) pra não precisar dela como
+      // dependência do callback — recriar a função a cada frame de arrasto seria desperdício.
+      const atual = useAoeStore.getState().template;
+      if (!atual) return;
+      definirTemplate({ ...atual, alvo: snap, ativa: true });
     },
-    [grade, posicaoNormalizada],
+    [grade, posicaoNormalizada, definirTemplate],
   );
 
   const onPointerUp = useCallback(() => {
     desenhandoRef.current = false;
-  }, []);
+    const atual = useAoeStore.getState().template;
+    // ativa:false — sinal pro aoeSync.ts mandar a posição final na hora, fora do debounce.
+    if (atual) definirTemplate({ ...atual, ativa: false });
+  }, [definirTemplate]);
 
   const alvosDentro = template
     ? mapa.tokens
@@ -109,24 +126,25 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
     setDanoInput('');
   };
 
-  const limpar = () => {
-    setTemplate(null);
-    setForma(null);
-    setDanoInput('');
+  // sem log — mesma decisão já tomada em `aplicarCondicaoEmMassa` (useIniciativa.ts): é um
+  // lembrete visual pro mestre, não um evento narrativo. Pula quem já tem a condição, mesmo
+  // critério do toggle individual.
+  const aplicarCondicaoAosAlvos = () => {
+    if (!condicaoInput || alvosDentro.length === 0) return;
+    for (const alvo of alvosDentro) {
+      const ativas = (condicoesCombate ?? {})[alvo.participanteId] ?? [];
+      if (ativas.includes(condicaoInput)) continue;
+      alternarCondicaoCombate(alvo.participanteId, condicaoInput);
+    }
+    setCondicaoInput('');
   };
 
-  const paraPx = (p: Ponto): Ponto =>
-    imgRenderRect
-      ? { x: imgRenderRect.offsetX + p.x * imgRenderRect.renderW, y: imgRenderRect.offsetY + p.y * imgRenderRect.renderH }
-      : { x: p.x * tamanho.width, y: p.y * tamanho.height };
-
-  const celula = tamanhoCelula(grade);
-  const tamanhoCelulaPx = celula
-    ? {
-        w: imgRenderRect ? celula.larguraCelula * imgRenderRect.renderW : celula.larguraCelula * tamanho.width,
-        h: imgRenderRect ? celula.alturaCelula * imgRenderRect.renderH : celula.alturaCelula * tamanho.height,
-      }
-    : null;
+  const limpar = () => {
+    definirTemplate(null);
+    setForma(null);
+    setDanoInput('');
+    setCondicaoInput('');
+  };
 
   return (
     <>
@@ -161,21 +179,7 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
         onPointerCancel={onPointerUp}
       />
 
-      {template && tamanhoCelulaPx && tamanho.width > 0 && (
-        <svg className="mapa-aoe-svg" width={tamanho.width} height={tamanho.height} viewBox={`0 0 ${tamanho.width} ${tamanho.height}`}>
-          {(() => {
-            const origemPx = paraPx(template.origem);
-            const raioCelulas = tamanhoTemplateEmCelulas(template, grade);
-            const rx = raioCelulas * tamanhoCelulaPx.w;
-            const ry = raioCelulas * tamanhoCelulaPx.h;
-            return template.forma === 'circulo' ? (
-              <ellipse className="mapa-aoe-forma" cx={origemPx.x} cy={origemPx.y} rx={rx} ry={ry} />
-            ) : (
-              <rect className="mapa-aoe-forma" x={origemPx.x - rx} y={origemPx.y - ry} width={rx * 2} height={ry * 2} />
-            );
-          })()}
-        </svg>
-      )}
+      <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={grade} />
 
       {template && (
         <div className="mapa-aoe-painel">
@@ -196,6 +200,22 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
               style={{ width: 52, fontSize: 11 }}
             />
             <button className="icone-botao acento" onClick={aplicarDanoAosAlvos} disabled={alvosDentro.length === 0} style={{ fontSize: 10 }}>
+              aplicar a {alvosDentro.length}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center', marginTop: '0.3rem' }}>
+            <select value={condicaoInput} onChange={(ev) => setCondicaoInput(ev.target.value)} style={{ fontSize: 10 }}>
+              <option value="">condição…</option>
+              {CONDICOES_COMBATE.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+            <button
+              className="icone-botao acento"
+              onClick={aplicarCondicaoAosAlvos}
+              disabled={!condicaoInput || alvosDentro.length === 0}
+              style={{ fontSize: 10 }}
+            >
               aplicar a {alvosDentro.length}
             </button>
           </div>

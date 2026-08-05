@@ -42,7 +42,11 @@ export default function RuidoOverlay() {
   const burstTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const tierSanidade = useTierRuidoFichaAtiva();
-  const ruidoNarrativo = useStore((s) => s.sessaoPrivada.ruidoNarrativo);
+  // sessaoPublica, não sessaoPrivada: esta última nunca sai do Zustand local do GM (não
+  // sincroniza), e o valor já é espelhado pra cá em `atualizarSessaoPrivada` (store.ts) — ler
+  // daqui é o que faz este componente compartilhado (App.tsx e PlayerApp.tsx) mostrar o MESMO
+  // efeito nos dois lados.
+  const ruidoNarrativo = useStore((s) => s.sessaoPublica.ruidoNarrativo);
   const tierNarrativo = tierDeGauge(ruidoNarrativo);
   const tier = Math.max(tierSanidade, tierNarrativo) as 0 | 1 | 2 | 3;
 

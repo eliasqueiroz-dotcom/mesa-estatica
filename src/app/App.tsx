@@ -14,6 +14,7 @@ import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
+import { iniciarSyncAoE } from '../multiplayer/aoeSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
@@ -147,6 +148,7 @@ export default function App() {
     let pararLogRolls = () => {};
     let pararReguas = () => {};
     let pararSoundpad = () => {};
+    let pararAoE = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -161,6 +163,7 @@ export default function App() {
       pararLogRolls = iniciarSyncLogRolls();
       pararReguas = iniciarSyncReguas();
       pararSoundpad = iniciarSyncSoundpad();
+      pararAoE = iniciarSyncAoE();
     });
     return () => {
       cancelado = true;
@@ -175,6 +178,7 @@ export default function App() {
       pararLogRolls();
       pararReguas();
       pararSoundpad();
+      pararAoE();
     };
   }, []);
 
