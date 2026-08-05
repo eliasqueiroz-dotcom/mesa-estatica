@@ -6,6 +6,7 @@ import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
 import MapaJogadorView from '../features/mapa/MapaJogadorView';
 import MidiaJogadorView from '../features/midia/MidiaJogadorView';
 import MidiaPlayerJogador from '../features/midia/MidiaPlayerJogador';
+import SoundpadPlayer from '../features/midia/SoundpadPlayer';
 import NpcPublicaView from '../features/npcs/NpcPublicaView';
 import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
@@ -23,6 +24,7 @@ import {
 import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
+import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
@@ -79,18 +81,23 @@ export default function PlayerApp() {
     let pararTokens = () => {};
     let pararLogRolls = () => {};
     let pararReguas = () => {};
+    let pararSoundpad = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
       pararTokens = iniciarSyncTokens();
       pararLogRolls = iniciarSyncLogRolls();
       pararReguas = iniciarSyncReguas();
+      // mesmo módulo do mestre: aqui ele é só leitura na prática (o jogador não tem UI de
+      // soundpad, e a RLS só deixa o GM escrever).
+      pararSoundpad = iniciarSyncSoundpad();
     });
     return () => {
       cancelado = true;
       pararTokens();
       pararLogRolls();
       pararReguas();
+      pararSoundpad();
     };
   }, []);
 
@@ -158,6 +165,7 @@ export default function PlayerApp() {
           </nav>
         </div>
         <MidiaPlayerJogador />
+        <SoundpadPlayer />
       </header>
       <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>

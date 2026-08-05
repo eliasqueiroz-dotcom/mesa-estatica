@@ -330,6 +330,24 @@ export interface EstadoMidia {
   volume: number;
 }
 
+/** Um dos 6 botões do soundpad. `slot` (0–5) é a identidade de posição na grade. */
+export interface SomSoundpad {
+  id: string;
+  slot: number;
+  nome: string;
+  path: string;
+  url: string;
+}
+
+export interface EstadoSoundpad {
+  sons: SomSoundpad[];
+  /** Separado do volume da música — o GM controla os dois de forma independente. */
+  volume: number;
+  /** Evento, não estado: quem recebe compara `em` com o último disparo já tocado e só toca
+   *  se for mais novo, senão um refetch do Realtime repetiria o efeito. */
+  ultimoDisparo: { slot: number; em: string } | null;
+}
+
 export interface EstadoGlobal {
   schemaVersion: number;
   sessaoPublica: SessaoPublica;
@@ -341,6 +359,7 @@ export interface EstadoGlobal {
   iniciativa: EntradaIniciativa[];
   mapa: EstadoMapa;
   midia: EstadoMidia;
+  soundpad: EstadoSoundpad;
   log: EntradaLog[];
   rollsLog: EntradaRoll[];
   config: EstadoConfig;

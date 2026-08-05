@@ -4,6 +4,7 @@ import { calcularPosicaoEsperada } from '../../multiplayer/posicaoMidia';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { useStore } from '../../state/store';
 import type { FaixaMidia } from '../../state/types';
+import SoundpadGrid from './SoundpadGrid';
 
 const formatarTempo = (segundos: number): string => {
   const m = Math.floor(segundos / 60);
@@ -146,8 +147,8 @@ export default function MidiaTab() {
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="vazio" style={{ fontSize: 12 }} title="volume — vale pra todo mundo, mestre e jogadores">
-            volume (todos)
+          <span className="vazio" style={{ fontSize: 12 }} title="volume da música — vale pra todo mundo, mestre e jogadores">
+            volume música (todos)
           </span>
           <input
             type="range"
@@ -160,6 +161,8 @@ export default function MidiaTab() {
           />
         </div>
       </div>
+
+      <SoundpadGrid />
 
       <div className="secao" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         <h3 className="label" style={{ margin: 0 }}>

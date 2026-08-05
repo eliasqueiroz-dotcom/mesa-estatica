@@ -5,6 +5,7 @@ import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
 import MidiaPlayerGM from '../features/midia/MidiaPlayerGM';
 import MidiaTab from '../features/midia/MidiaTab';
+import SoundpadPlayer from '../features/midia/SoundpadPlayer';
 import VinculoMestre from '../features/multiplayer/VinculoMestre';
 import NpcsTab from '../features/npcs/NpcsTab';
 import PistasTab from '../features/pistas/PistasTab';
@@ -23,6 +24,7 @@ import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
+import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import LogTab from './LogTab';
 
@@ -126,6 +128,7 @@ export default function App() {
     let pararMidiaEstado = () => {};
     let pararLogRolls = () => {};
     let pararReguas = () => {};
+    let pararSoundpad = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -139,6 +142,7 @@ export default function App() {
       pararMidiaEstado = iniciarSyncMidiaEstado();
       pararLogRolls = iniciarSyncLogRolls();
       pararReguas = iniciarSyncReguas();
+      pararSoundpad = iniciarSyncSoundpad();
     });
     return () => {
       cancelado = true;
@@ -152,6 +156,7 @@ export default function App() {
       pararMidiaEstado();
       pararLogRolls();
       pararReguas();
+      pararSoundpad();
     };
   }, []);
 
@@ -231,6 +236,7 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <MidiaPlayerGM />
+          <SoundpadPlayer />
           <VinculoMestre />
           <ExportarImportar abrirControle={abrirControle} />
         </div>

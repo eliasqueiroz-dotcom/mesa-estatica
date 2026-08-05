@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularDanoAtaque, descricaoResultado, ordenarIniciativa, resolverTeste } from './teste';
+import { calcularDanoAtaque, descricaoResultado, inserirNaIniciativa, ordenarIniciativa, resolverTeste } from './teste';
 
 describe('resolverTeste', () => {
   it('sucesso normal quando total >= DT', () => {
@@ -67,6 +67,54 @@ describe('ordenarIniciativa', () => {
       { id: 'alta-agi', d20: 8, agilidade: 3 },
     ]);
     expect(r.map((p) => p.id)).toEqual(['alta-agi', 'baixa-agi']);
+  });
+});
+
+describe('inserirNaIniciativa', () => {
+  const lista = [
+    { id: 'a', valor: 20 },
+    { id: 'b', valor: 12 },
+    { id: 'c', valor: 5 },
+  ];
+
+  it('encaixa no meio conforme o valor', () => {
+    const r = inserirNaIniciativa(lista, [{ id: 'novo', valor: 15 }]);
+    expect(r.map((e) => e.id)).toEqual(['a', 'novo', 'b', 'c']);
+  });
+
+  it('valor mais alto vai pro topo', () => {
+    const r = inserirNaIniciativa(lista, [{ id: 'novo', valor: 25 }]);
+    expect(r.map((e) => e.id)).toEqual(['novo', 'a', 'b', 'c']);
+  });
+
+  it('valor mais baixo vai pro fim', () => {
+    const r = inserirNaIniciativa(lista, [{ id: 'novo', valor: 1 }]);
+    expect(r.map((e) => e.id)).toEqual(['a', 'b', 'c', 'novo']);
+  });
+
+  it('empate entra depois de quem já estava na lista', () => {
+    const r = inserirNaIniciativa(lista, [{ id: 'novo', valor: 12 }]);
+    expect(r.map((e) => e.id)).toEqual(['a', 'b', 'novo', 'c']);
+  });
+
+  it('lote de mesmo valor (rolagem em grupo) fica adjacente e na ordem recebida', () => {
+    const r = inserirNaIniciativa(lista, [
+      { id: 'g1', valor: 15 },
+      { id: 'g2', valor: 15 },
+      { id: 'g3', valor: 15 },
+    ]);
+    expect(r.map((e) => e.id)).toEqual(['a', 'g1', 'g2', 'g3', 'b', 'c']);
+  });
+
+  it('lista vazia recebe as novas na ordem dada', () => {
+    const r = inserirNaIniciativa([], [{ id: 'x', valor: 3 }, { id: 'y', valor: 9 }]);
+    expect(r.map((e) => e.id)).toEqual(['y', 'x']);
+  });
+
+  it('não muta a lista original', () => {
+    const original = [...lista];
+    inserirNaIniciativa(lista, [{ id: 'novo', valor: 15 }]);
+    expect(lista).toEqual(original);
   });
 });
 

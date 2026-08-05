@@ -4,11 +4,12 @@ import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
-import { ordenarIniciativa } from '../rules/teste';
+import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
 import {
   COR_NPC_PADRAO,
   criarEstadoInicial,
   criarEstadoMidia,
+  criarEstadoSoundpad,
   criarFichaVazia,
   criarGradeInicial,
   criarNpcVazio,
@@ -139,6 +140,13 @@ interface Acoes {
   atualizarEstadoMidia: (
     patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'volume'>>,
   ) => void;
+
+  /** Grava o som no slot (0–5), sobrescrevendo o que estiver lá — é o "substituir" da UI. */
+  definirSomSoundpad: (slot: number, nome: string, path: string, url: string) => string;
+  removerSomSoundpad: (slot: number) => void;
+  definirVolumeSoundpad: (volume: number) => void;
+  /** Carimba o disparo; GM e jogadores tocam o efeito e nunca repetem o mesmo carimbo. */
+  dispararSoundpad: (slot: number) => void;
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
   limparLog: () => void;
@@ -379,7 +387,33 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   if (versaoAnterior < 24) {
     estado.pistas = estado.pistas ?? [];
   }
+  // v24 → v25: soundpad (6 slots de efeito sonoro, volume próprio separado da música).
+  if (versaoAnterior < 25) {
+    estado.soundpad = { ...criarEstadoSoundpad(), ...(estado.soundpad ?? {}) };
+  }
   return estado as Store;
+}
+
+/** Encaixa entradas novas na iniciativa (por valor) mantendo a seta de turno na MESMA
+ *  pessoa. Reancorar é obrigatório: inserir alguém antes do índice atual desloca todos os
+ *  índices seguintes, e sem isso o turno pularia de combatente — mesmo cuidado que
+ *  `rerolarIniciativaDe` já tomava. */
+function comIniciativaInserida(
+  s: Store,
+  entradas: EntradaIniciativa[],
+): Pick<Store, 'iniciativa' | 'sessaoPublica'> {
+  const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
+  const iniciativa = inserirNaIniciativa(s.iniciativa, entradas);
+  const novoIndice = participanteIdNaVez
+    ? iniciativa.findIndex((e) => e.participanteId === participanteIdNaVez)
+    : -1;
+  return {
+    iniciativa,
+    sessaoPublica: {
+      ...s.sessaoPublica,
+      indiceAtualTurno: novoIndice >= 0 ? novoIndice : s.sessaoPublica.indiceAtualTurno,
+    },
+  };
 }
 
 export const useStore = create<Store>()(
@@ -694,7 +728,7 @@ export const useStore = create<Store>()(
           nome: p.nome,
           valor: p.d20 + p.agilidade,
         }));
-        set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
+        set((s) => comIniciativaInserida(s, entradas));
         get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
       },
       rolarIniciativaGrupo: (participanteIds) => {
@@ -711,7 +745,7 @@ export const useStore = create<Store>()(
           nome: n.nome || 'sem nome',
           valor,
         }));
-        set((s) => ({ iniciativa: [...s.iniciativa, ...entradas] }));
+        set((s) => comIniciativaInserida(s, entradas));
         get().registrarLog(
           'iniciativa',
           `iniciativa em grupo — ${grupo.map((n) => n.nome || 'sem nome').join(', ')}: d20+${maiorAgilidade}=${valor}`,
@@ -867,6 +901,25 @@ export const useStore = create<Store>()(
       atualizarEstadoMidia: (patch) =>
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
 
+      // Um slot por vez: definir sobrescreve o som que estiver naquela posição (é o
+      // "substituir" da UI — não existe caminho separado pra trocar).
+      definirSomSoundpad: (slot, nome, path, url) => {
+        const id = crypto.randomUUID();
+        set((s) => ({
+          soundpad: {
+            ...s.soundpad,
+            sons: [...s.soundpad.sons.filter((x) => x.slot !== slot), { id, slot, nome, path, url }],
+          },
+        }));
+        return id;
+      },
+      removerSomSoundpad: (slot) =>
+        set((s) => ({ soundpad: { ...s.soundpad, sons: s.soundpad.sons.filter((x) => x.slot !== slot) } })),
+      definirVolumeSoundpad: (volume) =>
+        set((s) => ({ soundpad: { ...s.soundpad, volume: Math.max(0, Math.min(1, volume)) } })),
+      dispararSoundpad: (slot) =>
+        set((s) => ({ soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString() } } })),
+
       registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
         const sessaoPublica = get().sessaoPublica;
         const entrada: EntradaLog = {
@@ -1004,10 +1057,10 @@ export const useStore = create<Store>()(
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+        const { fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
           get();
         return JSON.stringify(
-          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, log, rollsLog, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, config },
           null,
           2,
         );
@@ -1098,6 +1151,20 @@ export const useStore = create<Store>()(
             atualizadoEm: new Date(0).toISOString(),
             modoLoop: d.midia?.modoLoop ?? 'nenhum',
             volume: typeof d.midia?.volume === 'number' ? d.midia.volume : 0.8,
+          },
+          soundpad: {
+            sons: (d.soundpad?.sons ?? [])
+              .filter((x) => typeof x?.slot === 'number' && x.slot >= 0 && x.slot <= 5)
+              .map((x) => ({
+                id: x.id ?? crypto.randomUUID(),
+                slot: x.slot,
+                nome: x.nome ?? '',
+                path: x.path ?? '',
+                url: x.url ?? '',
+              })),
+            volume: typeof d.soundpad?.volume === 'number' ? d.soundpad.volume : 0.8,
+            // mesma razão de `tocando: false` acima — importar não dispara efeito em ninguém.
+            ultimoDisparo: null,
           },
           log: d.log ?? [],
           rollsLog: d.rollsLog ?? [],

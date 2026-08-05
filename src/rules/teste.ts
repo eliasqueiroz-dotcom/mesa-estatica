@@ -55,6 +55,26 @@ export function ordenarIniciativa<T extends ParticipanteIniciativa>(participante
 }
 
 /**
+ * Encaixa combatentes novos numa lista de iniciativa já existente, cada um na primeira
+ * posição em que supera o valor de quem está lá (empate entra depois — quem já estava
+ * na mesa mantém a vez).
+ *
+ * Insere em vez de reordenar tudo de propósito: a ordem dos que já estão na lista pode
+ * ter sido ajustada à mão pelo mestre (drag-and-drop em `reordenarIniciativa`), e um
+ * sort global jogaria esse ajuste fora. Entradas novas de mesmo valor (rolagem em grupo)
+ * saem adjacentes e na ordem recebida, por construção.
+ */
+export function inserirNaIniciativa<T extends { valor: number }>(lista: T[], novas: T[]): T[] {
+  const resultado = [...lista];
+  for (const nova of novas) {
+    const alvo = resultado.findIndex((e) => e.valor < nova.valor);
+    if (alvo === -1) resultado.push(nova);
+    else resultado.splice(alvo, 0, nova);
+  }
+  return resultado;
+}
+
+/**
  * Dano de ataque: corpo a corpo soma Vigor; à distância não soma nada.
  * Margem 10+ (ou 20 natural): dano máximo do dado em vez da rolagem.
  */

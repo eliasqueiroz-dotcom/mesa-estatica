@@ -549,6 +549,52 @@ describe('midia', () => {
   });
 });
 
+describe('soundpad', () => {
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+  });
+
+  it('definirSomSoundpad grava no slot pedido', () => {
+    useStore.getState().definirSomSoundpad(2, 'porta', 'sfx/porta', 'https://x/porta');
+    const sons = useStore.getState().soundpad.sons;
+    expect(sons).toHaveLength(1);
+    expect(sons[0]).toMatchObject({ slot: 2, nome: 'porta', path: 'sfx/porta' });
+  });
+
+  it('definir no mesmo slot substitui, nunca acumula', () => {
+    useStore.getState().definirSomSoundpad(2, 'porta', 'sfx/porta', 'https://x/porta');
+    useStore.getState().definirSomSoundpad(2, 'vidro', 'sfx/vidro', 'https://x/vidro');
+    const sons = useStore.getState().soundpad.sons;
+    expect(sons).toHaveLength(1);
+    expect(sons[0].nome).toBe('vidro');
+  });
+
+  it('remover esvazia só o slot alvo', () => {
+    useStore.getState().definirSomSoundpad(0, 'a', 'p', 'u');
+    useStore.getState().definirSomSoundpad(1, 'b', 'p', 'u');
+    useStore.getState().removerSomSoundpad(0);
+    expect(useStore.getState().soundpad.sons.map((s) => s.slot)).toEqual([1]);
+  });
+
+  it('volume do soundpad é clampado em 0..1 e não mexe no volume da música', () => {
+    const volumeMusica = useStore.getState().midia.volume;
+    useStore.getState().definirVolumeSoundpad(2);
+    expect(useStore.getState().soundpad.volume).toBe(1);
+    useStore.getState().definirVolumeSoundpad(-1);
+    expect(useStore.getState().soundpad.volume).toBe(0);
+    expect(useStore.getState().midia.volume).toBe(volumeMusica);
+  });
+
+  it('cada disparo gera um carimbo novo — é o que o player usa pra não repetir o efeito', async () => {
+    useStore.getState().dispararSoundpad(3);
+    const primeiro = useStore.getState().soundpad.ultimoDisparo;
+    expect(primeiro?.slot).toBe(3);
+    await new Promise((r) => setTimeout(r, 2));
+    useStore.getState().dispararSoundpad(3);
+    expect(useStore.getState().soundpad.ultimoDisparo?.em).not.toBe(primeiro?.em);
+  });
+});
+
 describe('rerolarIniciativaDe', () => {
   const montarIniciativa = () => {
     const npc1 = { id: 'n1', nome: 'Alvo', corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 3, notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [] };
@@ -640,6 +686,70 @@ describe('rolarIniciativaGrupo', () => {
   });
 });
 
+// Combatente adicionado NO MEIO de um combate: antes ele era sempre anexado no fim da
+// lista, ignorando o valor rolado (a lista é posicional — `avancarTurno` usa o índice).
+describe('adicionar combatente com combate em andamento', () => {
+  const criarNpc = (id: string, nome: string, agilidade: number) => ({
+    id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
+    notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [],
+  });
+  // lista em combate: valores 20 / 12 / 5
+  const iniciativaBase = [
+    { id: 'e1', participanteId: 'a', tipo: 'npc' as const, nome: 'A', valor: 20 },
+    { id: 'e2', participanteId: 'b', tipo: 'npc' as const, nome: 'B', valor: 12 },
+    { id: 'e3', participanteId: 'c', tipo: 'npc' as const, nome: 'C', valor: 5 },
+  ];
+
+  const prepararCombate = (agilidadeDoNovo: number, indiceAtualTurno: number) => {
+    useStore.setState((s) => ({
+      npcs: [criarNpc('novo', 'Novo', agilidadeDoNovo)],
+      iniciativa: iniciativaBase.map((e) => ({ ...e })),
+      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno },
+    }));
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11
+  };
+
+  it('entra na posição do valor rolado, não no fim da lista', () => {
+    prepararCombate(0, 0); // 11 + 0 = 11 → entre B (12) e C (5)
+    useStore.getState().rolarIniciativa(['novo']);
+    expect(useStore.getState().iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b', 'novo', 'c']);
+    vi.restoreAllMocks();
+  });
+
+  it('inserir DEPOIS do turno atual não move a seta de turno', () => {
+    prepararCombate(0, 1); // B está na vez; novo (11) entra depois dele
+    useStore.getState().rolarIniciativa(['novo']);
+    const s = useStore.getState();
+    expect(s.sessaoPublica.indiceAtualTurno).toBe(1);
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('b');
+    vi.restoreAllMocks();
+  });
+
+  it('inserir ANTES do turno atual empurra o índice — a vez continua da mesma pessoa', () => {
+    prepararCombate(4, 2); // C está na vez; novo (11+4=15) entra antes, entre A e B
+    useStore.getState().rolarIniciativa(['novo']);
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'novo', 'b', 'c']);
+    expect(s.sessaoPublica.indiceAtualTurno).toBe(3);
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+    vi.restoreAllMocks();
+  });
+
+  it('rolagem em grupo também respeita a posição e mantém o grupo adjacente', () => {
+    useStore.setState((s) => ({
+      npcs: [criarNpc('g1', 'G1', 4), criarNpc('g2', 'G2', 2)],
+      iniciativa: iniciativaBase.map((e) => ({ ...e })),
+      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno: 2 },
+    }));
+    vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11 → 11 + maior agilidade (4) = 15
+    useStore.getState().rolarIniciativaGrupo(['g1', 'g2']);
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'g1', 'g2', 'b', 'c']);
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+    vi.restoreAllMocks();
+  });
+});
+
 // ===== migrate (schema versionado do persist) =====
 // Caminho DIFERENTE de importarJSON (acima) — migrate só roda na reidratação do
 // localStorage pelo zustand/persist. Cobre as migrações mais recentes/arriscadas, não as
@@ -696,6 +806,11 @@ describe('migrate', () => {
   it('v23 → v24: injeta pistas vazio quando ausente', () => {
     const estado = migrate({ npcs: [] }, 23);
     expect(estado.pistas).toEqual([]);
+  });
+
+  it('v24 → v25: injeta soundpad default quando ausente', () => {
+    const estado = migrate({ npcs: [] }, 24);
+    expect(estado.soundpad).toEqual({ sons: [], volume: 0.8, ultimoDisparo: null });
   });
 });
 

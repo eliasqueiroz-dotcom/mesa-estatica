@@ -483,7 +483,11 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
               </button>
             </div>
           )}
-          {!modoCombate && (
+          {/* também disponível COM o combate em andamento: o retardatário entra na posição do
+              valor rolado e a vez continua de quem estava (store: `comIniciativaInserida`).
+              Ficava escondido durante o combate porque a inserção antiga jogava todo mundo
+              pro fim da lista. */}
+          {(
             <div style={{ borderTop: '1px solid var(--concrete-2)', paddingTop: '0.3rem', marginTop: '0.15rem' }}>
               <button
                 className="icone-botao"
