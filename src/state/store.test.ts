@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { migrate, useStore } from './store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { criarStorageComDebounce, migrate, useStore } from './store';
 import { calcularSanidadeMaxima } from '../rules/derivados';
 import { criarEstadoInicial, criarFichaVazia, criarGradeInicial } from './factories';
 import { TABELA_SURTO } from '../rules/data/surto';
+import { useStatusMesa } from '../lib/statusMesa';
 
 beforeEach(() => {
   useStore.setState(criarEstadoInicial());
@@ -832,5 +833,75 @@ describe('adicionarPista/atualizarPista/removerPista', () => {
 
     useStore.getState().removerPista(id);
     expect(useStore.getState().pistas.find((p) => p.id === id)).toBeUndefined();
+  });
+});
+
+// QuotaExceededError (mapa/mídia grandes) ou localStorage indisponível (Safari privado)
+// lançavam não capturados de dentro do setTimeout do debounce — a mesa parava de salvar em
+// silêncio. `criarStorageComDebounce` precisa engolir isso e avisar via lib/statusMesa.
+describe('criarStorageComDebounce', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useStatusMesa.setState({ local: 'ok', canaisConectados: new Set(), canaisComErro: new Set() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const criarStorageFalso = (comportamento: { lancaNoSet?: boolean; lancaNoGet?: boolean } = {}) => {
+    const dados = new Map<string, string>();
+    return {
+      getItem: vi.fn((chave: string) => {
+        if (comportamento.lancaNoGet) throw new DOMException('SecurityError');
+        return dados.get(chave) ?? null;
+      }),
+      setItem: vi.fn((chave: string, valor: string) => {
+        if (comportamento.lancaNoSet) throw new DOMException('QuotaExceededError');
+        dados.set(chave, valor);
+      }),
+      removeItem: vi.fn((chave: string) => {
+        dados.delete(chave);
+      }),
+      clear: vi.fn(),
+      key: vi.fn(),
+      length: 0,
+    } as Storage;
+  };
+
+  it('grava depois do atraso do debounce e marca status local ok', () => {
+    const bruto = criarStorageFalso();
+    const storage = criarStorageComDebounce(bruto);
+    storage.setItem('estatica-mesa', '{"a":1}');
+    expect(bruto.setItem).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(400);
+    expect(bruto.setItem).toHaveBeenCalledWith('estatica-mesa', '{"a":1}');
+    expect(useStatusMesa.getState().local).toBe('ok');
+  });
+
+  it('setItem que lança (quota estourada) não propaga e marca status local erro', () => {
+    const bruto = criarStorageFalso({ lancaNoSet: true });
+    const storage = criarStorageComDebounce(bruto);
+    storage.setItem('estatica-mesa', '{"a":1}');
+    expect(() => vi.advanceTimersByTime(400)).not.toThrow();
+    expect(useStatusMesa.getState().local).toBe('erro');
+  });
+
+  it('getItem que lança (Safari privado) devolve null em vez de derrubar a app', () => {
+    const bruto = criarStorageFalso({ lancaNoGet: true });
+    const storage = criarStorageComDebounce(bruto);
+    expect(() => storage.getItem('estatica-mesa')).not.toThrow();
+    expect(storage.getItem('estatica-mesa')).toBeNull();
+  });
+
+  it('escritas repetidas antes do atraso só gravam a última versão', () => {
+    const bruto = criarStorageFalso();
+    const storage = criarStorageComDebounce(bruto);
+    storage.setItem('estatica-mesa', 'v1');
+    storage.setItem('estatica-mesa', 'v2');
+    storage.setItem('estatica-mesa', 'v3');
+    vi.advanceTimersByTime(400);
+    expect(bruto.setItem).toHaveBeenCalledTimes(1);
+    expect(bruto.setItem).toHaveBeenCalledWith('estatica-mesa', 'v3');
   });
 });

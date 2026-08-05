@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EntradaIniciativa } from '../state/types';
 
@@ -99,10 +100,11 @@ export function iniciarSyncIniciativa(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'iniciativa' }, () => {
       void aplicarRemoto();
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('iniciativa-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('iniciativa-sync');
     cliente.removeChannel(canal);
   };
 }

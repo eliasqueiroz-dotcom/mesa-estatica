@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EstadoMidia, ModoLoopMidia } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
@@ -104,10 +105,11 @@ export function iniciarSyncMidiaEstado(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'midia_estado' }, () => {
       void aplicarRemoto();
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('midia-estado-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('midia-estado-sync');
     cliente.removeChannel(canal);
   };
 }

@@ -1,5 +1,6 @@
 import type { TokenMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -136,10 +137,11 @@ export function iniciarSyncTokens(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('tokens-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('tokens-sync');
     cliente.removeChannel(canal);
   };
 }

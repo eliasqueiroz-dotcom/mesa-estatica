@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { SessaoPublica } from '../state/types';
 
@@ -123,10 +124,11 @@ export function iniciarSyncSessaoPublica(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sessao_publica' }, () => {
       void aplicarRemoto();
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('sessao-publica-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('sessao-publica-sync');
     cliente.removeChannel(canal);
   };
 }

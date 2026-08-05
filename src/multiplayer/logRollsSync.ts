@@ -1,5 +1,6 @@
 import type { EntradaLog, EntradaRoll, TipoLog } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 
 interface LinhaLog {
@@ -180,7 +181,7 @@ export function iniciarSyncLogRolls(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('log-publico-sync'));
 
   const canalRolls = cliente
     .channel('rolls-publicas-sync')
@@ -202,10 +203,12 @@ export function iniciarSyncLogRolls(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('rolls-publicas-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('log-publico-sync');
+    desconectarCanal('rolls-publicas-sync');
     cliente.removeChannel(canalLog);
     cliente.removeChannel(canalRolls);
   };

@@ -33,13 +33,13 @@ Cada uma custou um bug real em produção ou ao vivo numa sessão.
 
 ## Próximos passos — confiabilidade pós-publicação
 
-O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, build/deploy) levantou os gaps abaixo. **Fase 0 é a próxima a implementar**; o resto fica registrado.
+O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, build/deploy) levantou os gaps abaixo.
 
-### Fase 0 — evitar perda de dados ao vivo (próxima)
+### Fase 0 — evitar perda de dados ao vivo (concluída em 04/08)
 
-1. **Try/catch em `criarStorageComDebounce`** (`src/state/store.ts`) — `setItem/getItem/removeItem` não tratam `QuotaExceededError` nem localStorage indisponível (Safari privado); hoje a mesa pode sumir em silêncio.
-2. **Indicador visual de status** (salvo local / sync conectada) — os 12 módulos de `src/multiplayer/` tratam falha de rede só com `.catch(console.error)`; o mestre não descobre que parou de sincronizar. Reusar o padrão de badge (`EstadoMesaSection.tsx`) e o desacoplamento de `debounce.ts`.
-3. **Backup automático/periódico** — usar `exportarJSON` já existente, como última linha de defesa se local e Supabase falharem juntos.
+1. ~~**Try/catch em `criarStorageComDebounce`**~~ — `setItem/getItem/removeItem` agora engolem `QuotaExceededError`/localStorage indisponível em vez de propagar não capturado; reporta em `lib/statusMesa.ts`.
+2. ~~**Indicador visual de status**~~ — novo `lib/statusMesa.ts` (store efêmero, fora do `persist`) + `StatusIndicador.tsx` no header do mestre: "● registrado"/"⚠ não salvou local" e "● sync ok"/"⚠ sync com erro"/"— local". Cada um dos 11 módulos de sync do lado do mestre reporta pelo callback de status do `.subscribe()` do Realtime (`assinarStatusCanal`/`desconectarCanal`) — não foi mexido nos ~25 pontos individuais de `.catch(console.error)` dos pushes, o canal já é o sinal agregado que importa. Lado do jogador não tem o indicador de propósito (os canais de `hidratacaoJogador.ts` não foram instrumentados — mostrar status ali seria enganoso).
+3. ~~**Backup — lembrete, não automático**~~ — download automático via script se choca com o bloqueio de "múltiplos downloads" do navegador depois do primeiro; virou lembrete visual no botão "exportar" (some ao clicar) a cada 15min, exige o clique real que o navegador sempre permite.
 
 ### Fase 1 — evitar a tela travar
 

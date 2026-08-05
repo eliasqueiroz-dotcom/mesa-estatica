@@ -27,6 +27,7 @@ import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import LogTab from './LogTab';
+import StatusIndicador from './StatusIndicador';
 
 const ATALHOS: Record<string, string> = {
   sessao: '1',
@@ -52,10 +53,22 @@ const ABAS: { id: AbaId; label: string }[] = [
   { id: 'midia', label: 'Mídia' },
 ];
 
+/** Nunca automático de verdade: navegadores bloqueiam downloads disparados por script sem
+ *  clique depois do primeiro (Chrome mostra "permitir múltiplos downloads?" e pode simplesmente
+ *  descartar os seguintes) — um lembrete visual que exige clique é a única forma confiável de
+ *  garantir que o backup realmente saia. Reseta a cada exportação (manual ou por este lembrete). */
+const INTERVALO_LEMBRETE_BACKUP_MS = 15 * 60 * 1000;
+
 function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   const exportarJSON = useStore((s) => s.exportarJSON);
   const importarJSON = useStore((s) => s.importarJSON);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [precisaBackup, setPrecisaBackup] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setPrecisaBackup(true), INTERVALO_LEMBRETE_BACKUP_MS);
+    return () => clearInterval(id);
+  }, []);
 
   const exportar = () => {
     const blob = new Blob([exportarJSON()], { type: 'application/json' });
@@ -65,6 +78,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
     a.download = `estatica-mesa-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setPrecisaBackup(false);
   };
 
   const importar = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +87,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
     arquivo.text().then((texto) => {
       try {
         importarJSON(texto);
+        setPrecisaBackup(false);
       } catch {
         window.alert('sinal corrompido — não foi possível ler esse arquivo.');
       }
@@ -82,12 +97,14 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-      <span className="mono" style={{ fontSize: '11px', color: 'var(--rede)' }} title="salva a cada alteração — localStorage deste navegador">
-        ● registrado
-      </span>
+      <StatusIndicador />
       <div style={{ display: 'flex', gap: '0.4rem' }}>
-        <button onClick={exportar} title="confie no papel, não na nuvem">
-          exportar
+        <button
+          className={precisaBackup ? 'acento' : undefined}
+          onClick={exportar}
+          title={precisaBackup ? 'já faz 15+ min do último backup — considere exportar de novo' : 'confie no papel, não na nuvem'}
+        >
+          {precisaBackup ? 'exportar ⚠' : 'exportar'}
         </button>
         <button onClick={() => inputRef.current?.click()}>importar</button>
         {/* botão de controle agora oculto; o controle é acessível clicando no título principal */}

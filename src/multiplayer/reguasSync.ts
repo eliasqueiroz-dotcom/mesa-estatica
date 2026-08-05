@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useReguasStore, type ReguaViva } from '../state/reguasStore';
 import { criarDebouncePorChave } from './debounce';
 
@@ -47,7 +48,7 @@ export function iniciarSyncReguas(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('reguas'));
 
   canalAtivo = canal;
 
@@ -74,6 +75,7 @@ export function iniciarSyncReguas(): () => void {
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('reguas');
     cliente.removeChannel(canal);
     if (canalAtivo === canal) canalAtivo = null;
   };

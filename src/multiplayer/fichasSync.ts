@@ -2,6 +2,7 @@ import type { BasePV } from '../rules/data/dificuldades';
 import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
 import type { Ficha } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
@@ -240,7 +241,7 @@ export function iniciarSyncFichas(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('fichas-publico-sync'));
 
   const canalPrivado = cliente
     .channel('fichas-privado-sync')
@@ -248,10 +249,12 @@ export function iniciarSyncFichas(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('fichas-privado-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('fichas-publico-sync');
+    desconectarCanal('fichas-privado-sync');
     cliente.removeChannel(canalPublico);
     cliente.removeChannel(canalPrivado);
   };

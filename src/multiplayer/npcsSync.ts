@@ -1,5 +1,6 @@
 import type { Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -219,7 +220,7 @@ export function iniciarSyncNpcs(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('npcs-publico-sync'));
 
   const canalPrivado = cliente
     .channel('npcs-privado-sync')
@@ -227,10 +228,12 @@ export function iniciarSyncNpcs(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('npcs-privado-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('npcs-publico-sync');
+    desconectarCanal('npcs-privado-sync');
     cliente.removeChannel(canalPublico);
     cliente.removeChannel(canalPrivado);
   };

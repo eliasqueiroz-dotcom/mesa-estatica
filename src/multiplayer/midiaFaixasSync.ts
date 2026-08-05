@@ -1,5 +1,6 @@
 import type { FaixaMidia } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { computarDiffFaixas } from './midiaFaixasDiff';
@@ -116,10 +117,11 @@ export function iniciarSyncMidiaFaixas(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('midia-faixas-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('midia-faixas-sync');
     cliente.removeChannel(canal);
   };
 }

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { GradeMapa } from '../state/types';
 
@@ -59,10 +60,11 @@ export function iniciarSyncMapaPublico(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, () => {
       void aplicarRemoto();
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('mapa-publico-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('mapa-publico-sync');
     cliente.removeChannel(canal);
   };
 }

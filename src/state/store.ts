@@ -5,6 +5,7 @@ import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, 
 import { resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
+import { marcarLocalErro, marcarLocalOk } from '../lib/statusMesa';
 import {
   COR_NPC_PADRAO,
   criarEstadoInicial,
@@ -210,16 +211,29 @@ const ehBundleJogador = typeof window !== 'undefined' && window.location.pathnam
  *  fechar podia nunca chegar no disco. */
 const ATRASO_STORAGE_MS = 400;
 
-function criarStorageComDebounce(bruto: Storage): StateStorage {
+/** `setItem`/`getItem`/`removeItem` de um `Storage` real podem lançar — quota estourada
+ *  (mapa/mídia grandes empurram a mesa pra perto do limite do localStorage) ou o navegador
+ *  em modo privado (Safari históricamente lança em qualquer acesso). Sem isso, a exceção
+ *  subia não capturada de dentro do `setTimeout`/`pagehide` e a mesa parava de salvar em
+ *  silêncio — o mestre só descobria ao recarregar e achar tudo do jeito antigo.
+ *  `marcarLocalOk`/`marcarLocalErro` (lib/statusMesa.ts) alimentam o indicador no header. */
+export function criarStorageComDebounce(bruto: Storage): StateStorage {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let pendente: { chave: string; valor: string } | null = null;
 
   const gravarAgora = () => {
     if (!pendente) return;
-    bruto.setItem(pendente.chave, pendente.valor);
-    pendente = null;
-    if (timer) clearTimeout(timer);
-    timer = null;
+    try {
+      bruto.setItem(pendente.chave, pendente.valor);
+      marcarLocalOk();
+    } catch (erro) {
+      console.error('[store] gravação local falhou — exporte um backup agora', erro);
+      marcarLocalErro();
+    } finally {
+      pendente = null;
+      if (timer) clearTimeout(timer);
+      timer = null;
+    }
   };
 
   if (typeof window !== 'undefined') {
@@ -230,8 +244,22 @@ function criarStorageComDebounce(bruto: Storage): StateStorage {
   }
 
   return {
-    getItem: (chave) => bruto.getItem(chave),
-    removeItem: (chave) => bruto.removeItem(chave),
+    getItem: (chave) => {
+      try {
+        return bruto.getItem(chave);
+      } catch (erro) {
+        console.error('[store] leitura local falhou', erro);
+        marcarLocalErro();
+        return null;
+      }
+    },
+    removeItem: (chave) => {
+      try {
+        bruto.removeItem(chave);
+      } catch (erro) {
+        console.error('[store] remoção local falhou', erro);
+      }
+    },
     setItem: (chave, valor) => {
       pendente = { chave, valor };
       if (timer) clearTimeout(timer);

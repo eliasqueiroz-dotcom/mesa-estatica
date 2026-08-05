@@ -1,5 +1,6 @@
 import type { SomSoundpad } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -195,10 +196,11 @@ export function iniciarSyncSoundpad(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe();
+    .subscribe(assinarStatusCanal('soundpad-sync'));
 
   return () => {
     unsubscribeLocal();
+    desconectarCanal('soundpad-sync');
     cliente.removeChannel(canal);
   };
 }
