@@ -183,7 +183,6 @@ export function useDiceBox(
       boxRef.current = null;
       container.replaceChildren();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerId, enabled, baseScale]);
 
   // a lib não protege roll() concorrente: uma segunda chamada enquanto a primeira ainda anima

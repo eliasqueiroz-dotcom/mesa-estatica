@@ -350,6 +350,7 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   }
   // v10 → v11: surto vira array surtosAtivos em cada ficha
   if (versaoAnterior < 11 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = estado.fichas.map((f: any) => {
       const { surtoAtivo, surtoEscolha, ...resto } = f;
       const surtosAtivos: SurtoAtivo[] = [];
@@ -365,6 +366,7 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   }
   // v11 → v12: garante surtosAtivos em toda ficha
   if (versaoAnterior < 12 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = estado.fichas.map((f: any) => ({ surtosAtivos: [], ...f }));
   }
   // v13 → v14: aba Mídia — jukebox sincronizado (faixas + estado de playback).
@@ -382,10 +384,12 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   }
   // v17 → v18: kitInvestigacao em cada ficha (corrige spread que sobrescrevia com undefined)
   if (versaoAnterior < 18 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, kitInvestigacao: f.kitInvestigacao ?? [] }));
   }
   // v18 → v19: observacaoCombate em cada ficha
   if (versaoAnterior < 19 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, observacaoCombate: f.observacaoCombate ?? '' }));
   }
   // v19 → v20: escala/unidade na grade do mapa (régua de medição).

@@ -54,9 +54,11 @@ O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, 
 - ~~**Aviso visível sem Supabase em produção**~~ — `AvisoSupabaseAusente.tsx`, banner vermelho só quando `import.meta.env.PROD && !supabase` (nunca aparece em dev local sem `.env`, que é uso válido). Testado com build real sem as env vars.
 - ~~**Auditoria de reuso de token em `vincular-jogador`**~~ — tabela `vinculo_jogador_log` (migração 0023) registra auth_uid anterior → novo a cada vínculo bem-sucedido, sem bloquear (revincular é comportamento válido). Só leitura do mestre; sem UI ainda, é consulta direta no banco.
 
-### Fase 3 — nice to have
+### Fase 3 — nice to have (parcial, 05/08)
 
-- Detecção de offline + fila de pendências · ESLint no CI · `404.html`/`robots.txt`.
+- ~~**ESLint no CI**~~ — `eslint.config.js` novo (flat config, ESLint 10 + typescript-eslint). Só `src/**` (mesmo escopo do `tsconfig.json`); `react-hooks` restrito às regras clássicas (`rules-of-hooks`/`exhaustive-deps`) — o `recommended` do plugin v7 vem com o pacote de regras do React Compiler (purity, refs, set-state-in-effect) que acusa padrões intencionais já usados no projeto (ex.: `ref.current = valor` direto no render em `TokenScene.tsx`) como erro. `no-unused-vars` desligado (o `tsc --strict` já cobre). Gate novo em `deploy.yml`, antes do build. 0 erros, 18 avisos de `react-refresh` (HMR only, não bloqueiam).
+- ~~**`404.html`/`robots.txt`**~~ — página 404 com a identidade visual do app (`public/404.html`, self-contained, sem CDN) + `robots.txt` com `Disallow: /`. Também `<meta name="robots" content="noindex, nofollow">` em `index.html`/`jogador.html` — é o que realmente vale pra um site num subpath (`/mesa-estatica/robots.txt` não é o local padrão que crawlers verificam; a spec do protocolo só olha a raiz do domínio).
+- **Detecção de offline + fila de pendências** — não priorizado por enquanto (é o maior item, mexe nos ~11 módulos de sync); fica registrado pra quando fizer sentido.
 
 ### Ideias sem prioridade
 
