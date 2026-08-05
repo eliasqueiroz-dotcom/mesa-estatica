@@ -47,12 +47,12 @@ O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, 
 - ~~**Handler global `window.onerror`/`unhandledrejection`**~~ (`lib/globalErrorHandler.ts`) — não tenta recuperar nada, só acende `⚠ erro inesperado` no `StatusIndicador` (clique dispensa) via `statusMesa.ts`.
 - ~~**Validação de shape em `importarJSON`**~~ (`state/validarImportacao.ts`) — além da presença das 6 chaves (já existia), agora confere o TIPO de campos aninhados (`fichas[].traumas` deveria ser lista, `.atributos` deveria ser objeto, etc.) antes de tocar no estado. Reproduzi o cenário exato do bug (traumas como string): sem a validação, quebra no render de `TraumasSection` sem contexto nenhum; com ela, `importarJSON` lança `formato inválido: "fichas[0].traumas" deveria ser uma lista` antes de mudar qualquer coisa.
 
-### Fase 2 — segurança pós-publicação
+### Fase 2 — segurança pós-publicação (concluída em 05/08)
 
-- Rate limit na Edge Function `vincular-mestre` — compara token por string simples, sem limite de tentativas.
-- Reavaliar RLS aberta em `tokens`/`forced_queue`/mídia — as migrations a justificam com "o link não é divulgado", premissa que mudou.
-- Aviso visível quando `supabase === null` em produção — hoje só `console.warn` em DEV; secrets erradas publicam sem multiplayer, em silêncio.
-- Auditoria de reuso de token em `vincular-jogador`.
+- ~~**Rate limit em `vincular-mestre`**~~ — tabela `mestre_tentativas` (migração 0022), 5 tentativas erradas por identidade anônima e bloqueia 15min. Testado ao vivo contra o Supabase real: 5x token errado → 403, 6ª → 429.
+- ~~**RLS de `tokens` fechada de verdade**~~ (migração 0021) — era o item mais sério: `using (true)` em insert/update/delete desde a Fase A, então **qualquer um** com a chave anon pública (sempre visível no bundle) conseguia reescrever ou apagar posição de token de qualquer personagem, sem precisar de link nem ser mestre. Agora insert/delete são só `is_gm()`, update é dono-do-PC-ou-mestre (mesmo padrão de `characters_publico`). Select continua aberto (posição de token não é sensível). `forced_queue` já estava fechado (zero policy) desde a Fase C, não precisou mexer. **`mídia` (bucket de Storage) ficou aberta de propósito** — fechar direito exigiria trocar URL pública permanente por URL assinada com expiração, um refactor de arquitetura maior pra um risco baixo (são só música/efeito sonoro, não dado de jogo sensível); decisão consciente de não priorizar, não esquecimento.
+- ~~**Aviso visível sem Supabase em produção**~~ — `AvisoSupabaseAusente.tsx`, banner vermelho só quando `import.meta.env.PROD && !supabase` (nunca aparece em dev local sem `.env`, que é uso válido). Testado com build real sem as env vars.
+- ~~**Auditoria de reuso de token em `vincular-jogador`**~~ — tabela `vinculo_jogador_log` (migração 0023) registra auth_uid anterior → novo a cada vínculo bem-sucedido, sem bloquear (revincular é comportamento válido). Só leitura do mestre; sem UI ainda, é consulta direta no banco.
 
 ### Fase 3 — nice to have
 

@@ -5,6 +5,10 @@
 // de characters_privado dona daquele owner_token. Reatribuível de propósito: o token
 // é o credencial (doc §6) — trocar de aparelho com o mesmo link revincula sem drama.
 // Roda com service_role só aqui dentro; nunca sai desta função.
+//
+// Auditoria mínima (migração 0023, tabela `vinculo_jogador_log`): não bloqueia reuso (quebraria
+// o fluxo legítimo de troca de aparelho) — só registra auth_uid anterior → novo, pro mestre
+// poder desconfiar depois se um link vazou e alguém mais o usou.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -47,7 +51,7 @@ Deno.serve(async (req) => {
 
   const { data: linha, error: buscaError } = await admin
     .from('characters_privado')
-    .select('id')
+    .select('id, auth_uid')
     .eq('owner_token', ownerToken)
     .maybeSingle();
 
@@ -59,6 +63,14 @@ Deno.serve(async (req) => {
     .eq('id', linha.id);
 
   if (updateError) return jsonResponse({ erro: 'falha ao vincular' }, 500);
+
+  // auditoria — não bloqueia o fluxo se falhar (nunca deixa a troca de aparelho travar por
+  // causa de um log).
+  await admin.from('vinculo_jogador_log').insert({
+    character_id: linha.id,
+    auth_uid_anterior: linha.auth_uid,
+    auth_uid_novo: authUid,
+  });
 
   return jsonResponse({ ok: true, characterId: linha.id }, 200);
 });

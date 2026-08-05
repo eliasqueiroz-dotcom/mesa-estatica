@@ -28,6 +28,7 @@ import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
+import AvisoSupabaseAusente from './AvisoSupabaseAusente';
 import LogTabJogador from './LogTabJogador';
 import '../features/fichas/ficha.css';
 
@@ -132,6 +133,7 @@ export default function PlayerApp() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <AvisoSupabaseAusente />
       <RuidoOverlay />
       <AlertaOverlayJogador />
       <header

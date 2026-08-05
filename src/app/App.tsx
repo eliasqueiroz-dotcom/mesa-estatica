@@ -26,6 +26,7 @@ import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
+import AvisoSupabaseAusente from './AvisoSupabaseAusente';
 import LogTab from './LogTab';
 import StatusIndicador from './StatusIndicador';
 
@@ -211,6 +212,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <AvisoSupabaseAusente />
       <RuidoOverlay />
       <AlertaOverlay />
       <header
