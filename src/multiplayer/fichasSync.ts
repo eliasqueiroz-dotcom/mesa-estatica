@@ -205,7 +205,24 @@ export function iniciarSyncFichas(): () => void {
   const aplicarRemoto = async (id: string) => {
     aplicandoRemotoContagem++;
     try {
+      // Snapshot ANTES do fetch — se a ficha local mudar enquanto `buscarEMontar` está em voo
+      // (rede fora não é instantânea), o subscriber local abaixo vê `aplicandoRemotoContagem > 0`
+      // e não agenda push nenhum pra essa edição — ela fica só na memória, esperando. Sem o
+      // check pós-await, o `fichaRemota` (buscado ANTES dessa edição existir) sobrescreveria a
+      // ficha inteira aqui, apagando a edição do mestre sem nunca reenviá-la ao servidor.
+      const fichaLocalAntes = useStore.getState().fichas.find((f) => f.id === id);
       const fichaRemota = await buscarEMontar(cliente, id);
+      const fichaLocalAgora = useStore.getState().fichas.find((f) => f.id === id);
+
+      if (fichaLocalAgora !== fichaLocalAntes) {
+        // Edição local aconteceu durante o fetch — ela vence (mantém o que está na tela) e
+        // agenda o push que o guard engoliu; `fichaLocalAgora` undefined = o mestre removeu a
+        // ficha nesse meio-tempo, então nem re-adiciona `fichaRemota` (evitaria ressuscitar uma
+        // ficha recém-apagada).
+        if (fichaLocalAgora) agendarPush(id, fichaLocalAgora);
+        return;
+      }
+
       if (!fichaRemota) return;
       const s = useStore.getState();
       const existe = s.fichas.some((f) => f.id === id);

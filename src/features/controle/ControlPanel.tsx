@@ -147,20 +147,30 @@ export default function ControlPanel() {
           <p className="vazio">nenhuma entrada bate com o filtro.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {filaVisivel.map((e, i) => (
-              <div key={e.id} className="reguladores-linha mono">
-                <span>
-                  <span className="badge" style={{ marginRight: '0.5rem' }}>
-                    {e.personagemNome}
+            {filaVisivel.map((e) => {
+              // "próxima" é por ALVO, não pelo topo visual da lista: consumirForcados (forcarRolagem.ts)
+              // pega a primeira entrada da fila (na ordem real, não filtrada) que casa com
+              // personagemId===null ("qualquer") ou personagemId===o alvo de e — então uma entrada só
+              // é "próxima" de verdade se for essa primeira ocorrência pro seu próprio alvo. Com o
+              // filtro aplicado, o topo da lista visível podia não ser o topo real da fila.
+              const idxNaFila = fila.indexOf(e);
+              const ehProxima =
+                fila.findIndex((f) => f.personagemId === null || f.personagemId === e.personagemId) === idxNaFila;
+              return (
+                <div key={e.id} className="reguladores-linha mono">
+                  <span>
+                    <span className="badge" style={{ marginRight: '0.5rem' }}>
+                      {e.personagemNome}
+                    </span>
+                    {ehProxima && <span className="vazio">próxima · </span>}
+                    [{e.valores.join(', ')}]
                   </span>
-                  {i === 0 && filtro === 'todos' && <span className="vazio">próxima · </span>}
-                  [{e.valores.join(', ')}]
-                </span>
-                <button className="icone-botao perigo" onClick={() => remover(e.id)}>
-                  ×
-                </button>
-              </div>
-            ))}
+                  <button className="icone-botao perigo" onClick={() => remover(e.id)}>
+                    ×
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

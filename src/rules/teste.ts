@@ -90,6 +90,31 @@ export function calcularDanoAtaque(params: {
   return base + (corpoACorpo ? vigor : 0);
 }
 
+export interface DanoArmaParseado {
+  qtd: number;
+  lados: number;
+  modificador: number;
+  /** true se o texto menciona "Vigor" — ficha.md: corpo a corpo soma Vigor automaticamente. */
+  corpoACorpo: boolean;
+}
+
+/**
+ * Extrai `NdM(+K)` e a flag "soma Vigor" do campo livre `ArmaFicha.dano` (ex: "1d6 + Vigor",
+ * "2d6+1", "1d4"). `ArmaFicha.dano` é texto totalmente livre (ficha.md, tabela de armas) —
+ * nem toda arma cadastrada bate com um termo de dado reconhecível (a coluna aceita qualquer
+ * anotação), então retorna `null` nesse caso em vez de inventar um valor.
+ */
+export function parseDanoArma(texto: string): DanoArmaParseado | null {
+  const m = texto.match(/(\d+)\s*d\s*(\d+)(?:\s*\+\s*(\d+))?/i);
+  if (!m) return null;
+  return {
+    qtd: parseInt(m[1], 10),
+    lados: parseInt(m[2], 10),
+    modificador: m[3] ? parseInt(m[3], 10) : 0,
+    corpoACorpo: /vigor/i.test(texto),
+  };
+}
+
 export function descricaoResultado(r: ResultadoTeste): string {
   if (r.natural1) return '1 natural — complicação';
   if (r.natural20) return '20 natural — margem garantida';

@@ -1,4 +1,5 @@
 import { useDiceBox } from '../../dice/useDiceBox';
+import { consumirForcados } from '../../dice/forcarRolagem';
 import RoladorTeste from './RoladorTeste';
 import RoladorSanidade from './RoladorSanidade';
 import RoladorSurto from './RoladorSurto';
@@ -6,7 +7,7 @@ import RoladorTrauma from './RoladorTrauma';
 import RolagemLivre from './RolagemLivre';
 
 export default function DadosTab({ active = true }: { active?: boolean }) {
-  const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja', active);
+  const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja', active, 100, undefined, consumirForcados);
   // os 5 roladores compartilham UMA bandeja física — a lib não protege roll() concorrente
   // (ver comentário em useDiceBox.rolar), então "pronto pra rolar" tem que valer pra todos ao
   // mesmo tempo: enquanto qualquer um está rolando, os botões dos outros também ficam desabilitados.

@@ -14,10 +14,20 @@ export function parseDado(dado: string): RollTermo {
 }
 
 export function extrairResultadosSanidade(grupos: RollGroupResult[], perdaTermo: RollTermo) {
-  const d20Grupo = grupos.find((g) => Number(g.sides) === 20) ?? grupos[0];
+  // `usados` evita que o d20 do teste de Vontade e o dado de perda apontem pro MESMO grupo
+  // quando os dois critérios colidem (ex: se um gatilho futuro de PERDA_SANIDADE usar 1d20 — hoje
+  // só 1d4/1d8/2d8 existem, então isso nunca dispara em uso normal, mas sem essa exclusão o
+  // segundo `.find()` reencontraria o grupo já usado pelo primeiro, e um dos dois valores reais
+  // seria descartado em silêncio).
+  const usados = new Set<RollGroupResult>();
+
+  const d20Grupo = grupos.find((g) => !usados.has(g) && Number(g.sides) === 20) ?? grupos[0];
+  if (d20Grupo) usados.add(d20Grupo);
+
   const perdaGrupo =
-    grupos.find((g) => Number(g.sides) === perdaTermo.sides && Number(g.qty) === perdaTermo.qty) ??
-    grupos.find((g) => Number(g.sides) === perdaTermo.sides) ??
+    grupos.find((g) => !usados.has(g) && Number(g.sides) === perdaTermo.sides && Number(g.qty) === perdaTermo.qty) ??
+    grupos.find((g) => !usados.has(g) && Number(g.sides) === perdaTermo.sides) ??
+    grupos.find((g) => !usados.has(g)) ??
     grupos.at(-1);
 
   return {

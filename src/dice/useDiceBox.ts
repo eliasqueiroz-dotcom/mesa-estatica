@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
 import { COLORSETS, type ColorsetId } from './colorsets';
-import { consumirForcados } from './forcarRolagem';
 import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
 
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
@@ -49,10 +48,20 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  */
 export type ResolverRemoto = (termos: RollTermo[], personagemId: string | null) => Promise<number[] | null>;
 
+/** Consome a fila local de forçados (`forcarRolagem.ts`). Injetável de propósito: este módulo
+ *  (`useDiceBox`) é compartilhado entre mestre e jogador, e `forcarRolagem.ts` abre um
+ *  BroadcastChannel com a fila secreta do mestre — importá-lo aqui direto o colocaria no bundle
+ *  do jogador mesmo sem uso real (o Rollup não consegue tree-shakear uma referência de código,
+ *  só o default no-op fica no caminho do jogador). Cada chamador do mestre passa a função real;
+ *  o jogador não passa nada. */
+export type ConsumirForcadosFn = (totalDados: number, personagemId: string | null) => number[] | null;
+const semForcados: ConsumirForcadosFn = () => null;
+
 export async function montarNotacao(
   termos: RollTermo[],
   personagemId: string | null = null,
   resolverRemoto: ResolverRemoto = resolverRolagemRemota,
+  consumirForcadosFn: ConsumirForcadosFn = semForcados,
 ): Promise<string> {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
@@ -60,7 +69,7 @@ export async function montarNotacao(
   // cai pro caminho local de sempre (fila local via BroadcastChannel, honesto se vazia).
   // `resolverRemoto` é injetável — o PlayerApp usa `resolverRolagemJogador` (sempre tenta o
   // servidor, sem o gate da flag) em vez do padrão do mestre.
-  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
+  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcadosFn(totalDados, personagemId);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -86,9 +95,10 @@ export async function rolarFallback2D(
   termos: RollTermo[],
   personagemId: string | null = null,
   resolverRemoto: ResolverRemoto = resolverRolagemRemota,
+  consumirForcadosFn: ConsumirForcadosFn = semForcados,
 ): Promise<GrupoResultado[]> {
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcados(totalDados, personagemId);
+  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcadosFn(totalDados, personagemId);
   let cursor = 0;
   return termos.map((t) => {
     const rolls: { value: number }[] = [];
@@ -113,6 +123,7 @@ export function useDiceBox(
   enabled = true,
   baseScale = 100,
   resolverRemoto: ResolverRemoto = resolverRolagemRemota,
+  consumirForcadosFn: ConsumirForcadosFn = semForcados,
 ) {
   const boxRef = useRef<DiceBox | null>(null);
   const [ready, setReady] = useState(false);
@@ -204,7 +215,7 @@ export function useDiceBox(
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto);
+      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto, consumirForcadosFn);
       const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
@@ -230,7 +241,7 @@ export function useDiceBox(
     if (modo2D) {
       // sem física rodando, então sem concorrência real pra proteger — resolve na hora (async
       // por dentro só pra poder tentar o servidor primeiro; onComplete dispara quando chegar).
-      void rolarFallback2D(termos, personagemId, resolverRemoto).then(onComplete);
+      void rolarFallback2D(termos, personagemId, resolverRemoto, consumirForcadosFn).then(onComplete);
       return;
     }
     if (!boxRef.current) return;

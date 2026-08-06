@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDiceBox } from '../../dice/useDiceBox';
+import { consumirForcados } from '../../dice/forcarRolagem';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { descricaoResultado, resolverTeste } from '../../rules/teste';
@@ -15,7 +16,7 @@ interface QuickRollOverlayProps {
 
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {
   const habilitado = abaAtual !== 'dados' && aberto;
-  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado, 45);
+  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado, 45, undefined, consumirForcados);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);

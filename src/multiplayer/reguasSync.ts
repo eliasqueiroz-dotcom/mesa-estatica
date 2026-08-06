@@ -19,6 +19,11 @@ const ATRASO_PUSH_MS = 80;
  * já é a fonte pro `ReguaOverlay` local; isso só ecoa as mudanças de quem mede pros outros
  * clientes, e aplica o que os outros medem localmente. Sem `VITE_SUPABASE_URL`/`ANON_KEY`,
  * `iniciarSyncReguas()` é no-op — a régua funciona 100% local (GM-solo offline).
+ *
+ * `private: true` (migração 0025) — canal privado do Realtime Authorization: SEND/RECEIVE
+ * passam a exigir sessão autenticada (`realtime.messages`), não só a anon key pública. Régua é
+ * simétrica (mestre E jogador medem — `MapaJogadorView.tsx` também monta `ReguaOverlay`), então
+ * a policy de envio não checa `is_gm()`, só autenticação.
  */
 export function iniciarSyncReguas(): () => void {
   const cliente = supabase;
@@ -27,7 +32,7 @@ export function iniciarSyncReguas(): () => void {
   let aplicandoRemoto = false;
 
   const canal: RealtimeChannel = cliente
-    .channel('reguas', { config: { broadcast: { self: false, ack: false } } })
+    .channel('reguas', { config: { broadcast: { self: false, ack: false }, private: true } })
     .on('broadcast', { event: 'regua' }, ({ payload }) => {
       const regua = (payload as { regua: ReguaViva }).regua;
       aplicandoRemoto = true;

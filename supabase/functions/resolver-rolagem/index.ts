@@ -8,11 +8,14 @@
 // em rolls_log (público). O cliente recebe só { valores, total } — nunca um
 // campo "forcado: true/false".
 //
-// AINDA NÃO CONECTADO à rolagem ao vivo do app (useDiceBox.ts continua no
-// caminho local síncrono, validado e em uso pra sessão de 25/07). Essa
-// função é a infraestrutura da Fase D (corte do #controle), testada
-// isoladamente — ligar na UI é trabalho futuro, com tempo pra testar em
-// dois aparelhos reais antes de ir ao ar.
+// Ligada nos dois lados, com gates diferentes (ver rolagemRemota.ts):
+// - Jogador (`resolverRolagemJogador`, usado por DadosTabJogador/QuickRollOverlayJogador):
+//   sempre chama esta function, sem flag — o jogador não tem #controle/BroadcastChannel, então
+//   não existe "caminho local forçável" pra cair de volta.
+// - Mestre (`resolverRolagemRemota`, usado por useDiceBox.ts): continua atrás de
+//   `VITE_FASE_D_ROLAGEM_REMOTA` (desligada por padrão) — sem a flag, o mestre segue 100% no
+//   caminho local síncrono (física + BroadcastChannel), validado e em uso pra sessão de 25/07.
+//   Ativar essa flag em produção só depois de testar em dois aparelhos reais.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 

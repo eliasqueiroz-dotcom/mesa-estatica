@@ -71,6 +71,33 @@ describe('validarTiposEstado', () => {
     expect(problemas).toContain('"mapa.tokens" deveria ser uma lista');
   });
 
+  it.each(['traumas', 'armas', 'vinculos', 'kitInvestigacao', 'reguladores', 'surtosAtivos'])(
+    'elemento inválido dentro de ficha.%s gera problema (não só o array em si)',
+    (campo) => {
+      const problemas = validarTiposEstado({ ...base(), fichas: [{ [campo]: [null, 'string solta', { ok: true }] }] });
+      expect(problemas).toContain(`"fichas[0].${campo}[0]" deveria ser um objeto`);
+      expect(problemas).toContain(`"fichas[0].${campo}[1]" deveria ser um objeto`);
+      expect(problemas).not.toContain(`"fichas[0].${campo}[2]" deveria ser um objeto`);
+    },
+  );
+
+  it('elemento inválido dentro de npcs[i].acoes gera problema', () => {
+    const problemas = validarTiposEstado({ ...base(), npcs: [{ acoes: [null] }] });
+    expect(problemas).toContain('"npcs[0].acoes[0]" deveria ser um objeto');
+  });
+
+  it('elemento inválido em iniciativa/log/mapa.tokens gera problema — é o que a UI itera com .id sem checar tipo', () => {
+    const problemas = validarTiposEstado({
+      ...base(),
+      iniciativa: [null],
+      log: ['string solta'],
+      mapa: { tokens: [42] },
+    });
+    expect(problemas).toContain('"iniciativa[0]" deveria ser um objeto');
+    expect(problemas).toContain('"log[0]" deveria ser um objeto');
+    expect(problemas).toContain('"mapa.tokens[0]" deveria ser um objeto');
+  });
+
   it('acumula vários problemas ao mesmo tempo, não para no primeiro', () => {
     const problemas = validarTiposEstado({
       ...base(),

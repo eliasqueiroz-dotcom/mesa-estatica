@@ -1,11 +1,68 @@
 import { useState } from 'react';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
+import { calcularDanoAtaque, parseDanoArma } from '../../../rules/teste';
+import { useStore } from '../../../state/store';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
   const [arsenalSelect, setArsenalSelect] = useState('');
   const [protecaoSelect, setProtecaoSelect] = useState('');
+  /** "margem 10+ (ou 20 natural)" da rolagem de ATAQUE que já aconteceu em RoladorTeste — o
+   *  mestre marca antes de clicar "rolar dano" pra este disparo específico usar dano máximo em
+   *  vez da rolagem (regras.md). Por linha de arma, não persiste — é um flag de "próxima rolagem". */
+  const [margem10Mais, setMargem10Mais] = useState<Record<string, boolean>>({});
+  /** Resultado da última rolagem de dano por arma — mostrado na própria ficha (não só no log),
+   *  pro jogador ver na hora sem precisar abrir a aba Log. */
+  const [resultados, setResultados] = useState<Record<string, { texto: string; erro: boolean }>>({});
+
+  const rolarDano = (arma: ArmaFicha) => {
+    const parsed = parseDanoArma(arma.dano);
+    const nomeArma = arma.nome || 'arma';
+    const nomePersonagem = ficha.nome || 'Personagem';
+    if (!parsed) {
+      const texto = `dano "${arma.dano}" não reconhecido, calcule na mão`;
+      registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${texto}`, ficha.id);
+      setResultados((prev) => ({ ...prev, [arma.id]: { texto, erro: true } }));
+      return;
+    }
+    const { qtd, lados, modificador, corpoACorpo } = parsed;
+    const critico = margem10Mais[arma.id] ?? false;
+    const danoMaximoDado = qtd * lados + modificador;
+    // Em crítico, o dado nem precisa ser rolado de verdade — calcularDanoAtaque usa o máximo do
+    // dado de qualquer jeito (regras.md, margem 10+/20 natural), então rolar só confundiria a
+    // exibição com um valor que não afeta o resultado.
+    let rolagemDano: number;
+    if (critico) {
+      rolagemDano = danoMaximoDado;
+    } else {
+      rolagemDano = 0;
+      for (let i = 0; i < qtd; i++) rolagemDano += Math.floor(Math.random() * lados) + 1;
+      rolagemDano += modificador;
+    }
+    const vigor = ficha.atributos.vigor;
+    const dano = calcularDanoAtaque({ rolagemDano, danoMaximoDado, vigor, corpoACorpo, margem10Mais: critico });
+
+    // Resultado do dado separado do total, ex: "1d6 → [4] + Vigor [5] · total 9" — em crítico,
+    // "1d6 → máximo [6] + Vigor [5] · total 11".
+    const notacaoDado = `${qtd}d${lados}${modificador !== 0 ? `${modificador > 0 ? '+' : ''}${modificador}` : ''}`;
+    const parteDado = critico ? `${notacaoDado} → máximo [${rolagemDano}]` : `${notacaoDado} → [${rolagemDano}]`;
+    const parteVigor = corpoACorpo ? ` + Vigor [${vigor}]` : '';
+    const texto = `${parteDado}${parteVigor} · total ${dano}`;
+
+    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${texto}`, ficha.id);
+    registrarRoll({
+      origem: nomePersonagem,
+      personagemId: ficha.id,
+      formula: arma.dano,
+      total: dano,
+      bruto: rolagemDano,
+      visibilidade: 'publica',
+    });
+    setResultados((prev) => ({ ...prev, [arma.id]: { texto, erro: false } }));
+  };
   const atualizar = (id: string, patch: Partial<ArmaFicha>) => {
     onChange({ armas: ficha.armas.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
   };
@@ -51,6 +108,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
               <th>Dano</th>
               <th>Alcance</th>
               <th>Nota</th>
+              <th>Rolar dano</th>
               <th />
             </tr>
           </thead>
@@ -71,6 +129,37 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
                 </td>
                 <td>
                   <input value={a.nota} onChange={(e) => atualizar(a.id, { nota: e.target.value })} />
+                </td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => rolarDano(a)} disabled={a.dano.trim() === ''}>
+                      dano
+                    </button>
+                    <label
+                      title="margem 10+ ou 20 natural no ataque — usa o máximo do dado"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '11px', cursor: 'pointer' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={margem10Mais[a.id] ?? false}
+                        onChange={(e) => setMargem10Mais((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+                      />
+                      crít.
+                    </label>
+                  </div>
+                  {resultados[a.id] && (
+                    <div
+                      className="mono"
+                      style={{
+                        marginTop: '0.3rem',
+                        fontSize: '11px',
+                        whiteSpace: 'nowrap',
+                        color: resultados[a.id].erro ? 'var(--ruido)' : 'var(--rede)',
+                      }}
+                    >
+                      {resultados[a.id].texto}
+                    </div>
+                  )}
                 </td>
                 <td>
                   <button className="icone-botao perigo" onClick={() => remover(a.id)}>

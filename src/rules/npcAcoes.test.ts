@@ -56,4 +56,26 @@ describe('usarAcaoNpc', () => {
     const texto = registrarLog.mock.calls[0][1] as string;
     expect(texto).toMatch(/dano 1d6\+2 → \d+/);
   });
+
+  it('fórmula de dano com modificador negativo (NdM-K) é calculada, não descartada', () => {
+    const registrarLog = vi.fn();
+    const registrarRoll = vi.fn();
+
+    vi.spyOn(Math, 'random').mockReturnValue(0); // 1d6-2 → 1-2, clampado em 0
+    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '1d6-2' }, registrarLog, registrarRoll);
+    vi.restoreAllMocks();
+
+    const texto = registrarLog.mock.calls[0][1] as string;
+    expect(texto).toContain('dano 1d6-2 → 0');
+  });
+
+  it('fórmula fora do padrão suportado (ex: dois dados combinados) avisa em vez de virar 0 silencioso', () => {
+    const registrarLog = vi.fn();
+    const registrarRoll = vi.fn();
+
+    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '1d6+1d4' }, registrarLog, registrarRoll);
+
+    const texto = registrarLog.mock.calls[0][1] as string;
+    expect(texto).toContain('dano 1d6+1d4 → fórmula não reconhecida, calcule na mão');
+  });
 });

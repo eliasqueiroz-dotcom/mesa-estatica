@@ -57,6 +57,12 @@ Deno.serve(async (req) => {
 
   if (buscaError || !linha) return jsonResponse({ erro: 'link inválido' }, 404);
 
+  // Fecha a leitura cruzada: se essa identidade já estava vinculada a OUTRA ficha (ex.: o mesmo
+  // navegador testou dois links), o vínculo antigo é revogado antes do novo — uma identidade nunca
+  // fica com auth_uid válido em mais de uma linha de characters_privado ao mesmo tempo, o que a
+  // policy RLS (auth_uid = auth.uid()) usaria pra liberar leitura das duas.
+  await admin.from('characters_privado').update({ auth_uid: null }).eq('auth_uid', authUid).neq('id', linha.id);
+
   const { error: updateError } = await admin
     .from('characters_privado')
     .update({ auth_uid: authUid })

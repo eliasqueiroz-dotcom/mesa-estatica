@@ -18,6 +18,12 @@ const CHAVE_DEBOUNCE = 'aoe';
  * chama `useAoeStore.getState().definirTemplate`. Este módulo roda igual nos dois lados —
  * o jogador só nunca aciona a metade que publica, porque não tem componente que escreve no
  * store. `AoEViewOverlay.tsx` (compartilhado) só lê `useAoeStore` pra desenhar.
+ *
+ * `private: true` (migração 0025) — canal privado do Realtime Authorization: SEND passa a
+ * exigir a policy `is_gm()` em `realtime.messages`, então mesmo achando a anon key (pública por
+ * design) ninguém publica um template de AoE falso sem estar de fato vinculado como mestre.
+ * Antes disso o canal era broadcast público — a UI (`AoEOverlay.tsx` GM-only) era o único
+ * limite, não o servidor.
  */
 export function iniciarSyncAoE(): () => void {
   const cliente = supabase;
@@ -26,7 +32,7 @@ export function iniciarSyncAoE(): () => void {
   let aplicandoRemoto = false;
 
   const canal: RealtimeChannel = cliente
-    .channel('aoe', { config: { broadcast: { self: false, ack: false } } })
+    .channel('aoe', { config: { broadcast: { self: false, ack: false }, private: true } })
     .on('broadcast', { event: 'aoe-template' }, ({ payload }) => {
       const template = (payload as { template: AoeVivo }).template;
       aplicandoRemoto = true;

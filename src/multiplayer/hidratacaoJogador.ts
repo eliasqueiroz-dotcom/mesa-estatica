@@ -37,8 +37,10 @@ export function useHidratarSessaoPublica(): void {
       .select('*')
       .eq('id', 'sessao')
       .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelado && data) useStore.setState({ sessaoPublica: paraSessaoPublica(data as LinhaSessaoPublica) });
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) console.error('[hidratacaoJogador] busca inicial de sessao_publica falhou', error);
+        else if (data) useStore.setState({ sessaoPublica: paraSessaoPublica(data as LinhaSessaoPublica) });
       });
 
     const canal = cliente
@@ -75,8 +77,10 @@ export function useHidratarMapaPublico(): void {
       .select('*')
       .eq('id', 'mapa')
       .maybeSingle()
-      .then(({ data }) => {
-        if (cancelado || !data) return;
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) return console.error('[hidratacaoJogador] busca inicial de mapa_publico falhou', error);
+        if (!data) return;
         const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
         // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
         // existirem em GradeMapa) não pode apagar os defaults locais desses campos.
@@ -117,10 +121,10 @@ export function useHidratarMidia(): void {
       .from('midia_faixas')
       .select('*')
       .order('ordem', { ascending: true })
-      .then(({ data }) => {
-        if (!cancelado && data) {
-          useStore.setState((s) => ({ midia: { ...s.midia, faixas: (data as LinhaFaixa[]).map(paraFaixa) } }));
-        }
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) return console.error('[hidratacaoJogador] busca inicial de midia_faixas falhou', error);
+        if (data) useStore.setState((s) => ({ midia: { ...s.midia, faixas: (data as LinhaFaixa[]).map(paraFaixa) } }));
       });
 
     cliente
@@ -128,10 +132,10 @@ export function useHidratarMidia(): void {
       .select('*')
       .eq('id', 'midia')
       .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelado && data) {
-          useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(data as LinhaMidiaEstado) } }));
-        }
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) return console.error('[hidratacaoJogador] busca inicial de midia_estado falhou', error);
+        if (data) useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(data as LinhaMidiaEstado) } }));
       });
 
     const canalFaixas = cliente
@@ -181,8 +185,10 @@ export function useFichasPublicas(): FichaPublica[] {
     cliente
       .from('characters_publico')
       .select('*')
-      .then(({ data }) => {
-        if (!cancelado && data) setFichas((data as LinhaFichaPublico[]).map(paraFichaPublica));
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) console.error('[hidratacaoJogador] busca inicial de characters_publico falhou', error);
+        else if (data) setFichas((data as LinhaFichaPublico[]).map(paraFichaPublica));
       });
 
     const canal = cliente
@@ -221,8 +227,10 @@ export function useNpcsPublicos(): NpcPublico[] {
     cliente
       .from('npcs_publico')
       .select('*')
-      .then(({ data }) => {
-        if (!cancelado && data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcPublico));
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) console.error('[hidratacaoJogador] busca inicial de npcs_publico falhou', error);
+        else if (data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcPublico));
       });
 
     const canal = cliente
@@ -264,8 +272,10 @@ export function useIniciativaPublica(): EntradaIniciativa[] {
         .from('iniciativa')
         .select('*')
         .order('posicao', { ascending: true })
-        .then(({ data }) => {
-          if (!cancelado && data) setIniciativa((data as LinhaIniciativa[]).map(paraEntrada));
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) console.error('[hidratacaoJogador] busca de iniciativa falhou', error);
+          else if (data) setIniciativa((data as LinhaIniciativa[]).map(paraEntrada));
         });
     };
 

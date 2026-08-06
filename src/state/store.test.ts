@@ -3,6 +3,7 @@ import { criarStorageComDebounce, migrate, useStore } from './store';
 import { calcularSanidadeMaxima } from '../rules/derivados';
 import { criarEstadoInicial, criarFichaVazia, criarGradeInicial } from './factories';
 import { TABELA_SURTO } from '../rules/data/surto';
+import { personagemEstaEmSurto } from '../rules/surto';
 import { useStatusMesa } from '../lib/statusMesa';
 
 beforeEach(() => {
@@ -36,9 +37,10 @@ describe('avancarCena', () => {
 
   it('só remove surto com expiraEm === novaCena — expiraEm anterior não é limpo retroativamente', () => {
     // Documenta o filtro real da store (`surto.expiraEm !== novaCena`): ele não trata "menor
-    // que" como expirado, só a correspondência exata. Na criação normal (ajustarSanidadeAtual)
-    // expiraEm é sempre contadorCena+1, então isso nunca ocorre em uso normal — mas um estado
-    // corrompido/importado com expiraEm defasado sobrevive a avancarCena indefinidamente.
+    // que" como expirado, só a correspondência exata. Na criação normal (ajustarSanidadeAtual,
+    // via calcularExpiraSurto) expiraEm fora de combate é sempre o contadorCena vigente no
+    // disparo, então isso nunca ocorre em uso normal — mas um estado corrompido/importado com
+    // expiraEm defasado sobrevive a avancarCena indefinidamente.
     const ficha = criarFichaVazia();
     ficha.surtosAtivos = [{ id: '1', expiraEm: 1, escolha: 'Fuga cega' }];
     useStore.setState({ fichas: [ficha], sessaoPublica: { ...useStore.getState().sessaoPublica, contadorCena: 1 } });
@@ -125,6 +127,30 @@ describe('ajustarSanidadeAtual', () => {
     const id = adicionarFicha(10);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     expect(useStore.getState().sessaoPrivada.estatisticas.surtos).toBe(1);
+  });
+
+  it('surto automático fora de combate usa calcularExpiraSurto — badge "ativo" já na cena do colapso', () => {
+    const id = adicionarFicha(10);
+    useStore.setState((s) => ({ sessaoPublica: { ...s.sessaoPublica, contadorCena: 7, modoCombate: false } }));
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // mesmo valor pros dois d20 → resolve direto, sem 1d4 aqui
+    useStore.getState().ajustarSanidadeAtual(id, 4);
+    vi.restoreAllMocks();
+    const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(ficha.surtosAtivos[0].expiraEm).toBe(7);
+    expect(personagemEstaEmSurto(ficha.surtosAtivos, useStore.getState().sessaoPublica)).toBe(true);
+  });
+
+  it('surto automático em combate usa rodada+1d4+1 (calcularExpiraSurto), não contadorCena', () => {
+    const id = adicionarFicha(10);
+    useStore.setState((s) => ({
+      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, rodada: 3, contadorCena: 99 },
+    }));
+    vi.spyOn(Math, 'random').mockReturnValue(0.1); // d20A=d20B=3 (mesmoNumero) e 1d4=1 → expiraEm = 3+1
+    useStore.getState().ajustarSanidadeAtual(id, 4);
+    vi.restoreAllMocks();
+    const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(ficha.surtosAtivos[0].expiraEm).toBe(4);
+    expect(personagemEstaEmSurto(ficha.surtosAtivos, useStore.getState().sessaoPublica)).toBe(true);
   });
 });
 
@@ -659,6 +685,73 @@ describe('rerolarIniciativaDe', () => {
     const antes = useStore.getState().iniciativa;
     useStore.getState().rerolarIniciativaDe('nao-existe');
     expect(useStore.getState().iniciativa).toBe(antes);
+  });
+});
+
+describe('removerDaIniciativa', () => {
+  const iniciativaABCD = () => [
+    { id: 'e1', participanteId: 'a', tipo: 'npc' as const, nome: 'A', valor: 20 },
+    { id: 'e2', participanteId: 'b', tipo: 'npc' as const, nome: 'B', valor: 15 },
+    { id: 'e3', participanteId: 'c', tipo: 'npc' as const, nome: 'C', valor: 10 },
+    { id: 'e4', participanteId: 'd', tipo: 'npc' as const, nome: 'D', valor: 5 },
+  ];
+
+  it('remove quem não está na vez — reancora indiceAtualTurno na MESMA pessoa', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABCD(),
+      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' está na vez
+    }));
+    useStore.getState().removerDaIniciativa('e1'); // remove 'a', antes de 'c'
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['b', 'c', 'd']);
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+  });
+
+  it('remove o próprio combatente da vez — assume o slot seguinte em vez de pular alguém', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABCD(),
+      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' está na vez
+    }));
+    useStore.getState().removerDaIniciativa('e3'); // remove a própria 'c'
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b', 'd']);
+    expect(s.sessaoPublica.indiceAtualTurno).toBe(2);
+    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('d');
+  });
+
+  it('remove o último da lista enquanto ele está na vez — clampa pro novo último', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABCD().slice(0, 3), // a, b, c
+      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' (último) está na vez
+    }));
+    useStore.getState().removerDaIniciativa('e3');
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b']);
+    expect(s.sessaoPublica.indiceAtualTurno).toBe(1);
+  });
+
+  it('limpa condicoesCombate/condicaoDuracao órfãos do participante removido', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABCD(),
+      sessaoPublica: {
+        ...s.sessaoPublica,
+        condicoesCombate: { c: ['atordoado'] },
+        condicaoDuracao: { c: { atordoado: 2 } },
+      },
+    }));
+    useStore.getState().removerDaIniciativa('e3'); // remove 'c'
+    const s = useStore.getState();
+    expect(s.sessaoPublica.condicoesCombate.c).toBeUndefined();
+    expect(s.sessaoPublica.condicaoDuracao.c).toBeUndefined();
+  });
+
+  it('não limpa a condição se outra entrada da iniciativa ainda referencia o mesmo participanteId', () => {
+    useStore.setState((s) => ({
+      iniciativa: [...iniciativaABCD(), { id: 'e5', participanteId: 'c', tipo: 'npc' as const, nome: 'C (2)', valor: 1 }],
+      sessaoPublica: { ...s.sessaoPublica, condicoesCombate: { c: ['atordoado'] } },
+    }));
+    useStore.getState().removerDaIniciativa('e3'); // remove só UMA entrada de 'c', a outra ('e5') continua
+    expect(useStore.getState().sessaoPublica.condicoesCombate.c).toEqual(['atordoado']);
   });
 });
 

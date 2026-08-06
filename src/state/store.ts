@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
-import { resolverSurto } from '../rules/surto';
+import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
 import { marcarLocalErro, marcarLocalOk } from '../lib/statusMesa';
@@ -534,7 +534,7 @@ export const useStore = create<Store>()(
                       sanidadeAtual: valor,
                       surtosAtivos: [
                         ...(f.surtosAtivos ?? []),
-                        { id: crypto.randomUUID(), expiraEm: s.sessaoPublica.contadorCena + 1, escolha: resultado.entradaA.nome },
+                        { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(s.sessaoPublica), escolha: resultado.entradaA.nome },
                       ],
                     }
                   : f,
@@ -549,7 +549,7 @@ export const useStore = create<Store>()(
                       sanidadeAtual: valor,
                       surtosAtivos: [
                         ...(f.surtosAtivos ?? []),
-                        { id: crypto.randomUUID(), expiraEm: s.sessaoPublica.contadorCena + 1, escolha: null },
+                        { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(s.sessaoPublica), escolha: null },
                       ],
                     }
                   : f,
@@ -807,7 +807,45 @@ export const useStore = create<Store>()(
         });
         get().registrarLog('iniciativa', `${entrada.nome} rerrolou iniciativa — d20+${agilidade}=${novoValor}`);
       },
-      removerDaIniciativa: (id) => set((s) => ({ iniciativa: s.iniciativa.filter((e) => e.id !== id) })),
+      removerDaIniciativa: (id) =>
+        set((s) => {
+          const removido = s.iniciativa.find((e) => e.id === id);
+          const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
+          const iniciativa = s.iniciativa.filter((e) => e.id !== id);
+
+          const novoIndice = participanteIdNaVez
+            ? iniciativa.findIndex((e) => e.participanteId === participanteIdNaVez)
+            : -1;
+          // o próprio combatente da vez foi removido — a próxima entrada assume o mesmo slot,
+          // clampado pro fim da lista se ele era o último (mesmo cuidado de reancorar que
+          // comIniciativaInserida/rerolarIniciativaDe já tomam ao mutar a lista).
+          const indiceAtualTurno =
+            novoIndice >= 0
+              ? novoIndice
+              : Math.min(s.sessaoPublica.indiceAtualTurno, Math.max(0, iniciativa.length - 1));
+
+          // condicoesCombate/condicaoDuracao são indexados por participanteId, não pelo id da
+          // entrada de iniciativa — só limpa se não sobrar nenhuma outra entrada com esse
+          // participanteId (evita ressurgir "atordoado" etc. se ele voltar pra luta depois).
+          const aindaPresente = removido && iniciativa.some((e) => e.participanteId === removido.participanteId);
+          let condicoesCombate = s.sessaoPublica.condicoesCombate ?? {};
+          let condicaoDuracao = s.sessaoPublica.condicaoDuracao;
+          if (removido && !aindaPresente) {
+            if (condicoesCombate[removido.participanteId]) {
+              condicoesCombate = { ...condicoesCombate };
+              delete condicoesCombate[removido.participanteId];
+            }
+            if (condicaoDuracao?.[removido.participanteId]) {
+              condicaoDuracao = { ...condicaoDuracao };
+              delete condicaoDuracao[removido.participanteId];
+            }
+          }
+
+          return {
+            iniciativa,
+            sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno, condicoesCombate, condicaoDuracao },
+          };
+        }),
       limparIniciativa: () => set({ iniciativa: [] }),
       reordenarIniciativa: (de, para) =>
         set((s) => {

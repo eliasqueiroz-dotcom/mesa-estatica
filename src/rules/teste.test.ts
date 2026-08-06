@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcularDanoAtaque, descricaoResultado, inserirNaIniciativa, ordenarIniciativa, resolverTeste } from './teste';
+import { calcularDanoAtaque, descricaoResultado, inserirNaIniciativa, ordenarIniciativa, parseDanoArma, resolverTeste } from './teste';
 
 describe('resolverTeste', () => {
   it('sucesso normal quando total >= DT', () => {
@@ -129,6 +129,29 @@ describe('calcularDanoAtaque', () => {
 
   it('margem 10+ usa dano máximo do dado em vez da rolagem', () => {
     expect(calcularDanoAtaque({ rolagemDano: 1, danoMaximoDado: 8, vigor: 2, corpoACorpo: true, margem10Mais: true })).toBe(10);
+  });
+});
+
+describe('parseDanoArma', () => {
+  it('reconhece NdM simples, sem Vigor', () => {
+    expect(parseDanoArma('1d6')).toEqual({ qtd: 1, lados: 6, modificador: 0, corpoACorpo: false });
+  });
+
+  it('reconhece NdM+K', () => {
+    expect(parseDanoArma('2d6+1')).toEqual({ qtd: 2, lados: 6, modificador: 1, corpoACorpo: false });
+  });
+
+  it('detecta "Vigor" no texto (soma automática de corpo a corpo, ficha.md)', () => {
+    expect(parseDanoArma('1d6 + Vigor')).toEqual({ qtd: 1, lados: 6, modificador: 0, corpoACorpo: true });
+  });
+
+  it('"Vigor" funciona junto de um modificador numérico', () => {
+    expect(parseDanoArma('1d4+2 + Vigor')).toEqual({ qtd: 1, lados: 4, modificador: 2, corpoACorpo: true });
+  });
+
+  it('texto sem termo de dado reconhecível retorna null — campo é livre (ficha.md)', () => {
+    expect(parseDanoArma('especial, ver nota')).toBeNull();
+    expect(parseDanoArma('')).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { resolverEstabilizar } from '../rules/combate';
 import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
 import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
+import { useCombateUiStore } from '../state/combateUiStore';
 import { useStore } from '../state/store';
 
 export interface PvCombatente {
@@ -67,11 +68,16 @@ export function useIniciativa() {
   const [adicionarAberto, setAdicionarAberto] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
-  /** Seleção pra "aplicar a N" (dano em área) — separada de `selecionadosIniciativa` (que é
-   *  pra ANTES de rolar iniciativa). Só existe depois que o combate já começou. */
-  const [selecionadosAplicar, setSelecionadosAplicar] = useState<Set<string>>(new Set());
-  /** "agrupar NPCs selecionados" ao rolar — só afeta `rolarSelecionados`, ver ali embaixo. */
-  const [agruparNpcs, setAgruparNpcs] = useState(false);
+  // Compartilhado via combateUiStore (não useState local) — NpcsTab e CombatOverlay podem estar
+  // montados ao mesmo tempo sobre a MESMA iniciativa, e precisam ver a mesma seleção/estado de
+  // combate ao vivo, não cópias independentes (ver combateUiStore.ts).
+  const selecionadosAplicar = useCombateUiStore((s) => s.selecionadosAplicar);
+  const toggleSelecionadoAplicarUi = useCombateUiStore((s) => s.toggleSelecionadoAplicar);
+  const limparSelecaoAplicarUi = useCombateUiStore((s) => s.limparSelecaoAplicar);
+  const agruparNpcs = useCombateUiStore((s) => s.agruparNpcs);
+  const setAgruparNpcs = useCombateUiStore((s) => s.setAgruparNpcs);
+  const socorristaPorAlvo = useCombateUiStore((s) => s.socorristaPorAlvo);
+  const definirSocorristaUi = useCombateUiStore((s) => s.definirSocorrista);
 
   const toggleSelecionado = (id: string) => {
     const novo = selecionadosIniciativa.includes(id)
@@ -114,7 +120,7 @@ export function useIniciativa() {
     atualizarSessaoPrivada({ selecionadosIniciativa: [] });
     setExpandidos(new Set());
     setAdicionarAberto(false);
-    setSelecionadosAplicar(new Set());
+    limparSelecaoAplicarUi();
     setAgruparNpcs(false);
     if (modoCombate) encerrarModoCombate();
     if (iniciativa.length > 0) limparIniciativa();
@@ -180,16 +186,8 @@ export function useIniciativa() {
     usarAcaoNpcCompartilhada(npcId, nome, acao, registrarLog, registrarRoll);
   };
 
-  const toggleSelecionadoAplicar = (id: string) => {
-    setSelecionadosAplicar((prev) => {
-      const novo = new Set(prev);
-      if (novo.has(id)) novo.delete(id);
-      else novo.add(id);
-      return novo;
-    });
-  };
-
-  const limparSelecaoAplicar = () => setSelecionadosAplicar(new Set());
+  const toggleSelecionadoAplicar = toggleSelecionadoAplicarUi;
+  const limparSelecaoAplicar = limparSelecaoAplicarUi;
 
   /** Dano (delta negativo) ou ajuste (delta positivo — nunca "cura": regras.md "não existe
    *  cura em combate", o app só corrige erro de digitação) em todos os selecionados de uma vez.
@@ -222,11 +220,7 @@ export function useIniciativa() {
     }
   };
 
-  /** Ficha.id escolhida como socorrista, por alvo (participanteId de quem está a 0 PV) —
-   *  um alvo de cada vez, não precisa ser um Set. */
-  const [socorristaPorAlvo, setSocorristaPorAlvoState] = useState<Record<string, string>>({});
-  const definirSocorrista = (alvoId: string, fichaId: string) =>
-    setSocorristaPorAlvoState((prev) => ({ ...prev, [alvoId]: fichaId }));
+  const definirSocorrista = definirSocorristaUi;
 
   /** Medicina (Intelecto) DT 15 estabiliza quem está a 0 PV (regras.md). Sucesso liga a
    *  condição 'estavel' (lembrete visual — acorda com 1 PV no fim da cena, o mestre aplica na

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { useStore } from '../../state/store';
 
@@ -16,7 +17,12 @@ function termoVazio(faces = 20): Termo {
 
 interface RolagemLivreProps {
   ready: boolean;
-  rolar: (notacao: RollTermo[], onComplete: (r: RollGroupResult[]) => void) => void;
+  rolar: (
+    notacao: RollTermo[],
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+  ) => void;
 }
 
 type ModoRolagem = 'nenhum' | 'pc' | 'npc';
@@ -59,6 +65,9 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
     setRolando(true);
     setGrupos(null);
     const notacao: RollTermo[] = termos.map((t) => ({ sides: t.faces, qty: t.quantidade }));
+    // sem isso, um valor forçado amarrado a este PC/NPC específico (janela de controle) nunca
+    // é consumido aqui — fica preso na fila e pode disparar depois, numa rolagem não relacionada.
+    const personagemId = modo === 'npc' ? (npc?.id ?? null) : modo === 'pc' ? (ficha?.id ?? null) : null;
     rolar(notacao, (resultados) => {
       setGrupos(resultados);
       setRolando(false);
@@ -101,7 +110,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           visibilidade: privado ? 'privada' : 'publica',
         });
       }
-    });
+    }, undefined, personagemId);
   };
 
   const totalGeral = grupos?.reduce((soma, g) => soma + g.value, 0) ?? null;

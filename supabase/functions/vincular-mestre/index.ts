@@ -10,6 +10,13 @@
 // publicada podia tentar adivinhar o token indefinidamente, sem custo nenhum. Chave é
 // auth_uid (já validado pelo getUser() abaixo), não IP — não dá pra confiar em header de IP
 // sem saber o proxy exato na frente da function.
+//
+// Migração 0024 fechou duas brechas: (1) o incremento agora roda inteiro dentro da function
+// Postgres `registrar_tentativa_mestre` (INSERT...ON CONFLICT DO UPDATE, atômico por lock de
+// linha) — o antigo "select → soma em JS → upsert" deixava tentativas paralelas lerem o mesmo
+// valor velho e nunca travar o limite; (2) uma trava GLOBAL (`registrar_tentativa_mestre_global`,
+// linha única) conta falhas de QUALQUER identidade na mesma janela — sem ela, trocar de auth_uid
+// (aba anônima nova) resetava as 5 tentativas de graça, indefinidamente.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -22,6 +29,7 @@ const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 const LIMITE_TENTATIVAS = 5;
+const LIMITE_TENTATIVAS_GLOBAL = 20;
 const JANELA_BLOQUEIO_MINUTOS = 15;
 
 Deno.serve(async (req) => {
@@ -51,25 +59,34 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  const { data: registro } = await admin
-    .from('mestre_tentativas')
-    .select('tentativas, bloqueado_ate')
-    .eq('auth_uid', authUid)
-    .maybeSingle();
+  const [{ data: registro }, { data: registroGlobal }] = await Promise.all([
+    admin.from('mestre_tentativas').select('bloqueado_ate').eq('auth_uid', authUid).maybeSingle(),
+    admin.from('mestre_tentativas_global').select('bloqueado_ate').eq('id', true).maybeSingle(),
+  ]);
 
-  if (registro?.bloqueado_ate && new Date(registro.bloqueado_ate) > new Date()) {
+  const agora = new Date();
+  if (registro?.bloqueado_ate && new Date(registro.bloqueado_ate) > agora) {
+    return jsonResponse({ erro: 'muitas tentativas — espere um pouco antes de tentar de novo' }, 429);
+  }
+  if (registroGlobal?.bloqueado_ate && new Date(registroGlobal.bloqueado_ate) > agora) {
     return jsonResponse({ erro: 'muitas tentativas — espere um pouco antes de tentar de novo' }, 429);
   }
 
   if (gmToken !== Deno.env.get('GM_TOKEN')) {
-    const tentativas = (registro?.tentativas ?? 0) + 1;
-    const bloqueado = tentativas >= LIMITE_TENTATIVAS;
-    await admin.from('mestre_tentativas').upsert({
-      auth_uid: authUid,
-      tentativas: bloqueado ? 0 : tentativas,
-      ultima_tentativa: new Date().toISOString(),
-      bloqueado_ate: bloqueado ? new Date(Date.now() + JANELA_BLOQUEIO_MINUTOS * 60_000).toISOString() : null,
-    });
+    // Incremento atômico (migração 0024) — por identidade E global, em paralelo. Cada RPC é uma
+    // única instrução SQL (INSERT...ON CONFLICT DO UPDATE / UPDATE sob lock de linha), então
+    // tentativas concorrentes nunca leem o mesmo valor "antes" e perdem incremento.
+    await Promise.all([
+      admin.rpc('registrar_tentativa_mestre', {
+        p_auth_uid: authUid,
+        p_limite: LIMITE_TENTATIVAS,
+        p_janela_minutos: JANELA_BLOQUEIO_MINUTOS,
+      }),
+      admin.rpc('registrar_tentativa_mestre_global', {
+        p_limite: LIMITE_TENTATIVAS_GLOBAL,
+        p_janela_minutos: JANELA_BLOQUEIO_MINUTOS,
+      }),
+    ]);
     return jsonResponse({ erro: 'token inválido' }, 403);
   }
 

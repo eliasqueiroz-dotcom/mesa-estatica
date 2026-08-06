@@ -15,6 +15,22 @@ export function validarTiposEstado(dados: Record<string, unknown>): string[] {
   const listar = (caminho: string, valor: unknown) => {
     if (valor !== undefined && !Array.isArray(valor)) problemas.push(`"${caminho}" deveria ser uma lista`);
   };
+  /** Como `listar`, mas também confere que CADA elemento é um objeto — não só o array em si.
+   *  Sem isso, `[null]` ou `["x"]` passava a checagem (é uma lista de verdade) e só quebrava
+   *  depois, no primeiro `.map(item => item.id)` da seção que renderiza essa lista — e como o
+   *  JSON malformado já tinha sido persistido, o crash se repetia pra sempre a cada reload. */
+  const listarDeObjetos = (caminho: string, valor: unknown) => {
+    if (valor === undefined) return;
+    if (!Array.isArray(valor)) {
+      problemas.push(`"${caminho}" deveria ser uma lista`);
+      return;
+    }
+    valor.forEach((item, i) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        problemas.push(`"${caminho}[${i}]" deveria ser um objeto`);
+      }
+    });
+  };
   const objetar = (caminho: string, valor: unknown) => {
     if (valor !== undefined && (typeof valor !== 'object' || valor === null || Array.isArray(valor))) {
       problemas.push(`"${caminho}" deveria ser um objeto`);
@@ -26,8 +42,8 @@ export function validarTiposEstado(dados: Record<string, unknown>): string[] {
 
   listar('fichas', dados.fichas);
   listar('npcs', dados.npcs);
-  listar('iniciativa', dados.iniciativa);
-  listar('log', dados.log);
+  listarDeObjetos('iniciativa', dados.iniciativa);
+  listarDeObjetos('log', dados.log);
   objetar('mapa', dados.mapa);
   objetar('config', dados.config);
 
@@ -42,7 +58,7 @@ export function validarTiposEstado(dados: Record<string, unknown>): string[] {
       objetar(`fichas[${i}].atributos`, ficha.atributos);
       objetar(`fichas[${i}].pericias`, ficha.pericias);
       for (const campo of ['traumas', 'armas', 'vinculos', 'kitInvestigacao', 'reguladores', 'surtosAtivos'] as const) {
-        listar(`fichas[${i}].${campo}`, ficha[campo]);
+        listarDeObjetos(`fichas[${i}].${campo}`, ficha[campo]);
       }
     });
   }
@@ -55,12 +71,12 @@ export function validarTiposEstado(dados: Record<string, unknown>): string[] {
       }
       const npc = n as Record<string, unknown>;
       textar(`npcs[${i}].nome`, npc.nome);
-      listar(`npcs[${i}].acoes`, npc.acoes);
+      listarDeObjetos(`npcs[${i}].acoes`, npc.acoes);
     });
   }
 
   if (dados.mapa && typeof dados.mapa === 'object' && !Array.isArray(dados.mapa)) {
-    listar('mapa.tokens', (dados.mapa as Record<string, unknown>).tokens);
+    listarDeObjetos('mapa.tokens', (dados.mapa as Record<string, unknown>).tokens);
   }
 
   return problemas;
