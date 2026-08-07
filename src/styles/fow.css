@@ -164,7 +164,7 @@
   right: 100px;
   display: flex;
   gap: 0.3rem;
-  z-index: 5;
+  z-index: 42;
 }
 
 .fow-toolbar .icone-botao[data-ativo='true'] {
@@ -175,8 +175,9 @@
 .fow-camada-captura {
   position: absolute;
   inset: 0;
-  z-index: 4; /* acima das camadas, abaixo dos tokens */
+  z-index: 33; /* abaixo só do AoE capture (34) e toolbar/painel (41/50); acima de tokens/régua/FoW view */
   cursor: crosshair;
+  touch-action: none;
 }
 
 .fow-rascunho {

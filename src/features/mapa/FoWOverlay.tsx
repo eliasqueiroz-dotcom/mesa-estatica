@@ -80,6 +80,7 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
       const p = posicaoNormalizada(e);
       if (!p) return;
       e.preventDefault();
+      e.stopPropagation(); // impede o handler da régua/tokens no `.mapa-area` parent de interferir
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       origemRef.current = p;
       desenhandoRef.current = true;
@@ -100,6 +101,7 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!desenhandoRef.current || !origemRef.current) return;
+      e.stopPropagation(); // mesma razão do Down — `.mapa-area` tem onPointerMove pra arrasto de token/grade
       const p = posicaoNormalizada(e);
       if (!p) return;
       const o = origemRef.current;
@@ -116,7 +118,8 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
     [posicaoNormalizada, definirRascunho],
   );
 
-  const onPointerUp = useCallback(() => {
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
     desenhandoRef.current = false;
     const r = useFowStore.getState().rascunho;
     origemRef.current = null;
