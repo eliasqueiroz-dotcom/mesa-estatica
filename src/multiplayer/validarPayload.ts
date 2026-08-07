@@ -1,6 +1,7 @@
 import type { Ponto } from '../features/mapa/mapaUtils';
 import type { ReguaViva } from '../state/reguasStore';
 import type { AoeVivo } from '../state/aoeStore';
+import type { PingVivo } from '../state/pingsStore';
 
 /**
  * Confere o shape mínimo de payloads de broadcast (`reguasSync.ts`, `aoeSync.ts`) antes de
@@ -40,4 +41,10 @@ export function ehAoeVivo(v: unknown): v is AoeVivo {
     ehPonto(t.origem) &&
     ehPonto(t.alvo)
   );
+}
+
+export function ehPingVivo(v: unknown): v is PingVivo {
+  if (!v || typeof v !== 'object') return false;
+  const p = v as Record<string, unknown>;
+  return typeof p.id === 'string' && typeof p.autorId === 'string' && typeof p.cor === 'string' && ehPonto(p.ponto);
 }

@@ -24,6 +24,7 @@ import { iniciarSyncMapaPublico } from '../multiplayer/mapaPublicoSync';
 import { iniciarSyncMidiaEstado } from '../multiplayer/midiaEstadoSync';
 import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
+import { iniciarSyncPing } from '../multiplayer/pingSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
@@ -148,6 +149,7 @@ export default function App() {
     let pararMidiaEstado = () => {};
     let pararLogRolls = () => {};
     let pararReguas = () => {};
+    let pararPing = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
     let pararFoW = () => {};
@@ -164,6 +166,7 @@ export default function App() {
       pararMidiaEstado = iniciarSyncMidiaEstado();
       pararLogRolls = iniciarSyncLogRolls();
       pararReguas = iniciarSyncReguas();
+      pararPing = iniciarSyncPing();
       pararSoundpad = iniciarSyncSoundpad();
       pararAoE = iniciarSyncAoE();
       pararFoW = iniciarSyncFoW();
@@ -180,6 +183,7 @@ export default function App() {
       pararMidiaEstado();
       pararLogRolls();
       pararReguas();
+      pararPing();
       pararSoundpad();
       pararAoE();
       pararFoW();

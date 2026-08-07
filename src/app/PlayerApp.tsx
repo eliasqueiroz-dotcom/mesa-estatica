@@ -25,6 +25,7 @@ import {
 } from '../multiplayer/hidratacaoJogador';
 import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
+import { iniciarSyncPing } from '../multiplayer/pingSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
@@ -84,6 +85,7 @@ export default function PlayerApp() {
     let pararTokens = () => {};
     let pararLogRolls = () => {};
     let pararReguas = () => {};
+    let pararPing = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
     let pararFoW = () => {};
@@ -93,6 +95,8 @@ export default function PlayerApp() {
       pararTokens = iniciarSyncTokens();
       pararLogRolls = iniciarSyncLogRolls();
       pararReguas = iniciarSyncReguas();
+      // ping é simétrico igual régua: o jogador também pinga (useRegua.ts), não só recebe.
+      pararPing = iniciarSyncPing();
       // mesmo módulo do mestre: aqui ele é só leitura na prática (o jogador não tem UI de
       // soundpad, e a RLS só deixa o GM escrever).
       pararSoundpad = iniciarSyncSoundpad();
@@ -109,6 +113,7 @@ export default function PlayerApp() {
       pararTokens();
       pararLogRolls();
       pararReguas();
+      pararPing();
       pararSoundpad();
       pararAoE();
       pararFoW();

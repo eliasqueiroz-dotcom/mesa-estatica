@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ehAoeVivo, ehReguaViva } from './validarPayload';
+import { ehAoeVivo, ehPingVivo, ehReguaViva } from './validarPayload';
 
 describe('ehReguaViva', () => {
   const valida = {
@@ -56,5 +56,30 @@ describe('ehAoeVivo', () => {
   it('rejeita payload vazio', () => {
     expect(ehAoeVivo({})).toBe(false);
     expect(ehAoeVivo(null)).toBe(false);
+  });
+});
+
+describe('ehPingVivo', () => {
+  const valido = { id: 'p1', autorId: 'mestre', cor: 'var(--rede)', ponto: { x: 0.3, y: 0.7 } };
+
+  it('aceita um ping bem formado', () => {
+    expect(ehPingVivo(valido)).toBe(true);
+  });
+
+  it('rejeita ponto ausente ou malformado', () => {
+    expect(ehPingVivo({ ...valido, ponto: undefined })).toBe(false);
+    expect(ehPingVivo({ ...valido, ponto: { x: 'nao-numero', y: 0 } })).toBe(false);
+  });
+
+  it('rejeita campos com tipo errado', () => {
+    expect(ehPingVivo({ ...valido, id: 42 })).toBe(false);
+    expect(ehPingVivo({ ...valido, autorId: null })).toBe(false);
+    expect(ehPingVivo({ ...valido, cor: 7 })).toBe(false);
+  });
+
+  it('rejeita payload vazio', () => {
+    expect(ehPingVivo({})).toBe(false);
+    expect(ehPingVivo(null)).toBe(false);
+    expect(ehPingVivo(undefined)).toBe(false);
   });
 });

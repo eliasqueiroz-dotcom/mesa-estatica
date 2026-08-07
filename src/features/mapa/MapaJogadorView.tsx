@@ -14,6 +14,7 @@ import AoEViewOverlay from './AoEViewOverlay';
 import CombatOverlayJogador from './CombatOverlayJogador';
 import CrachasOverlayJogador from './CrachasOverlayJogador';
 import FoWViewOverlay from './FoWViewOverlay';
+import PingOverlay from './PingOverlay';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlayJogador from './TokenOverlayJogador';
 import './mapa.css';
@@ -248,6 +249,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
           );
         })}
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <PingOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
         <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <FoWViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
         <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />

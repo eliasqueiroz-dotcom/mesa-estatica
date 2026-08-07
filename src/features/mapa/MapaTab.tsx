@@ -15,6 +15,7 @@ import FoWOverlay from './FoWOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import PingOverlay from './PingOverlay';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlay from './TokenOverlay';
 import { useRegua } from './useRegua';
@@ -400,6 +401,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           );
         })}
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <PingOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
         <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} containerRef={containerRef} imgRef={imgRef} />
         <FoWOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} containerRef={containerRef} imgRef={imgRef} />
         <CombatOverlay />

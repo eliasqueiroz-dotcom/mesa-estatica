@@ -135,7 +135,7 @@ Levantamento de features em VTTs maduros (Roll20, Foundry VTT, Fantasy Grounds, 
 ### Tier 2 — bom encaixe, mais lift ou parcialmente coberto
 
 - **Visão/lanterna de token** (paired com FoW) — lanterna limitada é horror clássico, mas adiciona complexidade no render; segundo momento.
-- **Ping/apontar no mapa** — jogador clica no mapa do app → todos vêem um pulso. Sync Realtime simples, baixo lift.
+- ~~**Ping/apontar no mapa**~~ — **implementado em 07/08**. Clique sem arrastar em `.mapa-area` (mestre OU jogador — mesma simetria da régua) dispara um pulso na cor de quem clicou, visto por todo mundo, some sozinho em ~1.4s. Reaproveita o gesto da régua: `useRegua.ts` só decide "é régua ou é ping" pela distância percorrida desde o `pointerdown` (limiar de 5px, mesmo princípio do clique-vs-arrasto de token em `MapaTab.tsx`) — abaixo disso nenhuma régua fantasma chega a ser publicada. Store efêmero `state/pingsStore.ts`, broadcast simples (sem tabela, sem debounce, sem evento de cancelamento — um ping nasce pronto) em `multiplayer/pingSync.ts`, render compartilhado `features/mapa/PingOverlay.tsx`.
 - **Sussurro privado pra um jogador** — GM envia nota só pra um aparelho. Combina com "você nota algo que só você vê".
 - **Bestiário/NPCs persistentes entre sessões** — hoje NPCs são por sessão; uma biblioteca evita re-setup a cada jogo.
 - **Macros de rolagem** — salvar presets de "Perception", "Investigation" (com 15 perícias, poupa cliques recorrentes).

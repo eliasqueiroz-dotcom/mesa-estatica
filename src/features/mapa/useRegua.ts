@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { notificarCancelamentoRegua } from '../../multiplayer/reguasSync';
 import { useReguasStore, type ReguaViva } from '../../state/reguasStore';
+import { usePingsStore } from '../../state/pingsStore';
 import type { GradeMapa } from '../../state/types';
 import { centroDaCelula, getImgRenderRect, retanguloConteudo, type Ponto } from './mapaUtils';
+
+/** px — abaixo disso entre o pointerdown e o momento atual, ainda conta como "pode virar
+ *  clique" (mesmo valor/princípio de `LIMIAR_CLIQUE` em `MapaTab.tsx`, que distingue clique de
+ *  arrasto em token). Comparado em coordenadas de TELA (clientX/Y), não normalizadas — a régua
+ *  em si já usa coords normalizadas à imagem, mas a distância percorrida em pixels de tela é o
+ *  que a mão do usuário realmente sente. */
+const LIMIAR_ARRASTO_PX = 5;
 
 interface UseReguaOpts {
   /** Ficha.id de quem mede, ou `'mestre'` pra o GM sem personagem próprio. */
@@ -19,16 +27,27 @@ interface UseReguaOpts {
 /**
  * Interação da régua de medição — compartilhada entre `MapaTab` (GM) e `MapaJogadorView`
  * (jogador), mesmo padrão de `useIniciativa.ts` centralizando lógica reusada nos dois lados.
+ * Também é dono do gesto de PING: um clique sem arrastar (nunca cruza `LIMIAR_ARRASTO_PX`) não
+ * vira régua nenhuma — dispara um ping (`pingsStore.ts`) no ponto de origem. Os dois moram no
+ * mesmo hook porque disputam o MESMO pointerdown em `.mapa-area`; decidir "é régua ou é ping"
+ * em dois handlers separados exigiria duplicar `setPointerCapture`/guarda de alvo/normalização.
  *
- * Fluxo: pointerdown em área vazia inicia a medição com snap ao centro da célula; pointermove
- * arrasta o último ponto; botão direito (ou tecla `w`) fixa um waypoint e abre novo segmento —
- * é isso que permite contornar um obstáculo desenhado no mapa; pointerup finaliza (a régua
- * começa a sumir sozinha, ver `ReguaOverlay.tsx`); `Esc` cancela e remove na hora.
+ * Fluxo: pointerdown em área vazia só grava a origem (não publica nada ainda — nenhuma régua
+ * fantasma de comprimento zero); pointermove só inicia a régua de verdade (com snap ao centro
+ * da célula) quando a distância desde a origem ultrapassa o limiar — abaixo disso continua
+ * "indeciso"; se pointerup chegar sem nunca ter cruzado o limiar, é um clique → ping. Depois de
+ * iniciada, arrasta o último ponto; botão direito (ou tecla `w`) fixa um waypoint e abre novo
+ * segmento — é isso que permite contornar um obstáculo desenhado no mapa; pointerup finaliza (a
+ * régua começa a sumir sozinha, ver `ReguaOverlay.tsx`); `Esc` cancela e remove na hora.
  */
 export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado }: UseReguaOpts) {
   const upsertRegua = useReguasStore((s) => s.upsertRegua);
   const removerRegua = useReguasStore((s) => s.removerRegua);
+  const adicionarPing = usePingsStore((s) => s.adicionarPing);
 
+  /** gesto em andamento mas AINDA não decidido entre régua/ping — null fora de um pointerdown. */
+  const origemRef = useRef<{ snap: Ponto; clientX: number; clientY: number } | null>(null);
+  /** true só depois de cruzar `LIMIAR_ARRASTO_PX` — vira uma régua de verdade. */
   const medindoRef = useRef(false);
   const pontosRef = useRef<Ponto[]>([]);
 
@@ -63,11 +82,13 @@ export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado 
   // `ativa: false` e deixa o fade natural cuidar do resto (ver ReguaOverlay.tsx); por isso avisa
   // o sync direto, em vez de esperar o próximo diff do store.
   const cancelar = useCallback(() => {
-    if (!medindoRef.current) return;
-    medindoRef.current = false;
-    pontosRef.current = [];
-    removerRegua(autorId);
-    notificarCancelamentoRegua(autorId);
+    if (medindoRef.current) {
+      medindoRef.current = false;
+      pontosRef.current = [];
+      removerRegua(autorId);
+      notificarCancelamentoRegua(autorId);
+    }
+    origemRef.current = null; // cancela também um clique/arrasto ainda indeciso — nada foi publicado
   }, [autorId, removerRegua]);
 
   const fixarWaypoint = useCallback(() => {
@@ -104,16 +125,26 @@ export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado 
       e.preventDefault();
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
       const snap = centroDaCelula(p.x, p.y, grade);
-      medindoRef.current = true;
-      pontosRef.current = [snap, snap];
-      publicar(true);
+      // só grava a origem — ainda não publica régua nenhuma. Só sabemos se isto vira régua
+      // (arrasto) ou ping (clique) depois de ver quanto o ponteiro se move (ou não).
+      origemRef.current = { snap, clientX: e.clientX, clientY: e.clientY };
+      medindoRef.current = false;
     },
-    [bloqueado, grade, posicaoNormalizada, publicar],
+    [bloqueado, grade, posicaoNormalizada],
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!medindoRef.current) return;
+      if (!origemRef.current) return;
+      if (!medindoRef.current) {
+        const dx = e.clientX - origemRef.current.clientX;
+        const dy = e.clientY - origemRef.current.clientY;
+        if (Math.hypot(dx, dy) < LIMIAR_ARRASTO_PX) return; // ainda pode virar clique — espera mais
+        // cruzou o limiar agora: a partir daqui É um arrasto de régua de verdade.
+        medindoRef.current = true;
+        pontosRef.current = [origemRef.current.snap, origemRef.current.snap];
+        publicar(true);
+      }
       const p = posicaoNormalizada(e);
       if (!p) return;
       const snap = centroDaCelula(p.x, p.y, grade);
@@ -125,10 +156,17 @@ export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado 
   );
 
   const onPointerUp = useCallback(() => {
-    if (!medindoRef.current) return;
-    medindoRef.current = false;
-    publicar(false);
-  }, [publicar]);
+    if (medindoRef.current) {
+      // arrasto de verdade — finaliza a régua normalmente, ela some sozinha (ReguaOverlay.tsx).
+      medindoRef.current = false;
+      publicar(false);
+    } else if (origemRef.current) {
+      // nunca cruzou o limiar de arrasto — foi um clique. Nenhuma régua chegou a ser publicada
+      // (nada pra desfazer), então isto vira um ping em vez de uma "régua" de comprimento zero.
+      adicionarPing({ id: crypto.randomUUID(), autorId, cor, ponto: origemRef.current.snap, criadoEm: Date.now() });
+    }
+    origemRef.current = null;
+  }, [autorId, cor, adicionarPing, publicar]);
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
