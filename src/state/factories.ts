@@ -1,5 +1,5 @@
 import type { Atributo } from '../rules/data/pericias';
-import type { EstadoGlobal, EstadoMidia, EstadoSoundpad, Ficha, GradeMapa, Npc, NpcAcao, Pista, SessaoPrivada, SessaoPublica } from './types';
+import type { EstadoFoW, EstadoGlobal, EstadoMidia, EstadoSoundpad, Ficha, GradeMapa, Npc, NpcAcao, Pista, SessaoPrivada, SessaoPublica } from './types';
 
 const gerarId = () => crypto.randomUUID();
 
@@ -89,6 +89,11 @@ export function criarGradeInicial(): GradeMapa {
   return { ativa: false, x: 0, y: 0, largura: 100, altura: 100, colunas: 10, linhas: 10, escala: 1.5, unidade: 'm' };
 }
 
+/** Fog of war vazio — nenhuma região revelada. Mesa nova nasce "às escuras" pro jogador. */
+export function criarFoWVazio(): EstadoFoW {
+  return { vistas: [], visiveisAgora: [], proximoIdZona: null };
+}
+
 export function criarSessaoPublica(): SessaoPublica {
   return {
     nomeDaMesa: 'Estática',
@@ -144,7 +149,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -156,7 +161,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     npcs: [],
     pistas: [],
     iniciativa: [],
-    mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() },
+    mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial(), fow: criarFoWVazio() },
     midia: criarEstadoMidia(),
     soundpad: criarEstadoSoundpad(),
     log: [],

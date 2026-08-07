@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
 import { COLORSETS, type ColorsetId } from './colorsets';
+import type { ConsumirForcadosFn, TipoRolagemForcada } from './registroForcados';
 import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
+
+/** Volume do som da física dos dados (0–1). Abaixo do soundpad (0.8) de propósito: o dado toca
+ *  em toda rolagem, então incomoda mais que um efeito pontual — e concorre com a música. */
+const VOLUME_DADOS = 0.5;
 
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
 export interface RollTermo {
@@ -46,15 +51,19 @@ function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[
  * ordem dos termos na notação (1º termo primeiro, etc.), então a ordem de `termos` aqui precisa
  * bater com a ordem que o valor forçado pretende atingir.
  */
-export type ResolverRemoto = (termos: RollTermo[], personagemId: string | null) => Promise<number[] | null>;
+export type ResolverRemoto = (
+  termos: RollTermo[],
+  personagemId: string | null,
+  tipo: TipoRolagemForcada,
+) => Promise<number[] | null>;
 
 /** Consome a fila local de forçados (`forcarRolagem.ts`). Injetável de propósito: este módulo
  *  (`useDiceBox`) é compartilhado entre mestre e jogador, e `forcarRolagem.ts` abre um
  *  BroadcastChannel com a fila secreta do mestre — importá-lo aqui direto o colocaria no bundle
  *  do jogador mesmo sem uso real (o Rollup não consegue tree-shakear uma referência de código,
  *  só o default no-op fica no caminho do jogador). Cada chamador do mestre passa a função real;
- *  o jogador não passa nada. */
-export type ConsumirForcadosFn = (totalDados: number, personagemId: string | null) => number[] | null;
+ *  o jogador não passa nada. Mesmo tipo usado pelo registro global (`registroForcados.ts`), que
+ *  atende os pontos de rolagem fora da bandeja. */
 const semForcados: ConsumirForcadosFn = () => null;
 
 export async function montarNotacao(
@@ -62,6 +71,7 @@ export async function montarNotacao(
   personagemId: string | null = null,
   resolverRemoto: ResolverRemoto = resolverRolagemRemota,
   consumirForcadosFn: ConsumirForcadosFn = semForcados,
+  tipo: TipoRolagemForcada = 'teste',
 ): Promise<string> {
   const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
@@ -69,7 +79,7 @@ export async function montarNotacao(
   // cai pro caminho local de sempre (fila local via BroadcastChannel, honesto se vazia).
   // `resolverRemoto` é injetável — o PlayerApp usa `resolverRolagemJogador` (sempre tenta o
   // servidor, sem o gate da flag) em vez do padrão do mestre.
-  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcadosFn(totalDados, personagemId);
+  const forcados = (await resolverRemoto(termos, personagemId, tipo)) ?? consumirForcadosFn(totalDados, personagemId, tipo);
   if (!forcados) return base;
   return `${base}@${forcados.join(',')}`;
 }
@@ -96,9 +106,10 @@ export async function rolarFallback2D(
   personagemId: string | null = null,
   resolverRemoto: ResolverRemoto = resolverRolagemRemota,
   consumirForcadosFn: ConsumirForcadosFn = semForcados,
+  tipo: TipoRolagemForcada = 'teste',
 ): Promise<GrupoResultado[]> {
   const totalDados = termos.reduce((n, t) => n + t.qty, 0);
-  const forcados = (await resolverRemoto(termos, personagemId)) ?? consumirForcadosFn(totalDados, personagemId);
+  const forcados = (await resolverRemoto(termos, personagemId, tipo)) ?? consumirForcadosFn(totalDados, personagemId, tipo);
   let cursor = 0;
   return termos.map((t) => {
     const rolls: { value: number }[] = [];
@@ -116,6 +127,7 @@ interface PedidoRolagem {
   onComplete: (grupos: GrupoResultado[]) => void;
   colorset: ColorsetId;
   personagemId: string | null;
+  tipo: TipoRolagemForcada;
 }
 
 export function useDiceBox(
@@ -162,12 +174,22 @@ export function useDiceBox(
     }
 
     const box = new DiceBox(`#${containerId}`, {
-      assetPath: '/assets/dice-box-threejs/',
+      // BASE_URL, não '/': o app é servido num subpath (`base: '/mesa-estatica/'`), então um
+      // caminho absoluto da raiz dá 404 tanto em dev quanto no GitHub Pages. Passou despercebido
+      // enquanto `sounds` era false — a lib gera a geometria dos dados por código e só usa o
+      // assetPath pra buscar áudio, então nada mais aqui exercitava esse caminho.
+      assetPath: `${import.meta.env.BASE_URL}assets/dice-box-threejs/`,
       theme_surface: 'green-felt',
       theme_material: 'glass',
       theme_customColorset: COLORSETS.rede,
       baseScale,
-      sounds: false,
+      // Som da física (colisão + superfície de feltro, casando com `theme_surface`). Os mp3 vêm
+      // no pacote da lib e o `postinstall` já os copia pra public/ — nada de rede em runtime.
+      // Isto é som LOCAL de quem rola, não o "dado audível pra todos" do roadmap (aquele precisa
+      // do canal de broadcast); na prática já cobre a mesa porque o mestre compartilha a janela
+      // no Discord. Não precisa de gesto de desbloqueio: rolar já é um clique.
+      sounds: true,
+      volume: VOLUME_DADOS,
       shadows: true,
     });
     boxRef.current = box;
@@ -215,7 +237,7 @@ export function useDiceBox(
         await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
         colorsetAtualRef.current = pedido.colorset;
       }
-      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto, consumirForcadosFn);
+      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto, consumirForcadosFn, pedido.tipo);
       const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
@@ -236,16 +258,17 @@ export function useDiceBox(
     onComplete: (grupos: GrupoResultado[]) => void,
     colorset: ColorsetId = 'rede',
     personagemId: string | null = null,
+    tipo: TipoRolagemForcada = 'teste',
   ) => {
     const termos = normalizarTermos(notacao);
     if (modo2D) {
       // sem física rodando, então sem concorrência real pra proteger — resolve na hora (async
       // por dentro só pra poder tentar o servidor primeiro; onComplete dispara quando chegar).
-      void rolarFallback2D(termos, personagemId, resolverRemoto, consumirForcadosFn).then(onComplete);
+      void rolarFallback2D(termos, personagemId, resolverRemoto, consumirForcadosFn, tipo).then(onComplete);
       return;
     }
     if (!boxRef.current) return;
-    const pedido: PedidoRolagem = { termos, onComplete, colorset, personagemId };
+    const pedido: PedidoRolagem = { termos, onComplete, colorset, personagemId, tipo };
     if (rolandoRef.current) {
       filaRef.current.push(pedido);
       return;

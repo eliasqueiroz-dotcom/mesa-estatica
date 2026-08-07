@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabaseClient';
  */
 export const fasedAtiva = (): boolean => supabase !== null && import.meta.env.VITE_FASE_D_ROLAGEM_REMOTA === 'true';
 
+import type { TipoRolagemForcada } from '../dice/registroForcados';
+
 interface Termo {
   qty: number;
   sides: number;
@@ -16,13 +18,17 @@ interface Termo {
 
 /** Chama resolver-rolagem. Retorna null se a Fase D estiver desligada ou a chamada falhar
  *  (o chamador deve cair pro caminho local nesse caso — nunca travar a rolagem por rede fora). */
-export async function resolverRolagemRemota(termos: Termo[], personagemId: string | null): Promise<number[] | null> {
+export async function resolverRolagemRemota(
+  termos: Termo[],
+  personagemId: string | null,
+  tipo: TipoRolagemForcada = 'teste',
+): Promise<number[] | null> {
   if (!fasedAtiva() || !supabase) return null;
   const { data: sessao } = await supabase.auth.getSession();
   if (!sessao.session) return null;
 
   const { data, error } = await supabase.functions.invoke<{ valores: number[] }>('resolver-rolagem', {
-    body: { character_id: personagemId, termos },
+    body: { character_id: personagemId, termos, tipo },
   });
   if (error || !data) {
     console.error('[fase-d] resolver-rolagem falhou, caindo pro caminho local', error);
@@ -39,13 +45,17 @@ export async function resolverRolagemRemota(termos: Termo[], personagemId: strin
  * `Math.random` puro (nunca trava a rolagem por rede fora, mas também nunca é forçável
  * nesse caminho de erro).
  */
-export async function resolverRolagemJogador(termos: Termo[], personagemId: string | null): Promise<number[] | null> {
+export async function resolverRolagemJogador(
+  termos: Termo[],
+  personagemId: string | null,
+  tipo: TipoRolagemForcada = 'teste',
+): Promise<number[] | null> {
   if (!supabase) return null;
   const { data: sessao } = await supabase.auth.getSession();
   if (!sessao.session) return null;
 
   const { data, error } = await supabase.functions.invoke<{ valores: number[] }>('resolver-rolagem', {
-    body: { character_id: personagemId, termos },
+    body: { character_id: personagemId, termos, tipo },
   });
   if (error || !data) {
     console.error('[jogador] resolver-rolagem falhou, rolando honesto localmente', error);

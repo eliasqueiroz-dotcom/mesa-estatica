@@ -13,6 +13,8 @@
  * e consumo (na principal) não se atropelam.
  */
 
+import type { TipoRolagemForcada } from './registroForcados';
+
 const CANAL = 'estatica-forcar-dados';
 
 export interface EntradaForca {
@@ -23,6 +25,11 @@ export interface EntradaForca {
   personagemNome: string;
   /** valor bruto por dado, na ordem da rolagem. */
   valores: number[];
+  /** categoria de rolagem que pode consumir esta entrada; 'qualquer' casa com todas.
+   *  Sem isto, a fila era só por ordem de chegada e um valor enfileirado pro d20 de um teste
+   *  podia ser roubado pela primeira iniciativa/dano que rolasse antes (o mesmo problema que
+   *  manteve o sorteio de trauma fora da fila — ver TraumasSection.tsx). */
+  tipo: TipoRolagemForcada;
 }
 
 type Mensagem =
@@ -70,9 +77,15 @@ canal?.addEventListener('message', (ev: MessageEvent<Mensagem>) => {
   }
 });
 
-/** Janela de controle: enfileira um resultado forçado, opcionalmente amarrado a um personagem. */
-export function enfileirarForcado(valores: number[], personagemId: string | null, personagemNome: string) {
-  const entrada: EntradaForca = { id: crypto.randomUUID(), personagemId, personagemNome, valores };
+/** Janela de controle: enfileira um resultado forçado, opcionalmente amarrado a um personagem
+ *  e a um tipo de rolagem. */
+export function enfileirarForcado(
+  valores: number[],
+  personagemId: string | null,
+  personagemNome: string,
+  tipo: TipoRolagemForcada = 'qualquer',
+) {
+  const entrada: EntradaForca = { id: crypto.randomUUID(), personagemId, personagemNome, valores, tipo };
   fila = [...fila, entrada];
   canal?.postMessage({ tipo: 'adicionar', entrada } satisfies Mensagem);
   notificar();
@@ -108,14 +121,33 @@ export function assinar(ouvinte: (f: EntradaForca[]) => void): () => void {
   return () => ouvintes.delete(ouvinte);
 }
 
+/** Uma entrada casa se serve pro personagem que está rolando E pra categoria da rolagem —
+ *  `null`/`'qualquer'` são curingas de cada eixo. Exportado pro `ControlPanel` marcar "próxima"
+ *  usando exatamente a mesma regra do consumo. */
+export function entradaCasa(
+  entrada: EntradaForca,
+  personagemId: string | null,
+  tipo: TipoRolagemForcada,
+): boolean {
+  const casaAlvo = entrada.personagemId === null || entrada.personagemId === personagemId;
+  // curinga dos dois lados: entrada "qualquer" serve a toda rolagem, e a rolagem livre (que não
+  // tem categoria) pega qualquer entrada da fila.
+  const casaTipo = entrada.tipo === 'qualquer' || tipo === 'qualquer' || entrada.tipo === tipo;
+  return casaAlvo && casaTipo;
+}
+
 /**
- * Consumido pela janela principal (useDiceBox) no momento da rolagem.
- * Pega a PRIMEIRA entrada da fila que casa com o personagem que está rolando (entrada "qualquer"
- * casa com todos), remove-a, e retorna exatamente `totalDados` valores (corta se sobra, repete o
- * último se falta) — ou null (honesto) se nada casa.
+ * Consumido no momento da rolagem — pela bandeja (`useDiceBox`) e pelos pontos fora dela, via
+ * `registroForcados.ts`. Pega a PRIMEIRA entrada da fila que casa com o personagem E o tipo da
+ * rolagem, remove-a, e retorna exatamente `totalDados` valores (corta se sobra, repete o último
+ * se falta) — ou null (honesto) se nada casa.
  */
-export function consumirForcados(totalDados: number, personagemId: string | null = null): number[] | null {
-  const idx = fila.findIndex((e) => e.personagemId === null || e.personagemId === personagemId);
+export function consumirForcados(
+  totalDados: number,
+  personagemId: string | null = null,
+  tipo: TipoRolagemForcada = 'teste',
+): number[] | null {
+  const idx = fila.findIndex((e) => entradaCasa(e, personagemId, tipo));
   if (idx === -1) return null;
   const entrada = fila[idx];
   fila = fila.filter((_, i) => i !== idx);

@@ -1,3 +1,4 @@
+import type { TipoRolagemForcada } from '../dice/registroForcados';
 import { supabase } from '../lib/supabaseClient';
 import { fasedAtiva } from './rolagemRemota';
 
@@ -24,10 +25,12 @@ export interface EntradaFilaRemota {
   id: string;
   character_id: string | null;
   valores: number[];
+  /** opcional na leitura: linhas criadas antes da coluna existir voltam sem ele (vira 'qualquer'). */
+  tipo?: TipoRolagemForcada;
 }
 
 export const listarFilaRemota = () => chamarFila<{ fila: EntradaFilaRemota[] }>('listar');
-export const adicionarFilaRemota = (characterId: string | null, valores: number[]) =>
-  chamarFila<{ entrada: EntradaFilaRemota }>('adicionar', { character_id: characterId, valores });
+export const adicionarFilaRemota = (characterId: string | null, valores: number[], tipo: TipoRolagemForcada) =>
+  chamarFila<{ entrada: EntradaFilaRemota }>('adicionar', { character_id: characterId, valores, tipo });
 export const removerFilaRemota = (id: string) => chamarFila<{ ok: true }>('remover', { id });
 export const limparFilaRemota = () => chamarFila<{ ok: true }>('limpar');

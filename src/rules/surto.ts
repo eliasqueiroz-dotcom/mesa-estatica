@@ -1,3 +1,4 @@
+import { rolarDadoComForcados } from '../dice/registroForcados';
 import { TABELA_SURTO, type EntradaSurto } from './data/surto';
 
 export interface ResultadoSurto {
@@ -24,10 +25,11 @@ export function resolverSurto(d20A: number, d20B: number): ResultadoSurto {
 
 /** Calcula o valor a armazenar em `ficha.surtoAtivo` quando o Surto dispara.
  *  Fora de combate: armazena `contadorCena` (vigora até avançar cena).
- *  Em combate: armazena `rodada + 1d4+1` (vigora até essa rodada passar). */
-export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto): number {
+ *  Em combate: armazena `rodada + 1d4` (vigora até essa rodada passar) — o 1d4 respeita a fila
+ *  de forçados (tipo `surto`), pro mestre poder fixar a duração junto do resultado. */
+export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto, personagemId: string | null = null): number {
   if (sessao.modoCombate) {
-    return sessao.rodada + (Math.floor(Math.random() * 4) + 1);
+    return sessao.rodada + rolarDadoComForcados(4, personagemId, 'surto');
   }
   return sessao.contadorCena;
 }

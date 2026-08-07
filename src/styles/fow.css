@@ -1,0 +1,193 @@
+/*
+ * Fog of war (ROADMAP F1) — três camadas sobre o `<img>` do mapa, em px absolutos do letterbox
+ * (`imgRenderRect`). CSS puro; zero JS por frame; só `mask-image`/`opacity`/`transform`.
+ *
+ * Três estados por pixel (cada um tem uma "assinatura visual" pro jogador reconhecer
+ * instantaneamente dado atual vs. desatualizado — essencial pra horror/investigação):
+ *
+ *   `nunca`  chiado P&B total (canal sem sinal) — informação zero. `data-zona` adiciona
+ *            matiz: `rua` (âmbar --real) / `corporativo` (ciano --rede) / default (P&B puro).
+ *
+ *   `visto`  frame congelado degradado: a mesma imagem estática, mas com `backdrop-filter`
+ *            blur+brightness/saturate baixos + scanlines fortes + microcopy mono discreto no
+ *            canto. "Memória corrompida" — cyberpunk-horror específico da Estática.
+ *
+ *   `visivel`  limpo + vinheta sutil de scanline. Na transição (entra em `visiveisAgora`),
+ *            burst de ~280ms com chroma aberration (mesma family do `--ruido-glitch`):
+ *            "sintonizando o sinal", em vez de fade suave.
+ *
+ * A marca das três camadas (`mask-image`) é montada em `fowGeometria.montarMaskSvg`:
+ *   nunca: máscara que mostra a camada FORA de `vistas ∪ visiveisAgora` (inverter=true)
+ *   visto: mostra SÓ em `vistas \ visiveisAgora`
+ *   visível: mostra SÓ em `visiveisAgora`
+ *
+ * Pegadinha: `backdrop-filter` pode renderizar diferente na captura de tela do Discord — em
+ * modo screen share às vezes o browser rasteriza só o `<img>` sem o backdrop. Detectado só a
+ * longo do teste de navegador; fallback declarado no plano (duplicar img sob a camada).
+ */
+
+.fow-camadas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2; /* abaixo dos tokens (z-index 3) e da régua/AoE; grade é z-index 1 */
+}
+
+.fow-camada {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mask-size: 100% 100%;
+  -webkit-mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
+
+/* ===== Camada 1 — nunca visto: chiado P&B total ===== */
+.fow-camada[data-estado='nunca'] {
+  background-color: var(--void);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  opacity: 0.95;
+  animation: fow-chiado 0.8s steps(4) infinite;
+}
+
+/* variantes por zona — troca a matiz do chiado. P&B puro é default (regra de arte.md: nunca
+   "preto + único verde-neon" — aqui usamos âmbar --real e ciano --rede porque já carregam a
+   semântica narrativa do mundo). Lentas (~5s) pra não vendar o olho. */
+.fow-camada[data-estado='nunca'][data-zona='rua'] {
+  filter: sepia(0.7) hue-rotate(-12deg) saturate(1.3) brightness(0.85);
+}
+.fow-camada[data-estado='nunca'][data-zona='corporativo'] {
+  filter: hue-rotate(150deg) saturate(0.5) brightness(0.85);
+}
+
+@keyframes fow-chiado {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1px, 0.5px); }
+  50% { transform: translate(0.5px, -1px); }
+  75% { transform: translate(-0.5px, 0.5px); }
+}
+
+/* ===== Camada 2 — visto, sem luz agora: frame congelado degradado ===== */
+.fow-camada[data-estado='visto'] {
+  /* `backdrop-filter` precisa estar LIGADO a um backdrop — o div é transparente (sem background)
+     e o backdrop é o `<img>` abaixo. Funciona em Chrome/Discord capture; fallback documentado. */
+  backdrop-filter: blur(3px) brightness(0.4) saturate(0.3);
+  -webkit-backdrop-filter: blur(3px) brightness(0.4) saturate(0.3);
+  background: rgba(11, 13, 17, 0.55); /* véu escurecedor extra pro caso do backdrop falhar */
+  opacity: 0.95;
+}
+
+/* scanlines fortes sobre a camada vista — `::before` repete o mesmo padrão do ruido.css mas
+   em densidade máxima, sempre visível (não按键 tier de Sanidade — aqui é a MáQUINA que
+   gravou o frame, não a cabeça do personagem). */
+.fow-camada[data-estado='visto']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(198, 204, 214, 0.18) 0px,
+    rgba(198, 204, 214, 0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: fow-scan 6s linear infinite;
+}
+
+/* microcopy discreto no canto superior esquerdo — `seen · timestamp` reforça a "memória
+   corrompida". Aparece só quanto hover do GM? não — fica sempre: é a assinatura da camada.
+   Cor `--ink-faint` pra não competir com o dado "vivo". */
+.fow-camada[data-estado='visto']::after {
+  content: 'seen · rec 23:42:07';
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  text-transform: lowercase;
+}
+
+@keyframes fow-scan {
+  from { transform: translateY(0); }
+  to { transform: translateY(3px); }
+}
+
+/* ===== Camada 3 — visível agora ===== */
+.fow-camada[data-estado='visivel'] {
+  /* transparente por padrão — só a vinheta sutil abaixo marca onde há luz. */
+  background: transparent;
+}
+
+.fow-camada[data-estado='visivel']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 70%, rgba(0, 0, 0, 0.18) 100%);
+  pointer-events: none;
+}
+
+/* ===== Sintonia (chroma aberration 280ms quando entra em `visiveisAgora`) =====
+ * Pai `.fow-camadas` ganha `data-burst="true"` em troca; cada `.fow-camada[data-estado='visivel']`
+ * faz um único disparo de aberration verde/âmbar — sintonizando. Depois da transition casa a
+ * vinheta estabilizada acima. */
+@keyframes fow-sintonia {
+  0% { transform: translate(0, 0); opacity: 0.2; filter: none; }
+  25% {
+    transform: translate(-2px, 0);
+    opacity: 1;
+    /* chroma aberration via box-shadow deslocado — branco + --rede/-real */
+    box-shadow:
+      inset 3px 0 0 rgba(79, 193, 212, 0.25),
+      inset -3px 0 0 rgba(201, 154, 90, 0.25);
+  }
+  60% {
+    transform: translate(2px, 0);
+    box-shadow:
+      inset -2px 0 0 rgba(79, 193, 212, 0.15),
+      inset 2px 0 0 rgba(201, 154, 90, 0.15);
+  }
+  100% { transform: translate(0, 0); opacity: 1; box-shadow: none; filter: none; }
+}
+
+.fow-camadas[data-burst='true'] .fow-camada[data-estado='visivel'] {
+  animation: fow-sintonia 0.28s steps(4);
+}
+
+/* ===== Toolbar GM (só mestre tem `FoWOverlay.tsx` no bundle) ===== */
+.fow-toolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 100px;
+  display: flex;
+  gap: 0.3rem;
+  z-index: 5;
+}
+
+.fow-toolbar .icone-botao[data-ativo='true'] {
+  border-color: var(--rede);
+  color: var(--rede);
+}
+
+.fow-camada-captura {
+  position: absolute;
+  inset: 0;
+  z-index: 4; /* acima das camadas, abaixo dos tokens */
+  cursor: crosshair;
+}
+
+.fow-rascunho {
+  position: absolute;
+  border: 1px dashed var(--rede);
+  background: rgba(79, 193, 212, 0.08);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.fow-rascunho[data-modo='cobrirLuz'] {
+  border-color: var(--ruido);
+  background: rgba(168, 70, 62, 0.08);
+}

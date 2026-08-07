@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
+import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
 import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
@@ -13,6 +14,7 @@ import {
   criarEstadoMidia,
   criarEstadoSoundpad,
   criarFichaVazia,
+  criarFoWVazio,
   criarGradeInicial,
   criarNpcVazio,
   criarPistaVazia,
@@ -32,11 +34,13 @@ import type {
   GradeMapa,
   Npc,
   Pista,
+  RegiaoFoW,
   SessaoPrivada,
   SessaoPublica,
   SurtoAtivo,
   TipoLog,
   TokenMapa,
+  ZonaFoW,
 } from './types';
 
 const ATRIBUTOS_ZERO: Record<'vigor' | 'agilidade' | 'intelecto' | 'percepcao' | 'presenca' | 'vontade', number> = {
@@ -131,6 +135,17 @@ interface Acoes {
   adicionarTokenMapa: (participanteId: string, tipo: 'pc' | 'npc') => void;
   moverTokenMapa: (id: string, x: number, y: number) => void;
   removerTokenMapa: (id: string) => void;
+
+  // ===== Fog of war (ROADMAP F1) =====
+  /** Revela região (entra em `vistas` ∪ `visiveisAgora`). Se `cobrirLuz`-only, retira de
+   *  `visiveisAgora` mantendo `vistas` (memória corrompida persiste). */
+  adicionarRegiaoFoW: (regiao: Omit<RegiaoFoW, 'id'>) => string | undefined;
+  removerRegiaoFoW: (id: string) => void;
+  /** Move região de `visiveisAgora` pra "fora da luz" — mantém em `vistas`. No-op se não estava visível. */
+  cobrirLuzFoW: (id: string) => void;
+  limparFoW: () => void;
+  /** Define a zona da próxima região traçada (`null` = P&B puro). */
+  definirProximoIdZonaFoW: (zona: ZonaFoW | null) => void;
 
   /** Ordem = maior ordem atual + 1. Retorna o id gerado. */
   adicionarFaixaMidia: (nome: string, path: string, url: string) => string;
@@ -424,6 +439,13 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   if (versaoAnterior < 25) {
     estado.soundpad = { ...criarEstadoSoundpad(), ...(estado.soundpad ?? {}) };
   }
+  // v25 → v26: fog of war no mapa (máscara de revelação controlada pelo mestre, persiste entre
+  // sessões; `fowSync.ts` sincroniza via tabela `fow_estado`). Injeta `fow` vazio em `mapa`
+  // pré-FoW — export/import JSON já cobre o campo de graça (pertence a `mapa`). Preserva
+  // `fow` já existente (não reescreve quem já migrou antes).
+  if (versaoAnterior < 26 && estado.mapa && !estado.mapa.fow) {
+    estado.mapa.fow = criarFoWVazio();
+  }
   return estado as Store;
 }
 
@@ -521,8 +543,10 @@ export const useStore = create<Store>()(
 
         let logSurtoImediato: string | null = null;
         if (alerta.surtoDisparado) {
-          const d20A = Math.floor(Math.random() * 20) + 1;
-          const d20B = Math.floor(Math.random() * 20) + 1;
+          // 2d20 numa consumida só, como o RoladorSurto da bandeja faz — enfileirar "13, 3"
+          // amarrado a surto cai aqui igual, mesmo o surto tendo sido disparado automaticamente
+          // pela perda de 5+ Sanidade em vez de clicado à mão.
+          const [d20A, d20B] = rolarDadosComForcados(2, 20, id, 'surto');
           const resultado = resolverSurto(d20A, d20B);
           if (resultado.mesmoNumero) {
             logSurtoImediato = `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${resultado.entradaA.nome} — ${resultado.entradaA.descricao}`;
@@ -712,20 +736,19 @@ export const useStore = create<Store>()(
 
       rolarIniciativaTodos: () => {
         const { fichas, npcs } = get();
-        const d20 = () => Math.floor(Math.random() * 20) + 1;
         const participantes = [
           ...fichas.map((f) => ({
             id: f.id,
             tipo: 'pc' as const,
             nome: f.nome || 'sem nome',
-            d20: d20(),
+            d20: rolarDadoComForcados(20, f.id, 'iniciativa'),
             agilidade: f.atributos.agilidade,
           })),
           ...npcs.map((n) => ({
             id: n.id,
             tipo: 'npc' as const,
             nome: n.nome || 'sem nome',
-            d20: d20(),
+            d20: rolarDadoComForcados(20, n.id, 'iniciativa'),
             agilidade: n.agilidade,
           })),
         ];
@@ -746,13 +769,15 @@ export const useStore = create<Store>()(
       },
       rolarIniciativa: (participanteIds) => {
         const { fichas, npcs } = get();
-        const d20 = () => Math.floor(Math.random() * 20) + 1;
-        const todos = [
-          ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome', d20: d20(), agilidade: f.atributos.agilidade })),
-          ...npcs.map((n) => ({ id: n.id, tipo: 'npc' as const, nome: n.nome || 'sem nome', d20: d20(), agilidade: n.agilidade })),
-        ];
-        const filtrados = todos.filter((p) => participanteIds.includes(p.id));
-        if (filtrados.length === 0) return;
+        const candidatos = [
+          ...fichas.map((f) => ({ id: f.id, tipo: 'pc' as const, nome: f.nome || 'sem nome', agilidade: f.atributos.agilidade })),
+          ...npcs.map((n) => ({ id: n.id, tipo: 'npc' as const, nome: n.nome || 'sem nome', agilidade: n.agilidade })),
+        ].filter((p) => participanteIds.includes(p.id));
+        if (candidatos.length === 0) return;
+        // rola só de quem entra na iniciativa. Antes o d20 saía pra TODA ficha/NPC da mesa e a
+        // lista era filtrada depois — inofensivo com Math.random, mas agora consumiria valores
+        // forçados de quem nem estava rolando.
+        const filtrados = candidatos.map((p) => ({ ...p, d20: rolarDadoComForcados(20, p.id, 'iniciativa') }));
         const ordenados = ordenarIniciativa(filtrados);
         const entradas: EntradaIniciativa[] = ordenados.map((p) => ({
           id: crypto.randomUUID(),
@@ -768,7 +793,9 @@ export const useStore = create<Store>()(
         const { npcs } = get();
         const grupo = npcs.filter((n) => participanteIds.includes(n.id));
         if (grupo.length === 0) return;
-        const d20 = Math.floor(Math.random() * 20) + 1;
+        // alvo null: é um d20 do GRUPO, não de um NPC específico — pra forçar, o mestre
+        // enfileira com alvo "qualquer" + tipo "iniciativa".
+        const d20 = rolarDadoComForcados(20, null, 'iniciativa');
         const maiorAgilidade = Math.max(...grupo.map((n) => n.agilidade));
         const valor = d20 + maiorAgilidade;
         const entradas: EntradaIniciativa[] = grupo.map((n) => ({
@@ -791,7 +818,7 @@ export const useStore = create<Store>()(
         const ficha = s.fichas.find((f) => f.id === participanteId);
         const npc = s.npcs.find((n) => n.id === participanteId);
         const agilidade = ficha?.atributos.agilidade ?? npc?.agilidade ?? 0;
-        const d20 = Math.floor(Math.random() * 20) + 1;
+        const d20 = rolarDadoComForcados(20, participanteId, 'iniciativa');
         const novoValor = d20 + agilidade;
         const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
         const reordenada = s.iniciativa
@@ -938,6 +965,40 @@ export const useStore = create<Store>()(
         })),
       removerTokenMapa: (id) =>
         set((s) => ({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== id) } })),
+
+      // ===== Fog of war (ROADMAP F1) =====
+      adicionarRegiaoFoW: (regiao) => {
+        const id = crypto.randomUUID();
+        set((s) => ({
+          mapa: {
+            ...s.mapa,
+            fow: {
+              ...s.mapa.fow,
+              vistas: [...s.mapa.fow.vistas, { ...regiao, id }],
+              visiveisAgora: [...s.mapa.fow.visiveisAgora, { ...regiao, id }],
+            },
+          },
+        }));
+        return id;
+      },
+      removerRegiaoFoW: (id) =>
+        set((s) => ({
+          mapa: {
+            ...s.mapa,
+            fow: {
+              ...s.mapa.fow,
+              vistas: s.mapa.fow.vistas.filter((r) => r.id !== id),
+              visiveisAgora: s.mapa.fow.visiveisAgora.filter((r) => r.id !== id),
+            },
+          },
+        })),
+      cobrirLuzFoW: (id) =>
+        set((s) => ({
+          mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: s.mapa.fow.visiveisAgora.filter((r) => r.id !== id) } },
+        })),
+      limparFoW: () => set((s) => ({ mapa: { ...s.mapa, fow: criarFoWVazio() } })),
+      definirProximoIdZonaFoW: (zona) =>
+        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, proximoIdZona: zona } } })),
 
       adicionarFaixaMidia: (nome, path, url) => {
         const id = crypto.randomUUID();
@@ -1208,6 +1269,16 @@ export const useStore = create<Store>()(
               y: typeof t.y === 'number' ? t.y : 0.5,
             })),
             grade: { ...base.mapa.grade, ...d.mapa?.grade },
+            // FoW: aceita `fow` do payload; importa o que vier (por região: campos opcionais
+            // caem no default). Imports sem `fow` (pré-F1) ficam com máscara vazia — mesa
+            // sem FoW, mesmo que antes de existir o recurso.
+            fow: d.mapa?.fow
+              ? {
+                  vistas: Array.isArray(d.mapa.fow.vistas) ? d.mapa.fow.vistas : [],
+                  visiveisAgora: Array.isArray(d.mapa.fow.visiveisAgora) ? d.mapa.fow.visiveisAgora : [],
+                  proximoIdZona: d.mapa.fow.proximoIdZona ?? null,
+                }
+              : base.mapa.fow,
           },
           midia: {
             faixas: (d.midia?.faixas ?? []).map((f) => ({

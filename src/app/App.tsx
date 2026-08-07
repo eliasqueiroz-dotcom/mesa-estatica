@@ -15,6 +15,7 @@ import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { useStore } from '../state/store';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
+import { iniciarSyncFoW } from '../multiplayer/fowSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
@@ -149,6 +150,7 @@ export default function App() {
     let pararReguas = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
+    let pararFoW = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -164,6 +166,7 @@ export default function App() {
       pararReguas = iniciarSyncReguas();
       pararSoundpad = iniciarSyncSoundpad();
       pararAoE = iniciarSyncAoE();
+      pararFoW = iniciarSyncFoW();
     });
     return () => {
       cancelado = true;
@@ -179,6 +182,7 @@ export default function App() {
       pararReguas();
       pararSoundpad();
       pararAoE();
+      pararFoW();
     };
   }, []);
 

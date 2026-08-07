@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { rolarDadoComForcados } from '../dice/registroForcados';
 import { resolverEstabilizar } from '../rules/combate';
 import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
 import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
@@ -232,7 +233,7 @@ export function useIniciativa() {
     const pvMaximoSocorrista = calcularPvMaximo(basePV, socorrista.atributos.vigor);
     const ferido = estaFerido(socorrista.pvAtual, pvMaximoSocorrista);
     const grauMedicina = socorrista.pericias['medicina'] ?? 0;
-    const d20 = Math.floor(Math.random() * 20) + 1;
+    const d20 = rolarDadoComForcados(20, socorrista.id, 'teste');
     const resultado = resolverEstabilizar({ d20, intelecto: socorrista.atributos.intelecto, grauMedicina, socorristaFerido: ferido });
     const alvoNome = iniciativa.find((e) => e.participanteId === alvoId)?.nome ?? '?';
     const nomeSocorrista = socorrista.nome || 'personagem';

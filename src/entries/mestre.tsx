@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from '../app/App';
 import ErrorBoundary from '../app/ErrorBoundary';
+import { consumirForcados } from '../dice/forcarRolagem';
+import { registrarConsumidorForcados } from '../dice/registroForcados';
 import ControlPanel from '../features/controle/ControlPanel';
 import { instalarHandlerGlobalDeErro } from '../lib/globalErrorHandler';
 import '@fontsource/barlow-condensed/600.css';
@@ -14,10 +16,17 @@ import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/ruido.css';
 import '../styles/alerta-sessao.css';
+import '../styles/fow.css';
 
 // #controle abre a janela de controle secreta do mestre (rolagem forçada), separada da
 // janela principal compartilhada no Discord. Mesma origin → BroadcastChannel conecta as duas.
 const ehControle = window.location.hash === '#controle';
+
+// Liga a fila de forçados nos pontos de rolagem que ficam fora da bandeja 3D (iniciativa, ação
+// de NPC, dano de arma, surto automático...). Só aqui: no bundle do jogador ninguém registra, e
+// o consumidor continua sendo o no-op — as rolagens dele são honestas por construção.
+// Ver registroForcados.ts pro porquê da indireção.
+registrarConsumidorForcados(consumirForcados);
 
 instalarHandlerGlobalDeErro();
 

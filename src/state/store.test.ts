@@ -4,6 +4,7 @@ import { calcularSanidadeMaxima } from '../rules/derivados';
 import { criarEstadoInicial, criarFichaVazia, criarGradeInicial } from './factories';
 import { TABELA_SURTO } from '../rules/data/surto';
 import { personagemEstaEmSurto } from '../rules/surto';
+import { limparConsumidorForcados, registrarConsumidorForcados } from '../dice/registroForcados';
 import { useStatusMesa } from '../lib/statusMesa';
 
 beforeEach(() => {
@@ -755,6 +756,77 @@ describe('removerDaIniciativa', () => {
   });
 });
 
+describe('iniciativa respeita a fila de forçados', () => {
+  const criarNpc = (id: string, nome: string, agilidade: number) => ({
+    id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
+    notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [],
+  });
+
+  afterEach(() => limparConsumidorForcados());
+
+  it('rolarIniciativa usa o valor forçado do participante em vez do d20 aleatório', () => {
+    useStore.setState({ npcs: [criarNpc('n1', 'Guarda', 2)], fichas: [], iniciativa: [] });
+    // fila devolve 20 só pra n1, em rolagem de iniciativa
+    registrarConsumidorForcados((_total, personagemId, tipo) =>
+      personagemId === 'n1' && tipo === 'iniciativa' ? [20] : null,
+    );
+    vi.spyOn(Math, 'random').mockReturnValue(0); // honesto daria d20=1 → valor 3
+
+    useStore.getState().rolarIniciativa(['n1']);
+
+    vi.restoreAllMocks();
+    expect(useStore.getState().iniciativa[0].valor).toBe(22); // 20 forçado + agilidade 2
+  });
+
+  it('só consome forçado de quem realmente entra na rolagem', () => {
+    useStore.setState({
+      npcs: [criarNpc('n1', 'Guarda', 0), criarNpc('n2', 'Fora', 0)],
+      fichas: [],
+      iniciativa: [],
+    });
+    const pedidos: (string | null)[] = [];
+    registrarConsumidorForcados((_t, personagemId) => {
+      pedidos.push(personagemId);
+      return null;
+    });
+
+    useStore.getState().rolarIniciativa(['n1']);
+
+    // antes, o store rolava d20 pra TODA ficha/NPC da mesa e filtrava depois — n2 teria
+    // consumido uma entrada da fila sem nunca aparecer na iniciativa.
+    expect(pedidos).toEqual(['n1']);
+  });
+
+  it('rerolarIniciativaDe respeita forçado do participante', () => {
+    useStore.setState({
+      npcs: [criarNpc('n1', 'Guarda', 1)],
+      fichas: [],
+      iniciativa: [{ id: 'e1', participanteId: 'n1', tipo: 'npc', nome: 'Guarda', valor: 5 }],
+    });
+    registrarConsumidorForcados((_t, personagemId, tipo) =>
+      personagemId === 'n1' && tipo === 'iniciativa' ? [19] : null,
+    );
+
+    useStore.getState().rerolarIniciativaDe('n1');
+
+    expect(useStore.getState().iniciativa[0].valor).toBe(20); // 19 + agilidade 1
+  });
+
+  it('surto automático por perda de 5+ Sanidade consome a fila de tipo surto', () => {
+    const ficha = criarFichaVazia();
+    ficha.sanidadeAtual = 10;
+    ficha.atributos.vontade = 5;
+    useStore.setState({ fichas: [ficha] });
+    // 13 e 13 → mesmoNumero, resolve sem pendência de escolha
+    registrarConsumidorForcados((_t, _p, tipo) => (tipo === 'surto' ? [13, 13] : null));
+
+    useStore.getState().ajustarSanidadeAtual(ficha.id, 4);
+
+    const log = useStore.getState().log.find((e) => e.tipo === 'surto');
+    expect(log?.texto).toContain('d20=13/13');
+  });
+});
+
 describe('rolarIniciativaGrupo', () => {
   const criarNpc = (id: string, nome: string, agilidade: number) => ({
     id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
@@ -930,6 +1002,17 @@ describe('migrate', () => {
   it('v24 → v25: injeta soundpad default quando ausente', () => {
     const estado = migrate({ npcs: [] }, 24);
     expect(estado.soundpad).toEqual({ sons: [], volume: 0.8, ultimoDisparo: null });
+  });
+
+  it('v25 → v26: injeta fow vazio em mapa pré-FoW', () => {
+    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() } }, 25);
+    expect(estado.mapa.fow).toEqual({ vistas: [], visiveisAgora: [], proximoIdZona: null });
+  });
+
+  it('v25 → v26: preserva fow já existente', () => {
+    const fow = { vistas: [], visiveisAgora: [], proximoIdZona: 'rua' as const };
+    const estado = migrate({ mapa: { fow } }, 25);
+    expect(estado.mapa.fow.proximoIdZona).toBe('rua');
   });
 });
 

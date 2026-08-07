@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -14,6 +15,7 @@ interface RoladorTesteProps {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
   ) => void;
 }
 
@@ -87,7 +89,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           bruto: d20,
           visibilidade,
         });
-      }, 'rede', ficha.id);
+      }, 'rede', ficha.id, 'teste');
     } else if (modo === 'npc' && npc) {
       rolar('1d20', (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
@@ -111,7 +113,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           bruto: d20,
           visibilidade,
         });
-      }, undefined, npc.id);
+      }, undefined, npc.id, 'teste');
     }
   };
 

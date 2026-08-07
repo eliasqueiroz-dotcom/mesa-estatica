@@ -48,10 +48,12 @@ Deno.serve(async (req) => {
 
   let characterId: string | null = null;
   let termos: Termo[] = [];
+  let tipo = 'teste';
   try {
     const body = await req.json();
     characterId = body.character_id ?? null;
     termos = body.termos;
+    if (typeof body.tipo === 'string') tipo = body.tipo;
     if (!Array.isArray(termos) || termos.length === 0) throw new Error();
   } catch {
     return jsonResponse({ erro: 'termos ausentes/inválidos' }, 400);
@@ -74,6 +76,9 @@ Deno.serve(async (req) => {
   query = characterId
     ? query.or(`character_id.eq.${characterId},character_id.is.null`)
     : query.is('character_id', null);
+  // mesmo eixo de tipo da fila local (migração 0026): 'qualquer' é curinga dos dois lados, pra
+  // uma entrada guardada pro d20 de um teste não ser consumida por uma iniciativa que role antes.
+  query = tipo === 'qualquer' ? query : query.or(`tipo.eq.${tipo},tipo.eq.qualquer`);
   const { data: entrada } = await query.limit(1).maybeSingle();
 
   let valores: number[];

@@ -13,11 +13,14 @@ const COR_TIER_RUIDO: Record<0 | 1 | 2 | 3, string> = {
  *  porque "sempre visível" quer dizer em qualquer aba, não só na de Sessão.
  *
  *  Também carrega o indicador compacto "ruído sanidade" (correcoes-parte2.md item 4) — o mestre
- *  precisa de uma leitura confiável do tier mesmo sem depender do efeito visual em tela cheia. */
+ *  precisa de uma leitura confiável do tier mesmo sem depender do efeito visual em tela cheia.
+ *  O valor numérico (ex: 8) aparece na frente — no mestre é da ficha ativa; no jogador é da
+ *  ficha própria (useMinhaFicha já seta fichaAtivaId = id do dono). */
 export default function DestaqueSuperior() {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
   const tierRuido = useTierRuidoFichaAtiva();
+  const sanidadeAtual = useStore((s) => (fichaAtivaId ? s.fichas.find((f) => f.id === fichaAtivaId)?.sanidadeAtual ?? null : null));
   const { numeroSessao, localAtual, objetivo } = sessaoPublica;
 
   return (
@@ -47,20 +50,11 @@ export default function DestaqueSuperior() {
           OBJETIVO: <span style={{ color: 'var(--ink)' }}>{objetivo}</span>
         </span>
       )}
-      {/* progresso removido em 20/07 a pedido do usuário — manter comentado pra reativar fácil
-      {progresso.total > 0 && (
-        <span>
-          PROGRESSO:{' '}
-          <span style={{ color: 'var(--ink)' }}>
-            {progresso.atual}/{progresso.total}
-          </span>
-        </span>
-      )}
-      */}
-      {fichaAtivaId && (
+      {fichaAtivaId && sanidadeAtual !== null && (
         <span>
           SANIDADE:{' '}
-          <span style={{ color: COR_TIER_RUIDO[tierRuido] }}>{NOME_TIER_RUIDO[tierRuido].toUpperCase()}</span>
+          <span style={{ color: COR_TIER_RUIDO[tierRuido] }}>{sanidadeAtual}</span>
+          <span style={{ color: 'var(--ink-dim)' }}> · {NOME_TIER_RUIDO[tierRuido]}</span>
         </span>
       )}
     </div>

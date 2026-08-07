@@ -113,7 +113,7 @@ describe('criarEstadoInicial', () => {
     expect(estado.fichas).toEqual([]);
     expect(estado.npcs).toEqual([]);
     expect(estado.fichaAtivaId).toBeNull();
-    expect(estado.mapa).toEqual({ imagemDataUrl: null, tokens: [], grade: criarGradeInicial() });
+    expect(estado.mapa).toEqual({ imagemDataUrl: null, tokens: [], grade: criarGradeInicial(), fow: { vistas: [], visiveisAgora: [], proximoIdZona: null } });
     expect(estado.config).toEqual({ basePV: 20 });
   });
 });

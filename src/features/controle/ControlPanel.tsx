@@ -1,6 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useFilaForcada } from './useFilaForcada';
+import { entradaCasa } from '../../dice/forcarRolagem';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { useStore } from '../../state/store';
+
+/** Rótulos do seletor de tipo. A ordem é a da tela. */
+const TIPOS: { id: TipoRolagemForcada; label: string }[] = [
+  { id: 'qualquer', label: 'qualquer rolagem' },
+  { id: 'teste', label: 'teste (perícia, ataque, estabilizar)' },
+  { id: 'iniciativa', label: 'iniciativa' },
+  { id: 'dano', label: 'dano' },
+  { id: 'sanidade', label: 'sanidade' },
+  { id: 'surto', label: 'surto' },
+];
 import '../../styles/tokens.css';
 import '../../styles/base.css';
 
@@ -17,6 +29,7 @@ export default function ControlPanel() {
   const npcs = useStore((s) => s.npcs);
   const { fila, remoto, adicionar: adicionarNaFila, remover, limpar } = useFilaForcada();
   const [alvo, setAlvo] = useState<string>('qualquer');
+  const [tipo, setTipo] = useState<TipoRolagemForcada>('qualquer');
   const [valorUnico, setValorUnico] = useState(20);
   const [lista, setLista] = useState('');
   const [filtro, setFiltro] = useState<string>('todos');
@@ -24,7 +37,7 @@ export default function ControlPanel() {
   const adicionar = (valores: number[]) => {
     if (valores.length === 0) return;
     const personagemId = alvo === 'qualquer' ? null : alvo;
-    adicionarNaFila(valores, personagemId);
+    adicionarNaFila(valores, personagemId, tipo);
   };
 
   const adicionarLista = () => {
@@ -76,7 +89,21 @@ export default function ControlPanel() {
               </optgroup>
             </select>
           </div>
+          <div>
+            <label htmlFor="ctrl-tipo">Tipo de rolagem</label>
+            <select id="ctrl-tipo" value={tipo} onChange={(e) => setTipo(e.target.value as TipoRolagemForcada)}>
+              {TIPOS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+        <p className="vazio" style={{ marginBottom: '0.6rem' }}>
+          o tipo evita que a entrada caia na rolagem errada — um valor guardado pro d20 de um teste
+          não é consumido por uma iniciativa que role antes. "qualquer" casa com todas.
+        </p>
 
         <p className="vazio" style={{ marginBottom: '0.4rem' }}>
           valor bruto do dado — ex: para um teste, o d20. a ficha soma atributo + perícia depois.
@@ -148,19 +175,22 @@ export default function ControlPanel() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {filaVisivel.map((e) => {
-              // "próxima" é por ALVO, não pelo topo visual da lista: consumirForcados (forcarRolagem.ts)
-              // pega a primeira entrada da fila (na ordem real, não filtrada) que casa com
-              // personagemId===null ("qualquer") ou personagemId===o alvo de e — então uma entrada só
-              // é "próxima" de verdade se for essa primeira ocorrência pro seu próprio alvo. Com o
-              // filtro aplicado, o topo da lista visível podia não ser o topo real da fila.
+              // "próxima" é por ALVO + TIPO, não pelo topo visual da lista: `consumirForcados` pega
+              // a primeira entrada da fila real (não filtrada) que casa com os dois eixos, então uma
+              // entrada só é "próxima" de verdade se for a primeira ocorrência pra própria combinação
+              // dela. Reusa `entradaCasa` pra não duplicar a regra e sair do sincronismo.
               const idxNaFila = fila.indexOf(e);
-              const ehProxima =
-                fila.findIndex((f) => f.personagemId === null || f.personagemId === e.personagemId) === idxNaFila;
+              const alvoDela = e.personagemId;
+              const tipoDela = e.tipo === 'qualquer' ? 'teste' : e.tipo;
+              const ehProxima = fila.findIndex((f) => entradaCasa(f, alvoDela, tipoDela)) === idxNaFila;
               return (
                 <div key={e.id} className="reguladores-linha mono">
                   <span>
                     <span className="badge" style={{ marginRight: '0.5rem' }}>
                       {e.personagemNome}
+                    </span>
+                    <span className="badge" style={{ marginRight: '0.5rem' }}>
+                      {e.tipo}
                     </span>
                     {ehProxima && <span className="vazio">próxima · </span>}
                     [{e.valores.join(', ')}]

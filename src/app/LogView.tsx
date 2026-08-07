@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
 import type { TipoLog } from '../state/types';
 
@@ -70,8 +70,12 @@ function RolsSection({ podeLimpar }: { podeLimpar: boolean }) {
  * Log compartilhado entre mestre (`LogTab.tsx`) e jogador (`LogTabJogador.tsx`) — mesmo
  * idioma de `podeArrastar` em `IniciativaPanel`: um componente, uma prop de capacidade.
  * `podeLimpar=false` esconde "limpar log" e restringe rolagens visíveis às públicas.
+ *
+ * `acoes` é um slot pra botões que só existem no lado do mestre (hoje, "iniciar sessão limpa"),
+ * renderizado ao lado de "limpar log". É slot em vez de import direto justamente porque este
+ * arquivo entra no bundle do jogador — quem passa o conteúdo é o `LogTab.tsx`, que não entra.
  */
-export default function LogView({ podeLimpar }: { podeLimpar: boolean }) {
+export default function LogView({ podeLimpar, acoes }: { podeLimpar: boolean; acoes?: ReactNode }) {
   const log = useStore((s) => s.log);
   const fichas = useStore((s) => s.fichas);
   const limparLog = useStore((s) => s.limparLog);
@@ -96,9 +100,12 @@ export default function LogView({ podeLimpar }: { podeLimpar: boolean }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <h3 className="label">Log da sessão</h3>
         {podeLimpar && (
-          <button className="perigo" onClick={limparLog}>
-            limpar log
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="perigo" onClick={limparLog}>
+              limpar log
+            </button>
+            {acoes}
+          </div>
         )}
       </div>
 

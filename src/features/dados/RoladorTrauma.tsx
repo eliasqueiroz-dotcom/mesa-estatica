@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
@@ -16,6 +17,7 @@ interface RoladorTraumaProps {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
   ) => void;
 }
 

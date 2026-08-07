@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularExpiraSurto, resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
@@ -11,6 +12,7 @@ interface RoladorSurtoProps {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
   ) => void;
 }
 
@@ -70,7 +72,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
           },
         }));
       }
-    }, 'ruido', ficha.id);
+    }, 'ruido', ficha.id, 'surto');
   };
 
   const escolher = (lado: 'A' | 'B') => {

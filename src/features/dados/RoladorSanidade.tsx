@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { calcularPerdaSanidade } from '../../rules/sanidade';
@@ -43,6 +44,7 @@ interface RoladorSanidadeProps {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
   ) => void;
 }
 
@@ -85,7 +87,7 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
       setRolando(false);
 
       ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-    }, 'ruido', ficha.id);
+    }, 'ruido', ficha.id, 'sanidade');
   };
 
   return (

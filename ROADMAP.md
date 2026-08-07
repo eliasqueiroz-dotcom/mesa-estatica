@@ -23,7 +23,9 @@ Cada uma custou um bug real em produção ou ao vivo numa sessão.
 - **Exclusão nunca por diff.** Sync infere criação/edição por diff, mas remoção só propaga se a UI marcou de propósito (`multiplayer/remocaoExplicita.ts`). O `GM_TOKEN` é compartilhado — uma aba com lista desatualizada apagava fichas/NPCs/tokens de todo mundo.
 - **Flag de "aplicando remoto" é contador, não boolean.** Duas tabelas disparam dois eventos Realtime pro mesmo push; com boolean, o primeiro a terminar zera a flag e o segundo vaza como edição local → loop exponencial de requests.
 - **Coordenadas do mapa são % da IMAGEM renderizada**, nunca do container (`getImgRenderRect`/`retanguloGradeEmPx` em `mapaUtils.ts`) — edição E renderização. Container varia por dispositivo; misturar as duas bases desalinha mestre e jogador.
-- **Notação de dado forçado aceita um único `@` no fim** — o parser da lib quebra com mais de um. `consumirForcados` é exclusivo do `useDiceBox` (sorteio de trauma usa `Math.random` puro).
+- **Notação de dado forçado aceita um único `@` no fim** — o parser da lib quebra com mais de um.
+- **Consumo da fila forçada é destrutivo e casa por alvo + tipo.** Enquanto a única chave era o personagem, qualquer consumidor novo roubava entradas dos outros (um forçado guardado pro d20 de um teste sumia se um sorteio de trauma rodasse antes) — foi o que manteve a fila restrita ao `useDiceBox` por muito tempo. Com o eixo de `tipo` (06/08) dá pra ligar os outros pontos; sem ele, não. O sorteio de trauma segue de fora, por decisão.
+- **`forcarRolagem.ts` não pode entrar no bundle do jogador** (abre `BroadcastChannel` no top-level). Quem rola fora da bandeja usa a ponte neutra `dice/registroForcados.ts`, que só o entry do mestre popula — nunca import direto.
 - **Visibilidade de rolagem precisa existir no banco.** `registrarLog` (texto livre) e `registrarRoll` são canais paralelos: filtro client-side não basta, a coluna + RLS têm que existir, senão o eco do Realtime devolve a entrada sem visibilidade e vaza.
 - **Bundle do jogador não persiste em localStorage** (storage condicional no `persist`) — os dois bundles rodam na mesma origin e compartilhariam a chave `estatica-mesa`.
 - **Fallback de array em selector do Zustand precisa ser constante fora do componente** (`EMPTY_CONDICOES`) — `?? []` inline cria array novo a cada render e quebra com "getSnapshot should be cached".
@@ -62,7 +64,47 @@ O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, 
 
 ### Ideias sem prioridade
 
-Recap automático de sessão a partir do log · relógio de tensão ligado aos gauges · gatilhos narrativos ao cruzar limiares de Ruído/Ameaça · handouts (compartilhar imagem/documento) · indicador sutil de Sanidade no jogador.
+Recap automático de sessão a partir do log · indicador sutil de Sanidade no jogador.
+
+## Próximos passos — mesa ao vivo
+
+Quatro frentes levantadas em 06/08, depois da caça a bugs. O levantamento técnico de cada uma já foi feito; o que está aqui é o desenho e as pegadinhas descobertas, não código.
+
+### 1. Dado rolando visível e audível para todos
+
+Hoje a animação acontece só na tela de quem rolou; os outros recebem o resultado em texto no log, depois que o dado já caiu. Objetivo: todo mundo (jogadores e mestre) vê o dado girar e ouve, na aba Dados e na rolagem rápida; quem estiver em outra aba percebe que alguém rolou e pode ir olhar.
+
+- **A base já existe**: o mecanismo de dado forçado (`useDiceBox.ts`, sufixo `@v1,v2`) faz a lib cair em valores predeterminados — é exatamente o que reproduzir a rolagem de outra pessoa exige. `aoeSync.ts`/`reguasSync.ts` são o padrão de canal broadcast privado (migração 0025). O soundpad é o padrão de "evento por carimbo" que chega a todos, incluindo o cuidado de excluir o carimbo do fetch inicial pra não disparar em quem acabou de entrar.
+- **Desenho**: canal broadcast novo `dados` (privado, com policy em `realtime.messages`). Quem rola resolve os valores localmente como hoje e transmite `{ id, termos, valores, colorset, origem }`; cada cliente reproduz a animação com os mesmos valores. Como todos animam, o som já sai em todos de graça.
+- ~~**Som da física ligado**~~ (06/08) — `sounds: true` + `volume: 0.5` no DiceBox; os mp3 vêm no pacote da lib e o `postinstall` já copia pra `public/`. É som local de quem rola, não o "audível pra todos" acima, mas na prática cobre a mesa porque o mestre compartilha a janela no Discord. Não precisa de gesto de desbloqueio: rolar já é um clique.
+- **As quatro lacunas reais**: nenhuma bandeja fica montada fora da aba Dados/overlay (precisa de uma sempre montada no header, como o `SoundpadPlayer`); `rolar()` não é chamável de fora do componente (hoje o único gatilho externo é a prop-contador `pedidoRolagem`); áudio exige gesto do usuário e só o jogador tem botão de desbloqueio, o mestre não; e precisa de dedupe por id pra não reanimar um dado depois de reconectar.
+- **Aviso fora da aba**: carimbo no store (mesmo padrão de `ultimoDisparo`) + destaque na aba Dados. Não existe nada de "atividade nova" no app hoje.
+
+### 2. Ambiente de desenvolvimento isolado da mesa oficial — **só depois de 29/08**
+
+Testar feature nova não pode encostar na sessão real, e desenvolver não deveria expor o conteúdo do RPG.
+
+**Adiado de propósito**: hoje não existe mesa oficial pra proteger — o banco de produção só passa a ter dado real que importa quando a ferramenta entrar em uso de verdade, na sessão de 29/08. Montar o segundo projeto antes disso é cerimônia sem ganho. Retomar logo depois da sessão, antes da primeira feature que mexa em sync.
+
+- **"Dois tokens" não resolve** — foi a primeira ideia e não funciona: o `GM_TOKEN` é secret do projeto Supabase e nenhuma tabela tem coluna que diga a que mesa a linha pertence, então dois tokens no mesmo banco enxergam exatamente as mesmas fichas, NPCs e mapa. Pior: `sessao_publica`, `mapa_publico`, `midia_estado` e `soundpad_estado` são singletons por `check` constraint (uma linha fixa cada), o que impede duas mesas no mesmo banco sem quebrar constraint, ~11 módulos de sync e os nomes de canal Realtime.
+- **Caminho escolhido**: um segundo projeto Supabase só pra dev (o free tier permite dois). Rodar as migrações nele, definir um `GM_TOKEN` diferente, e apontar o ambiente local pra ele via `.env.development.local` (já coberto pelo `*.local` do `.gitignore`). O CI continua injetando os secrets de produção no build, e variável de processo tem precedência sobre arquivo `.env` — então `npm run dev` fala com o banco de teste e o deploy fala com o real, sem nenhuma flag no código.
+- **O `localStorage` já está isolado de graça**: `localhost:5173` e o GitHub Pages são origens diferentes, então o estado local de teste nunca encosta no da mesa real. A ressalva é não usar o site publicado pra testar.
+- **Atalho pra quando não precisar de sync**: sem as env vars, `supabase` vira `null` e o app roda 100% local — serve pra qualquer feature que não seja de multiplayer.
+
+### 3. ~~Botão "sessão limpa" (GM-only, aba Log)~~ — concluído em 06/08
+
+`features/sessao/ResetSessao.tsx` (montado em `LogTab.tsx`, fora do `LogView` compartilhado pra não entrar no bundle do jogador) + `multiplayer/resetMesa.ts`. Confirmação em dois passos e backup oferecido antes de apagar.
+
+A armadilha que motivou o módulo separado: `resetarEstado()` já existia no store mas era código morto, e chamá-lo cru seria pior que nada — os syncs só propagam DELETE pra id marcado em `remocaoExplicita.ts`, então fichas e NPCs ficariam órfãos no banco e **voltariam** pra tela no próximo Realtime ou reload, desfazendo o reset sozinho. `resetMesa.ts` marca as cinco coleções primeiro, reseta, e só então apaga `rolls_publicas` — a única tabela que nenhum diff de sync cobre. Fora do alcance de propósito: arquivos no bucket de Storage e as tabelas de auditoria.
+
+### 4. ~~Toda rolagem respeitando a fila de forçados~~ — concluído em 06/08
+
+Onze pontos de rolagem usavam `Math.random()` direto e ignoravam a fila: iniciativa nas quatro variantes, surto automático, ação de NPC (d20 e dano), estabilizar, duração de surto em combate e dano de arma do PC. Agora todos consomem — inclusive a iniciativa durante o combate, que era a que mais incomodava ao vivo.
+
+- **`tipo` na entrada da fila** (`qualquer`/`teste`/`iniciativa`/`dano`/`sanidade`/`surto`), além do alvo que já existia; `consumirForcados` casa pelos dois eixos, com `qualquer` de curinga dos dois lados. Sem isso o consumo destrutivo por primeira-correspondência faria uma iniciativa roubar o valor guardado pro d20 de um teste — é o que impedia ligar os outros pontos. `ControlPanel` ganhou o seletor, e a fila remota (`forced_queue`) a coluna equivalente (migração 0026 + as duas Edge Functions).
+- **Ponte neutra `dice/registroForcados.ts`** — `store.ts`, `rules/surto.ts` e `ArmasSection.tsx` estão no bundle do jogador e não podem importar `forcarRolagem.ts`; e quem rola ali é o store (Zustand vanilla) e módulos de regra, que não recebem props como o `useDiceBox`. Só `entries/mestre.tsx` registra o consumidor real: no bundle do jogador ninguém registra e o no-op mantém tudo honesto por construção. Bundle do jogador cresceu 0,01 kB.
+- **Bug achado no caminho**: `rolarIniciativa` rolava um d20 pra toda ficha/NPC da mesa e filtrava depois — inofensivo com `Math.random`, mas consumiria forçados de quem nem estava rolando. Agora filtra antes.
+- **Fica de fora**: o sorteio de trauma continua honesto pela decisão já documentada; com `tipo` na fila o risco original some, então dá pra reconsiderar depois.
 
 ## Checklist do dia da sessão
 
@@ -73,3 +115,38 @@ Recap automático de sessão a partir do log · relógio de tensão ligado aos g
 - [ ] Discord: compartilhar a **janela** do navegador (não a tela), 1080p, "otimizar para vídeo" desligado
 - [ ] Determinação de todos resetada para 1
 - [ ] d20 físico na mesa por garantia — *fé no rolador do navegador, mas o papel não esquece*
+
+## Próximos passos — ideias capturadas de VTTs (06/08)
+
+Levantamento de features em VTTs maduros (Roll20, Foundry VTT, Fantasy Grounds, Owlbear Rodeo) filtradas pelo modelo da Estática (horror/investigação, mestre compartilha tela no Discord, app do jogador reduzido, local-first com Supabase opcional). Descartado: marketplace, multi-sistema, voz/vídeo embarcado, worldbuilding 3D, sistema de extensões Lua/XML — nada disso se aplica.
+
+### Tier 1 — alta aderência ao tema, reaproveita infraestrutura já existente
+
+| # | Ideia | Origem | Por que encaixa |
+|---|---|---|---|
+| **F1** | **~~Fog of war no mapa~~** (máscara de revelação controlada pelo GM, sync pro app do jogador) — **implementado em 06/08** | Roll20, Foundry, FG | Três camadas CSS (`vistas`/`visiveisAgora`/nunca), cada uma com assinatura visual própria: chiado P&B (canal sem sinal), frame congelado degradado (`backdrop-filter` + scanlines + microcopy `seen · timestamp`), luz atual com vinheta sutil + burst de 280ms com chroma aberration na transição ("sintonizando"). Zona por região (`rua` = âmbar `--real`, `corporativo` = ciano `--rede`, default P&B puro). Persistente (`EstadoFoW` em `mapa.fow` + tabela `fow_estado` migration 0027); toolbar GM-only (`FoWOverlay.tsx`), render compartilhado (`FoWViewOverlay.tsx`). `fowSync` espelha `mapaPublicoSync` (singleton, RLS `is_gm()`). `resetMesa` DELETE explícito de `fow_estado`. Arquivos: `features/mapa/FoW{Overlay,ViewOverlay}.tsx`, `fowGeometria.ts`, `state/fowStore.ts`, `multiplayer/fowSync.ts`, `styles/fow.css`. |
+| **F2** | **Relógio de tensão in-game** (relógio manual, atado aos gauges de Ruído/Ameaça) | Foundry (módulos) | Investigação tem pressão de tempo ("até o amanhecer"). Concentrado na aba Sessão, perto dos gauges já existentes. (Movido de "Ideias sem prioridade".) |
+| **F3** | **Anotações no mapa** (desenhos/marcadores do GM, sync — possível camada GM-only vs pública) | Roll20, Foundry, FG | Marcar sangue, pistas, conexões. Aproveita o mesmo canal Realtime dos tokens. |
+| **F4** | **Handouts (empurrar imagem/doc pro app do jogador)** | Roll20, Foundry, FG | Investigação vive de pistas visuais. Reaproveita a aba Pistas + Realtime. (Movido de "Ideias sem prioridade".) |
+| **F5** | **Música atada à cena** (troca de mapa → troca automática de trilha) | Roll20, Foundry | Jukebox já sincronizada; só falta metadados cena→track. Lift pequeno, imersão grande. |
+| **F6** | **Tabelas aleatórias** ("encontros de rua de São Paulo", "ruídos noturnos", "eventos de surto") | Roll20, Foundry, FG | Específicas pro setting distópico. Rolagem → resultado no log. Sub-seção em Dados ou Pistas. |
+| **F7** | **Gatilhos narrativos ao cruzar limiares de Ruído/Ameaça** | — | Casa com relógio de tensão e FoW: ao atingir threshold, dispara efeito (overlay, som, mudança de cena). (Movido de "Ideias sem prioridade".) |
+
+### Tier 2 — bom encaixe, mais lift ou parcialmente coberto
+
+- **Visão/lanterna de token** (paired com FoW) — lanterna limitada é horror clássico, mas adiciona complexidade no render; segundo momento.
+- **Ping/apontar no mapa** — jogador clica no mapa do app → todos vêem um pulso. Sync Realtime simples, baixo lift.
+- **Sussurro privado pra um jogador** — GM envia nota só pra um aparelho. Combina com "você nota algo que só você vê".
+- **Bestiário/NPCs persistentes entre sessões** — hoje NPCs são por sessão; uma biblioteca evita re-setup a cada jogo.
+- **Macros de rolagem** — salvar presets de "Perception", "Investigation" (com 15 perícias, poupa cliques recorrentes).
+- **Overlays atmosféricos na cena** (chuva, neblina estática) — extender o tier atual de ruído visual p/ o mapa.
+
+### Tier 3 — toques pequenos
+
+- Turn timer no combate (tensão de pacing).
+- Transição de cena (fade to black/vermelho) ao trocar de mapa ou cruzar limiar de Ameaça.
+- Indicador de atividade noutra aba — generalizar o "aviso fora da aba" já mapeado para o dado remoto.
+
+### Próxima implementação (a partir de 06/08)
+
+Tier 1, em ordem: ~~**F1 Fog of war**~~ (06/08) · **F2 Relógio de tensão** · **F3 Anotações no mapa**. Cada uma ganha levantamento técnico próprio quando sair do backlog (desenho + pegadinhas, não código).

@@ -13,6 +13,7 @@ import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
+import { iniciarSyncFoW } from '../multiplayer/fowSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
   useFichasPublicas,
@@ -85,6 +86,7 @@ export default function PlayerApp() {
     let pararReguas = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
+    let pararFoW = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -97,6 +99,10 @@ export default function PlayerApp() {
       // idem — só o AoEOverlay.tsx (GM-only, fora deste bundle) escreve no aoeStore; aqui é
       // sempre leitura.
       pararAoE = iniciarSyncAoE();
+      // FoW: só leitura. O jogador nunca tem `FoWOverlay.tsx` no bundle, e a RLS
+      // (`is_gm()` no insert/update/delete) garante no servidor que nem vazar a anon key
+      // permite escrever no banco.
+      pararFoW = iniciarSyncFoW();
     });
     return () => {
       cancelado = true;
@@ -105,6 +111,7 @@ export default function PlayerApp() {
       pararReguas();
       pararSoundpad();
       pararAoE();
+      pararFoW();
     };
   }, []);
 

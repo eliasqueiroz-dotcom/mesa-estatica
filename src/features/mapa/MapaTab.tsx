@@ -11,6 +11,7 @@ import AoEOverlay from './AoEOverlay';
 import { comprimirImagem } from '../../lib/comprimirImagem';
 import CombatOverlay from './CombatOverlay';
 import CrachasOverlay from './CrachasOverlay';
+import FoWOverlay from './FoWOverlay';
 import GradeOverlay from './GradeOverlay';
 import './mapa.css';
 import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
@@ -400,6 +401,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         })}
         <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} containerRef={containerRef} imgRef={imgRef} />
+        <FoWOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} containerRef={containerRef} imgRef={imgRef} />
         <CombatOverlay />
         <CrachasOverlay />
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { rolarDadosComForcados } from '../../../dice/registroForcados';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
 import { calcularDanoAtaque, parseDanoArma } from '../../../rules/teste';
 import { useStore } from '../../../state/store';
@@ -38,9 +39,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
     if (critico) {
       rolagemDano = danoMaximoDado;
     } else {
-      rolagemDano = 0;
-      for (let i = 0; i < qtd; i++) rolagemDano += Math.floor(Math.random() * lados) + 1;
-      rolagemDano += modificador;
+      rolagemDano = rolarDadosComForcados(qtd, lados, ficha.id, 'dano').reduce((a, b) => a + b, 0) + modificador;
     }
     const vigor = ficha.atributos.vigor;
     const dano = calcularDanoAtaque({ rolagemDano, danoMaximoDado, vigor, corpoACorpo, margem10Mais: critico });

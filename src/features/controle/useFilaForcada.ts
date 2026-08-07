@@ -7,6 +7,7 @@ import {
   pedirEstado,
   removerForcado,
 } from '../../dice/forcarRolagem';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { adicionarFilaRemota, limparFilaRemota, listarFilaRemota, removerFilaRemota } from '../../multiplayer/filaRemota';
 import { fasedAtiva } from '../../multiplayer/rolagemRemota';
 import { useStore } from '../../state/store';
@@ -17,13 +18,15 @@ export interface EntradaFila {
   personagemId: string | null;
   personagemNome: string;
   valores: number[];
+  /** categoria de rolagem que pode consumir esta entrada ('qualquer' casa com todas). */
+  tipo: TipoRolagemForcada;
 }
 
 interface FilaForcada {
   fila: EntradaFila[];
   /** true = Fase D ativa (fila em `forced_queue` via Edge Function); false = local (BroadcastChannel). */
   remoto: boolean;
-  adicionar: (valores: number[], personagemId: string | null) => void;
+  adicionar: (valores: number[], personagemId: string | null, tipo: TipoRolagemForcada) => void;
   remover: (id: string) => void;
   limpar: () => void;
 }
@@ -71,6 +74,7 @@ export function useFilaForcada(): FilaForcada {
           personagemId: e.character_id,
           personagemNome: nomeDoAlvo(e.character_id),
           valores: e.valores,
+          tipo: e.tipo ?? 'qualquer',
         })),
       );
     });
@@ -81,11 +85,11 @@ export function useFilaForcada(): FilaForcada {
   }, [remoto, atualizarFilaRemota]);
 
   const adicionar = useCallback(
-    (valores: number[], personagemId: string | null) => {
+    (valores: number[], personagemId: string | null, tipo: TipoRolagemForcada) => {
       if (remoto) {
-        void adicionarFilaRemota(personagemId, valores).then(atualizarFilaRemota);
+        void adicionarFilaRemota(personagemId, valores, tipo).then(atualizarFilaRemota);
       } else {
-        enfileirarForcado(valores, personagemId, nomeDoAlvo(personagemId));
+        enfileirarForcado(valores, personagemId, nomeDoAlvo(personagemId), tipo);
       }
     },
     [remoto, atualizarFilaRemota, nomeDoAlvo],

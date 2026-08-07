@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { useStore } from '../../state/store';
 
@@ -22,6 +23,7 @@ interface RolagemLivreProps {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
   ) => void;
 }
 
@@ -110,7 +112,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           visibilidade: privado ? 'privada' : 'publica',
         });
       }
-    }, undefined, personagemId);
+    }, undefined, personagemId, 'qualquer');
   };
 
   const totalGeral = grupos?.reduce((soma, g) => soma + g.value, 0) ?? null;

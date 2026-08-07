@@ -13,6 +13,7 @@ import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/ruido.css';
 import '../styles/alerta-sessao.css';
+import '../styles/fow.css';
 
 // Bundle do jogador (mesa-estatica-multiplayer-completo.md Parte IV §2) — nunca importa
 // App/ControlPanel/forcarRolagem. O Rollup faz tree-shaking por entrada: essa árvore não

@@ -301,6 +301,35 @@ export interface EstadoMapa {
   imagemDataUrl: string | null;
   tokens: TokenMapa[];
   grade: GradeMapa;
+  /** Fog of war — máscara de revelação controlada pelo mestre (ROADMAP F1). Persiste entre
+   *  sessões (reabrir o mapa segue onde parou) e sincroniza via `fowSync.ts` (migration 0027). */
+  fow: EstadoFoW;
+}
+
+/** Variante por zona do chiado do FoW (arte.md: --real=rua/analógico, --rede=corporativo).
+ *  `null` = P&B puro canal-sem-sinal (default). */
+export type ZonaFoW = 'rua' | 'corporativo';
+
+/** Região retangular (v1) — 0-1 normalizado à IMAGEM (mesmo espaço de TokenMapa.x/y, invariante
+ *  #3 do ROADMAP). `forma` faz parte do tipo já em v1 pra v2 (polígonos) migrar sem shape break
+ *  (acrescentar `'poly'` + `pontos?: Ponto[]` numa futura SCHEMA_VERSION). */
+export interface RegiaoFoW {
+  id: string;
+  forma: 'rect';
+  x: number; // 0-1, canto superior esquerdo
+  y: number; // 0-1, canto superior esquerdo
+  w: number; // 0-1, largura
+  h: number; // 0-1, altura
+  zona: ZonaFoW | null;
+}
+
+export interface EstadoFoW {
+  /** já visitado — persiste entre sessões; "memória" corrompida (frame visto com degradação). */
+  vistas: RegiaoFoW[];
+  /** luz atual — subset de `vistas`; `visiveisAgora ⊆ vistas` sempre que cobrir luz (mantém memória). */
+  visiveisAgora: RegiaoFoW[];
+  /** próxima região traçada assume essa zona (toolbar GM). Determina matiz do chiado/transition. */
+  proximoIdZona: ZonaFoW | null;
 }
 
 export type ModoLoopMidia = 'nenhum' | 'faixa' | 'lista';

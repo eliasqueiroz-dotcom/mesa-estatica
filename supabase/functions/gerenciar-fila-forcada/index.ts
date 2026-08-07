@@ -20,6 +20,9 @@ const corsHeaders = {
 const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+/** Espelha o CHECK da migração 0026 e o `TipoRolagemForcada` do cliente. */
+const TIPOS_VALIDOS = ['qualquer', 'teste', 'iniciativa', 'dano', 'sanidade', 'surto'];
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ erro: 'método não permitido' }, 405);
@@ -27,7 +30,7 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return jsonResponse({ erro: 'sem autenticação' }, 401);
 
-  let body: { acao?: string; character_id?: string | null; valores?: number[]; id?: string };
+  let body: { acao?: string; character_id?: string | null; valores?: number[]; id?: string; tipo?: string };
   try {
     body = await req.json();
   } catch {
@@ -52,7 +55,7 @@ Deno.serve(async (req) => {
   if (acao === 'listar') {
     const { data, error } = await admin
       .from('forced_queue')
-      .select('id, character_id, valores, criado_em')
+      .select('id, character_id, valores, tipo, criado_em')
       .eq('consumido', false)
       .order('criado_em', { ascending: true });
     if (error) return jsonResponse({ erro: 'falha ao listar' }, 500);
@@ -61,10 +64,13 @@ Deno.serve(async (req) => {
 
   if (acao === 'adicionar') {
     if (!Array.isArray(body.valores) || body.valores.length === 0) return jsonResponse({ erro: 'valores ausentes' }, 400);
+    // valida aqui além do CHECK da migração 0026 — erro de constraint viraria um 500 opaco.
+    const tipo = body.tipo ?? 'qualquer';
+    if (!TIPOS_VALIDOS.includes(tipo)) return jsonResponse({ erro: 'tipo inválido' }, 400);
     const { data, error } = await admin
       .from('forced_queue')
-      .insert({ character_id: body.character_id ?? null, valores: body.valores, criado_por: userData.user.id })
-      .select('id, character_id, valores')
+      .insert({ character_id: body.character_id ?? null, valores: body.valores, tipo, criado_por: userData.user.id })
+      .select('id, character_id, valores, tipo')
       .single();
     if (error) return jsonResponse({ erro: 'falha ao adicionar' }, 500);
     return jsonResponse({ entrada: data }, 200);

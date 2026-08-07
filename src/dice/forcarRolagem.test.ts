@@ -60,3 +60,43 @@ describe('fila', () => {
     expect(filaAtual().filter((e) => e.id === original.id).length).toBe(1);
   });
 });
+
+describe('casamento por tipo de rolagem', () => {
+  it('entrada de um tipo não é consumida por rolagem de outro — o bug que travou ligar a fila em tudo', () => {
+    enfileirarForcado([20], 'pc-1', 'A', 'teste');
+    // a iniciativa do MESMO personagem role antes: não pode roubar o valor guardado pro teste
+    expect(consumirForcados(1, 'pc-1', 'iniciativa')).toBeNull();
+    // e o valor continua lá, esperando o teste
+    expect(consumirForcados(1, 'pc-1', 'teste')).toEqual([20]);
+  });
+
+  it('entrada "qualquer" casa com toda rolagem', () => {
+    enfileirarForcado([7], 'pc-1', 'A', 'qualquer');
+    expect(consumirForcados(1, 'pc-1', 'iniciativa')).toEqual([7]);
+  });
+
+  it('rolagem "qualquer" (rolagem livre) casa com entrada de qualquer tipo', () => {
+    enfileirarForcado([9], 'pc-1', 'A', 'dano');
+    expect(consumirForcados(1, 'pc-1', 'qualquer')).toEqual([9]);
+  });
+
+  it('pula a entrada de tipo errado e consome a certa, mesmo estando depois na fila', () => {
+    enfileirarForcado([1], null, 'qualquer', 'sanidade');
+    enfileirarForcado([18], null, 'qualquer', 'iniciativa');
+    expect(consumirForcados(1, null, 'iniciativa')).toEqual([18]);
+    // a de sanidade ficou intacta
+    expect(filaAtual()).toHaveLength(1);
+    expect(filaAtual()[0].tipo).toBe('sanidade');
+  });
+
+  it('exige os dois eixos: tipo certo mas personagem errado não casa', () => {
+    enfileirarForcado([20], 'pc-1', 'A', 'iniciativa');
+    expect(consumirForcados(1, 'pc-2', 'iniciativa')).toBeNull();
+  });
+
+  it('sem tipo explícito, a entrada entra como "qualquer" (compatível com o comportamento antigo)', () => {
+    enfileirarForcado([12], null, 'qualquer');
+    expect(filaAtual()[0].tipo).toBe('qualquer');
+    expect(consumirForcados(1, 'pc-9', 'surto')).toEqual([12]);
+  });
+});

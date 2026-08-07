@@ -71,7 +71,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         bruto: valor,
         visibilidade,
       });
-    }, 'rede', quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null));
+    }, 'rede', quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null), 'teste');
   };
 
   const rolarPericia = () => {
@@ -106,7 +106,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           bruto: d20,
           visibilidade,
         });
-      }, 'rede', ficha.id);
+      }, 'rede', ficha.id, 'teste');
     } else if (quem === 'npc' && npc) {
       setResultadoRoll(null);
       rolar('1d20', (grupos) => {
@@ -128,7 +128,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           bruto: d20,
           visibilidade,
         });
-      }, undefined, npc.id);
+      }, undefined, npc.id, 'teste');
     }
   };
 
