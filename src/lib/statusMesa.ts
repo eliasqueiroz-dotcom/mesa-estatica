@@ -5,8 +5,10 @@ export type StatusSync = 'sem-config' | 'conectado' | 'erro';
 
 interface StatusMesaState {
   local: StatusLocal;
-  /** Nomes dos canais Realtime atualmente `SUBSCRIBED` — o indicador não distingue QUAL
-   *  canal caiu, só se pelo menos um está de pé e se algum está com erro. */
+  /** Nomes dos canais Realtime atualmente `SUBSCRIBED`. O texto do indicador continua agregado
+   *  (um aviso só), mas o tooltip nomeia os canais com erro — sem isso, "sync com erro" é
+   *  indistinguível de ruído de rede. Foi o que escondeu por dias a régua/AoE caídos quando os
+   *  canais viraram `private: true` sem a policy correspondente no banco (migração 0025). */
   canaisConectados: Set<string>;
   canaisComErro: Set<string>;
   /** Erro fora do ciclo de render (Promise rejeitada sem `.catch`, exceção síncrona num

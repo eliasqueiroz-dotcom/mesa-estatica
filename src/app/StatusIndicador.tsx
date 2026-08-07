@@ -14,6 +14,7 @@ import { limparErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/st
 export default function StatusIndicador() {
   const local = useStatusMesa((s) => s.local);
   const sync = useStatusMesa(statusSincronizacao);
+  const canaisComErro = useStatusMesa((s) => s.canaisComErro);
   const erroRuntime = useStatusMesa((s) => s.erroRuntime);
 
   const corLocal = local === 'ok' ? 'var(--rede)' : 'var(--ruido)';
@@ -25,9 +26,12 @@ export default function StatusIndicador() {
 
   const corSync = sync === 'erro' ? 'var(--ruido)' : sync === 'conectado' ? 'var(--rede)' : 'var(--ink-dim)';
   const textoSync = sync === 'erro' ? '⚠ sync com erro' : sync === 'conectado' ? '● sync ok' : '— local';
+  // nomear os canais caídos é o que separa "a rede oscilou" de "esta feature está quebrada" —
+  // um canal específico sempre com erro aponta pra policy/migração faltando no banco.
+  const nomesComErro = [...canaisComErro].sort().join(', ');
   const tituloSync =
     sync === 'erro'
-      ? 'sincronização com os jogadores está falhando — eles podem estar vendo dados desatualizados'
+      ? `sincronização com os jogadores está falhando (${nomesComErro}) — eles podem estar vendo dados desatualizados`
       : sync === 'conectado'
         ? 'sincronizado com os jogadores em tempo real'
         : 'sem sincronização — mesa rodando só nesta tela (sem Supabase configurado, ou ainda conectando)';

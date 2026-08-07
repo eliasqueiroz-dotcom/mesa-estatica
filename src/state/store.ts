@@ -3,6 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
+import { caixasIntersectam, subtrairCaixa } from '../features/mapa/fowGeometria';
 import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
 import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
@@ -143,6 +144,8 @@ interface Acoes {
   removerRegiaoFoW: (id: string) => void;
   /** Move região de `visiveisAgora` pra "fora da luz" — mantém em `vistas`. No-op se não estava visível. */
   cobrirLuzFoW: (id: string) => void;
+  /** Apaga a luz só na área dada, recortando as regiões visíveis que ela toca. */
+  cobrirAreaFoW: (area: Pick<RegiaoFoW, 'x' | 'y' | 'w' | 'h'>) => void;
   limparFoW: () => void;
   /** Define a zona da próxima região traçada (`null` = P&B puro). */
   definirProximoIdZonaFoW: (zona: ZonaFoW | null) => void;
@@ -996,6 +999,24 @@ export const useStore = create<Store>()(
         set((s) => ({
           mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: s.mapa.fow.visiveisAgora.filter((r) => r.id !== id) } },
         })),
+      /** Apaga a luz EXATAMENTE na área desenhada: cada região iluminada que o retângulo toca é
+       *  recortada (`subtrairCaixa`), sobrando as bordas que ficaram de fora. O pedaço coberto
+       *  continua em `vistas`, então vira memória — não volta a ser chiado de nunca-visto.
+       *
+       *  Antes isto removia a região INTEIRA por interseção: cobrir um cantinho apagava o cômodo
+       *  todo, e cobrir onde não havia luz não fazia nada. */
+      cobrirAreaFoW: (area) =>
+        set((s) => {
+          const atuais = s.mapa.fow.visiveisAgora;
+          if (atuais.length === 0) return s;
+          const restantes = atuais.flatMap((r) =>
+            caixasIntersectam(r, area)
+              ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
+              : [r],
+          );
+          if (restantes.length === atuais.length && restantes.every((r, i) => r === atuais[i])) return s;
+          return { mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: restantes } } };
+        }),
       limparFoW: () => set((s) => ({ mapa: { ...s.mapa, fow: criarFoWVazio() } })),
       definirProximoIdZonaFoW: (zona) =>
         set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, proximoIdZona: zona } } })),

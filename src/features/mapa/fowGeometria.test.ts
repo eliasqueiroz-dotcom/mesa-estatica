@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { montarMaskSvg, pontoDentroRegiao, regiaoEmPx } from './fowGeometria';
+import { caixasIntersectam, montarMaskSvg, pontoDentroRegiao, regiaoEmPx, subtrairCaixa } from './fowGeometria';
 
 describe('pontoDentroRegiao', () => {
   const r = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
@@ -64,5 +64,67 @@ describe('montarMaskSvg', () => {
     const pretas = (mask.match(/fill%3D%22%23000%22/g) ?? []).length;
     // talvez o encode do `#` seja %23 mesmo; conta cuidado só pra garantir presença/ausência
     expect(rets !== null || brancas === 2 || pretas >= 1).toBe(true);
+  });
+});
+/** Soma das áreas dos pedaços — usada pra conferir que a subtração não perde nem duplica área. */
+const area = (cs: { w: number; h: number }[]) => cs.reduce((t, c) => t + c.w * c.h, 0);
+
+describe('caixasIntersectam', () => {
+  // frações exatas em binário (0.25/0.5) de propósito: com 0.2+0.4 o próprio JS devolve
+  // 0.6000000000000001 e a borda "colada" vira sobreposição de ~1e-16. Na prática isso é
+  // inofensivo (o recorte resultante tem área desprezível), mas num teste viraria ruído.
+  const a = { x: 0.25, y: 0.25, w: 0.25, h: 0.25 };
+
+  it('sobreposição parcial conta', () => {
+    expect(caixasIntersectam(a, { x: 0.375, y: 0.375, w: 0.25, h: 0.25 })).toBe(true);
+  });
+
+  it('separadas não contam', () => {
+    expect(caixasIntersectam(a, { x: 0.75, y: 0.75, w: 0.125, h: 0.125 })).toBe(false);
+  });
+
+  it('encostar de raspão (bordas coladas, área zero) não conta', () => {
+    expect(caixasIntersectam(a, { x: 0.5, y: 0.25, w: 0.25, h: 0.25 })).toBe(false);
+  });
+});
+
+describe('subtrairCaixa', () => {
+  const a = { x: 0, y: 0, w: 1, h: 1 };
+
+  it('sem interseção devolve a original intacta', () => {
+    const fora = { x: 0.8, y: 0.8, w: 0.1, h: 0.1 };
+    expect(subtrairCaixa({ x: 0, y: 0, w: 0.5, h: 0.5 }, fora)).toEqual([{ x: 0, y: 0, w: 0.5, h: 0.5 }]);
+  });
+
+  it('recorte que cobre tudo não deixa sobra', () => {
+    expect(subtrairCaixa({ x: 0.2, y: 0.2, w: 0.2, h: 0.2 }, a)).toEqual([]);
+  });
+
+  it('buraco no meio vira 4 faixas e conserva a área (1 - área do buraco)', () => {
+    const buraco = { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
+    const partes = subtrairCaixa(a, buraco);
+    expect(partes).toHaveLength(4);
+    expect(area(partes)).toBeCloseTo(1 - 0.2 * 0.2, 6);
+  });
+
+  it('as faixas não se sobrepõem — área somada bate com a geométrica', () => {
+    // se as laterais invadissem a faixa de cima/baixo, a soma passaria do esperado
+    const partes = subtrairCaixa(a, { x: 0.25, y: 0.25, w: 0.5, h: 0.5 });
+    expect(area(partes)).toBeCloseTo(1 - 0.25, 6);
+  });
+
+  it('corte encostado numa borda gera só as faixas necessárias', () => {
+    const partes = subtrairCaixa(a, { x: 0, y: 0, w: 1, h: 0.3 }); // tira a faixa de cima inteira
+    expect(partes).toHaveLength(1);
+    expect(partes[0]).toEqual({ x: 0, y: 0.3, w: 1, h: 0.7 });
+  });
+
+  it('nenhum pedaço escapa da caixa original', () => {
+    for (const p of subtrairCaixa(a, { x: 0.1, y: 0.6, w: 0.3, h: 0.2 })) {
+      expect(p.x).toBeGreaterThanOrEqual(a.x);
+      expect(p.y).toBeGreaterThanOrEqual(a.y);
+      expect(p.x + p.w).toBeLessThanOrEqual(a.x + a.w + 1e-9);
+      expect(p.y + p.h).toBeLessThanOrEqual(a.y + a.h + 1e-9);
+    }
   });
 });

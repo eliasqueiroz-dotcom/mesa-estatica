@@ -9,10 +9,6 @@ interface Props {
   tamanho: { width: number; height: number };
 }
 
-interface RenderRectOnly {
-  imgRenderRect: Props['imgRenderRect'];
-}
-
 /**
  * Só o desenho das três camadas de FoW sobre o `<img>` — sem toolbar, sem captura de ponteiro.
  * Compartilhado entre `FoWOverlay.tsx` (mestre — único que desenha, escreve em `mapa.fow` via
@@ -67,12 +63,22 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho }: Props) {
 
   if (tamanho.width <= 0) return null;
 
+  // O container das camadas é o RETÂNGULO DA IMAGEM, não o do mapa (invariante #3). As máscaras
+  // são montadas em 0–1 relativo à imagem e esticadas com `mask-size: 100% 100%`; enquanto este
+  // div era `inset: 0`, esse 0–1 virava 0–1 do CONTAINER e, com `object-fit: contain`, todo o
+  // fog saía deslocado/esticado pelo letterbox (e diferente entre mestre e jogador, que têm
+  // proporções de tela distintas). `{x:0,y:0,w:1,h:1}` devolve exatamente o rect da imagem.
+  const estiloCamadas = regiaoEmPx(imgRenderRect, { x: 0, y: 0, w: 1, h: 1 });
+
   // conjuntos por id — `vistas \ visiveisAgora` (memória sem luz).
   const idsVisiveis = new Set(fow.visiveisAgora.map((r) => r.id));
   // `vistas` já contém TODAS as regiões (incluindo as que estão em `visiveisAgora`, pois
   // `adicionarRegiaoFoW` adiciona em AMBAS as listas). Não precisamos de union — `vistas`
   // sozinho já é a janela completa do "tocou uma vez ou está visível agora".
   const todasVistas = fow.vistas;
+  // sem nenhuma região, o mapa fica limpo (FoW só existe depois que o mestre desenha) — mas o
+  // container e o rascunho continuam montados, senão o primeiro arrasto não mostra nada.
+  const temFog = todasVistas.length > 0;
   const somenteVistas = fow.vistas.filter((r) => !idsVisiveis.has(r.id)); // memória desligada
   const todasZonas = new Set<RegiaoFoW['zona']>(fow.vistas.map((r) => r.zona));
 
@@ -86,49 +92,58 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho }: Props) {
   const maskVisto = montarMaskSvg(somenteVistas);
   const maskVisivel = montarMaskSvg(fow.visiveisAgora);
 
-  // Sem FoW (nada revelado): o chiado "nunca" cobriria tudo — equivalente a mapa oculto. Mas
-  // também não queremos que uma mesa sem FoW configurado apareça 100% coberta de chiado: se
-  // `vistas` e `visiveisAgora` estão vazias, decisao é: FoW desligado (toolbar GM controla).
-  if (todasVistas.length === 0) return null;
-
   return (
-    <div className="fow-camadas" data-burst={burst ? 'true' : undefined}>
-      <div
-        className="fow-camada"
-        data-estado="nunca"
-        data-zona={zonaGlobal ?? undefined}
-        style={{ maskImage: maskNunca, WebkitMaskImage: maskNunca }}
-      />
-      <div
-        className="fow-camada"
-        data-estado="visto"
-        style={{
-          // posiciona o backdrop filter ONDE a memória existe, controled pela mask — mas o
-          // backdrop-filter só se aplica à visita sem luz: usamos gradient inline pra localizar.
-          // mask reaplica o mesmo setup das outras camadas.
-          maskImage: maskVisto,
-          WebkitMaskImage: maskVisto,
-        }}
-      />
-      <div
-        className="fow-camada"
-        data-estado="visivel"
-        style={{ maskImage: maskVisivel, WebkitMaskImage: maskVisivel }}
-      />
-      {/* Rascunho do GM quando arrasta — só mestre tem (rascunho fica em `useFowStore`, mas
-          este espelho visual aparece só ao mestre pq o jogador nunca recebe `rascunho` do GM
-          (não faria sentido: a área coberta ainda aparece pro jogador antes do commit). */}
-      <RascunhoVisual imgRenderRect={imgRenderRect} />
-    </div>
+    <>
+      <div className="fow-camadas" style={estiloCamadas} data-burst={burst ? 'true' : undefined}>
+        {temFog && (
+        <>
+          <div
+            className="fow-camada"
+            data-estado="nunca"
+            data-zona={zonaGlobal ?? undefined}
+            style={{ maskImage: maskNunca, WebkitMaskImage: maskNunca }}
+          />
+          <div
+            className="fow-camada"
+            data-estado="visto"
+            style={{
+              // posiciona o backdrop filter ONDE a memória existe, controled pela mask — mas o
+              // backdrop-filter só se aplica à visita sem luz: usamos gradient inline pra localizar.
+              // mask reaplica o mesmo setup das outras camadas.
+              maskImage: maskVisto,
+              WebkitMaskImage: maskVisto,
+            }}
+          />
+          <div
+            className="fow-camada"
+            data-estado="visivel"
+            style={{ maskImage: maskVisivel, WebkitMaskImage: maskVisivel }}
+          />
+        </>
+      )}
+      </div>
+
+      {/* Rascunho do GM enquanto arrasta — só o mestre tem (o jogador nunca recebe `rascunho`).
+          IRMÃO de `.fow-camadas`, não filho: aquele div tem z-index próprio e criava um contexto
+          de empilhamento, então o z-index do tracejado só valia lá dentro e ele sumia sob tokens
+          e régua. Aqui em cima ele fica visível durante todo o arrasto — e fora do `temFog`,
+          porque em mapa novo não existe região nenhuma e sem isso o primeiro arrasto não
+          desenhava nada (parecia que a seleção não funcionava). */}
+      <div className="fow-rascunho-camada" style={estiloCamadas}>
+        <RascunhoVisual />
+      </div>
+    </>
   );
 }
 
-/** Renderiza o rascunho do GM (áfico ento do FoWOverlay) — lê `useFowStore` (efêmero, GM-only
- *  em prática pq só FoWOverlay.tsx escreve, embora o store em si não seja bundléplayperienced).
- *  Componente separado pra evitar re-render do sub arvore principal a cada pointermove. */
-function RascunhoVisual({ imgRenderRect }: RenderRectOnly) {
+/** Rascunho do GM enquanto arrasta — lê `useFowStore` (efêmero; só `FoWOverlay.tsx` escreve).
+ *  Componente separado pra não re-renderizar a árvore das camadas a cada pointermove.
+ *
+ *  Usa porcentagem (`regiaoEmPx(null, …)`) de propósito: o pai `.fow-camadas` JÁ é o retângulo
+ *  da imagem, então somar `imgRenderRect` aqui aplicaria o offset do letterbox duas vezes. */
+function RascunhoVisual() {
   const rascunho = useFowStore((s) => s.rascunho);
   if (!rascunho) return null;
-  const px = regiaoEmPx(imgRenderRect, rascunho);
+  const px = regiaoEmPx(null, rascunho);
   return <div className="fow-rascunho" data-modo={rascunho.modo} style={px} />;
 }

@@ -27,9 +27,10 @@ interface Props {
  *
  * `up` (soltou o ponteiro) comita o rascunho:
  *   `modo: 'revelar'` → `adicionarRegiaoFoW` (entra em `vistas ∪ visiveisAgora`).
- *   `modo: 'cobrirLuz'` → retângulo recobre as regiões visiveisAGora que intersecta (cada
- *     uma que tem pelo menos 1px dentro do retângulo vira `cobrirLuzFoW` — perde `visiveisAgora`,
- *     mantém `vistas`). Não há criarDe-regiao: cobrir é apertar luz em cima do que já foi visto.
+ *   `modo: 'cobrirLuz'` → `cobrirAreaFoW` recorta o retângulo desenhado das regiões de
+ *     `visiveisAgora` que ele toca (`subtrairCaixa`), sobrando as bordas de fora. O pedaço
+ *     coberto continua em `vistas`, então vira memória. Cobrir é apagar a luz exatamente ali,
+ *     não descartar a região inteira que o retângulo encostou.
  *
  * Pegadinhas:
  *  - Coords em 0–1 da IMAGEM, não do container (`getImgRenderRect` + `retanguloConteudo`,
@@ -42,7 +43,7 @@ interface Props {
 export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRef }: Props) {
   const fow = useStore((s) => s.mapa.fow);
   const adicionarRegiaoFoW = useStore((s) => s.adicionarRegiaoFoW);
-  const cobrirLuzFoW = useStore((s) => s.cobrirLuzFoW);
+  const cobrirAreaFoW = useStore((s) => s.cobrirAreaFoW);
   const limparFoW = useStore((s) => s.limparFoW);
   const definirProximoIdZonaFoW = useStore((s) => s.definirProximoIdZonaFoW);
   const registrarLog = useStore((s) => s.registrarLog);
@@ -133,13 +134,13 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
       const tagZona = r.zona === 'rua' ? ' rua' : r.zona === 'corporativo' ? ' corp' : '';
       registrarLog('anotacao', `memória estabelecida${tagZona}`, null, 'privada');
     } else {
-      // cobrir luz: acha todas as regiões `visiveisAgora` que intersectam o retângulo e apaga
-      // cada uma do conjunto visível (mantém em `vistas` — handler de `cobrirLuzFoW`).
-      const rBox = { x: r.x, y: r.y, w: r.w, h: r.h };
-      const afetadas = fow.visiveisAgora.filter((v) => !(v.x + v.w < rBox.x || v.x > rBox.x + rBox.w || v.y + v.h < rBox.y || v.y > rBox.y + rBox.h));
-      for (const v of afetadas) cobrirLuzFoW(v.id);
+      // cobrir luz: apaga EXATAMENTE o retângulo desenhado, recortando as regiões visíveis que
+      // ele toca (o pedaço coberto continua em `vistas`, então vira memória). Antes isto removia
+      // a região inteira por interseção — cobrir um canto apagava o cômodo todo.
+      cobrirAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
+      registrarLog('anotacao', 'luz apagada na área', null, 'privada');
     }
-  }, [adicionarRegiaoFoW, cobrirLuzFoW, definirRascunho, fow.visiveisAgora, registrarLog]);
+  }, [adicionarRegiaoFoW, cobrirAreaFoW, definirRascunho, registrarLog]);
 
   const trocarModo = (m: 'revelar' | 'cobrirLuz') => setModo((atual) => (atual === m ? 'desligado' : m));
 
@@ -202,7 +203,13 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
 
       <div
         className="fow-camada-captura"
-        style={{ pointerEvents: modo !== 'desligado' ? 'auto' : 'none' }}
+        style={{
+          pointerEvents: modo !== 'desligado' ? 'auto' : 'none',
+          // com o modo ligado, precisa ficar acima da captura do AoE (z-index 34): não há
+          // ferramenta ativa única no mapa, então uma forma de AoE esquecida selecionada
+          // interceptava o pointerdown e o modo FoW parecia morto.
+          zIndex: modo !== 'desligado' ? 35 : undefined,
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

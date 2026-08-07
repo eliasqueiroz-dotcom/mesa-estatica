@@ -941,6 +941,50 @@ describe('adicionar combatente com combate em andamento', () => {
   });
 });
 
+
+describe('cobrirAreaFoW', () => {
+  /** Revela a metade esquerda do mapa e devolve a região criada. */
+  function revelarMetadeEsquerda() {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], proximoIdZona: null } } });
+    useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1, zona: null });
+  }
+
+  it('cobrir um pedaço no meio recorta só aquele pedaço, mantendo o resto iluminado', () => {
+    revelarMetadeEsquerda();
+    // buraco central dentro da área revelada
+    useStore.getState().cobrirAreaFoW({ x: 0.125, y: 0.25, w: 0.25, h: 0.5 });
+
+    const { visiveisAgora, vistas } = useStore.getState().mapa.fow;
+    const areaVisivel = visiveisAgora.reduce((t, r) => t + r.w * r.h, 0);
+    // 0.5 de área revelada menos 0.25*0.5 do buraco
+    expect(areaVisivel).toBeCloseTo(0.5 - 0.125, 6);
+    expect(visiveisAgora.length).toBeGreaterThan(1); // virou várias faixas
+    // a memória continua intacta: cobrir apaga a luz, não desfaz a visita
+    expect(vistas).toHaveLength(1);
+    expect(vistas[0].w * vistas[0].h).toBeCloseTo(0.5, 6);
+  });
+
+  it('cobrir fora de qualquer área revelada não muda nada', () => {
+    revelarMetadeEsquerda();
+    const antes = useStore.getState().mapa.fow.visiveisAgora;
+    useStore.getState().cobrirAreaFoW({ x: 0.8, y: 0.8, w: 0.1, h: 0.1 });
+    expect(useStore.getState().mapa.fow.visiveisAgora).toBe(antes); // mesma referência
+  });
+
+  it('cobrir a área toda apaga a luz por completo, sem apagar a memória', () => {
+    revelarMetadeEsquerda();
+    useStore.getState().cobrirAreaFoW({ x: 0, y: 0, w: 1, h: 1 });
+    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
+    expect(useStore.getState().mapa.fow.vistas).toHaveLength(1);
+  });
+
+  it('sem nada revelado é no-op (antes o arrasto de cobrir simplesmente não fazia nada)', () => {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], proximoIdZona: null } } });
+    expect(() => useStore.getState().cobrirAreaFoW({ x: 0, y: 0, w: 1, h: 1 })).not.toThrow();
+    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
+  });
+});
+
 // ===== migrate (schema versionado do persist) =====
 // Caminho DIFERENTE de importarJSON (acima) — migrate só roda na reidratação do
 // localStorage pelo zustand/persist. Cobre as migrações mais recentes/arriscadas, não as

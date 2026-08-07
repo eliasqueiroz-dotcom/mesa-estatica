@@ -28,9 +28,11 @@
 
 .fow-camadas {
   position: absolute;
-  inset: 0;
+  /* SEM `inset: 0`: left/top/width/height vêm inline, do retângulo renderizado da IMAGEM
+     (FoWViewOverlay). Com `inset: 0` o container era o do mapa e o letterbox do
+     `object-fit: contain` deslocava/esticava todo o fog. Ver invariante #3. */
   pointer-events: none;
-  z-index: 2; /* abaixo dos tokens (z-index 3) e da régua/AoE; grade é z-index 1 */
+  z-index: 2; /* abaixo dos tokens (z-index 2, mesmo nível) e da régua (3)/AoE (4); grade é 1 */
 }
 
 .fow-camada {
@@ -180,12 +182,20 @@
   touch-action: none;
 }
 
+/* Wrapper do rascunho — irmão de `.fow-camadas` e acima de tokens/régua/AoE, pra o tracejado
+   do arrasto nunca sumir por baixo deles. Fica sob a camada de captura (33) e a toolbar (42).
+   Posicionado inline no retângulo da imagem, igual `.fow-camadas`. */
+.fow-rascunho-camada {
+  position: absolute;
+  pointer-events: none;
+  z-index: 32;
+}
+
 .fow-rascunho {
   position: absolute;
   border: 1px dashed var(--rede);
   background: rgba(79, 193, 212, 0.08);
   pointer-events: none;
-  z-index: 4;
 }
 
 .fow-rascunho[data-modo='cobrirLuz'] {

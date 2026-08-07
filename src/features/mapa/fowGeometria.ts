@@ -76,3 +76,55 @@ export function montarMaskSvg(
     `</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
+
+/** Retângulo simples em 0-1 da imagem — o shape geométrico de `RegiaoFoW` sem id/forma/zona. */
+export type Caixa = Pick<RegiaoFoW, 'x' | 'y' | 'w' | 'h'>;
+
+/** true se os dois retângulos têm alguma área em comum (encostar de raspão não conta). */
+export function caixasIntersectam(a: Caixa, b: Caixa): boolean {
+  return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+}
+
+/**
+ * `a` menos `b`: devolve os pedaços de `a` que sobram depois de recortar `b`.
+ *
+ * É o que faz "cobrir uma área específica" funcionar. Antes, cobrir removia por inteiro toda
+ * região revelada que o retângulo encostasse — cobrir um cantinho apagava a luz do cômodo todo,
+ * e cobrir onde não havia nada revelado não fazia absolutamente nada.
+ *
+ * Corta em até 4 faixas (acima, abaixo, esquerda, direita), sem sobreposição entre elas:
+ *
+ *     +----------------+
+ *     |     acima      |
+ *     +-----+----+-----+
+ *     | esq |  b | dir |
+ *     +-----+----+-----+
+ *     |     abaixo     |
+ *     +----------------+
+ *
+ * Sem interseção devolve `[a]` intacto; se `b` cobre `a` inteiro, devolve `[]`.
+ */
+export function subtrairCaixa(a: Caixa, b: Caixa): Caixa[] {
+  if (!caixasIntersectam(a, b)) return [a];
+
+  const partes: Caixa[] = [];
+  const topoCorte = Math.max(a.y, b.y);
+  const baseCorte = Math.min(a.y + a.h, b.y + b.h);
+
+  if (b.y > a.y) partes.push({ x: a.x, y: a.y, w: a.w, h: b.y - a.y });
+  if (b.y + b.h < a.y + a.h) {
+    const y = b.y + b.h;
+    partes.push({ x: a.x, y, w: a.w, h: a.y + a.h - y });
+  }
+  // as laterais só ocupam a faixa vertical que o recorte realmente atinge, pra não sobrepor
+  // as faixas de cima/baixo (regiões duplicadas fariam a máscara pintar duas vezes).
+  const alturaMeio = baseCorte - topoCorte;
+  if (alturaMeio > 0) {
+    if (b.x > a.x) partes.push({ x: a.x, y: topoCorte, w: b.x - a.x, h: alturaMeio });
+    if (b.x + b.w < a.x + a.w) {
+      const x = b.x + b.w;
+      partes.push({ x, y: topoCorte, w: a.x + a.w - x, h: alturaMeio });
+    }
+  }
+  return partes;
+}
