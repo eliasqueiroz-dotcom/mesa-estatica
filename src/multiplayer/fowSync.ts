@@ -7,8 +7,8 @@ type Cliente = NonNullable<typeof supabase>;
 
 const ID_FOW = 'fow';
 
-/** Linha do banco — mesmas colunas da migration 0027. Todos os campos jsonb são tipados aqui. */
-interface LinhaFow {
+/** Linha do banco — mesmas colunas das migrations 0027/0028. Todos os campos jsonb são tipados aqui. */
+export interface LinhaFow {
   id: string;
   vistas: RegiaoFoW[];
   visiveis_agora: RegiaoFoW[];
@@ -16,6 +16,24 @@ interface LinhaFow {
   ativa: boolean | null;
   version: number;
 }
+
+export const paraLinha = (f: EstadoFoW): Omit<LinhaFow, 'id' | 'version'> => ({
+  vistas: f.vistas,
+  visiveis_agora: f.visiveisAgora,
+  proximo_id_zona: f.proximoIdZona,
+  ativa: f.ativa,
+});
+
+/** `vistas`/`visiveis_agora` viram `[]` se a linha vier corrompida (não-array); `ativa` cai pra
+ *  `false` se a coluna não existir ainda (banco sem a migration 0028 — mesmo princípio do
+ *  fallback de `condicao_duracao` em `sessaoPublicaSync.ts`: nunca deixar undefined vazar pro
+ *  estado local). */
+export const paraEstadoFoW = (r: Pick<LinhaFow, 'vistas' | 'visiveis_agora' | 'proximo_id_zona' | 'ativa'>): EstadoFoW => ({
+  vistas: Array.isArray(r.vistas) ? r.vistas : [],
+  visiveisAgora: Array.isArray(r.visiveis_agora) ? r.visiveis_agora : [],
+  proximoIdZona: r.proximo_id_zona ?? null,
+  ativa: r.ativa ?? false,
+});
 
 /** Hidrata `mapa.fow` a partir do estado persistente no banco (mesmo padrão de
  *  `mapaPublicoSync.ts`). Roda no mestre E no jogador — o jogador só lê, nunca publica (RLS
@@ -39,13 +57,7 @@ export function iniciarSyncFoW(): () => void {
     const linha = data as LinhaFow;
     aplicandoRemotoContagem++;
     try {
-      const fow: EstadoFoW = {
-        vistas: Array.isArray(linha.vistas) ? linha.vistas : [],
-        visiveisAgora: Array.isArray(linha.visiveis_agora) ? linha.visiveis_agora : [],
-        proximoIdZona: linha.proximo_id_zona ?? null,
-        ativa: linha.ativa ?? false,
-      };
-      useStore.setState((s) => ({ mapa: { ...s.mapa, fow } }));
+      useStore.setState((s) => ({ mapa: { ...s.mapa, fow: paraEstadoFoW(linha) } }));
     } finally {
       aplicandoRemotoContagem--;
     }
@@ -65,16 +77,9 @@ export function iniciarSyncFoW(): () => void {
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0) return;
     if (state.mapa.fow === prevState.mapa.fow) return;
-    const f = state.mapa.fow;
     void cliente
       .from('fow_estado')
-      .upsert({
-        id: ID_FOW,
-        vistas: f.vistas,
-        visiveis_agora: f.visiveisAgora,
-        proximo_id_zona: f.proximoIdZona,
-        ativa: f.ativa,
-      })
+      .upsert({ id: ID_FOW, ...paraLinha(state.mapa.fow) })
       .then(({ error }) => {
         if (error) console.error('[fowSync] push falhou', error);
       });
