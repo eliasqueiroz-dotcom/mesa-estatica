@@ -149,6 +149,8 @@ interface Acoes {
   limparFoW: () => void;
   /** Define a zona da próxima região traçada (`null` = P&B puro). */
   definirProximoIdZonaFoW: (zona: ZonaFoW | null) => void;
+  /** Liga/desliga a renderização do FoW pro mapa atual — nunca apaga `vistas`/`visiveisAgora`. */
+  definirFoWAtivo: (ativa: boolean) => void;
 
   /** Ordem = maior ordem atual + 1. Retorna o id gerado. */
   adicionarFaixaMidia: (nome: string, path: string, url: string) => string;
@@ -448,6 +450,13 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   // `fow` já existente (não reescreve quem já migrou antes).
   if (versaoAnterior < 26 && estado.mapa && !estado.mapa.fow) {
     estado.mapa.fow = criarFoWVazio();
+  }
+  // v26 → v27: liga/desliga de FoW por mapa (`ativa`) — antes o mapa "tinha fog" sempre que
+  // `vistas` não estava vazio, sem jeito de desligar a camada sem perder o que já foi revelado.
+  // Mesas já em v26 (fow existente, sem `ativa`) nascem desligadas — não força fog em mapa que
+  // não usava a ferramenta.
+  if (versaoAnterior < 27 && estado.mapa?.fow && estado.mapa.fow.ativa === undefined) {
+    estado.mapa.fow.ativa = false;
   }
   return estado as Store;
 }
@@ -1020,6 +1029,8 @@ export const useStore = create<Store>()(
       limparFoW: () => set((s) => ({ mapa: { ...s.mapa, fow: criarFoWVazio() } })),
       definirProximoIdZonaFoW: (zona) =>
         set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, proximoIdZona: zona } } })),
+      definirFoWAtivo: (ativa) =>
+        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, ativa } } })),
 
       adicionarFaixaMidia: (nome, path, url) => {
         const id = crypto.randomUUID();
@@ -1298,6 +1309,7 @@ export const useStore = create<Store>()(
                   vistas: Array.isArray(d.mapa.fow.vistas) ? d.mapa.fow.vistas : [],
                   visiveisAgora: Array.isArray(d.mapa.fow.visiveisAgora) ? d.mapa.fow.visiveisAgora : [],
                   proximoIdZona: d.mapa.fow.proximoIdZona ?? null,
+                  ativa: d.mapa.fow.ativa ?? false,
                 }
               : base.mapa.fow,
           },

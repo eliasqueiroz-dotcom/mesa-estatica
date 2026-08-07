@@ -89,9 +89,9 @@ export function criarGradeInicial(): GradeMapa {
   return { ativa: false, x: 0, y: 0, largura: 100, altura: 100, colunas: 10, linhas: 10, escala: 1.5, unidade: 'm' };
 }
 
-/** Fog of war vazio — nenhuma região revelada. Mesa nova nasce "às escuras" pro jogador. */
+/** Fog of war vazio — nenhuma região revelada, desligado por padrão (mestre liga por mapa). */
 export function criarFoWVazio(): EstadoFoW {
-  return { vistas: [], visiveisAgora: [], proximoIdZona: null };
+  return { vistas: [], visiveisAgora: [], proximoIdZona: null, ativa: false };
 }
 
 export function criarSessaoPublica(): SessaoPublica {
@@ -149,7 +149,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

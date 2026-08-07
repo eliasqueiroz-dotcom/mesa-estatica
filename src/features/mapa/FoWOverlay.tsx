@@ -46,6 +46,7 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
   const cobrirAreaFoW = useStore((s) => s.cobrirAreaFoW);
   const limparFoW = useStore((s) => s.limparFoW);
   const definirProximoIdZonaFoW = useStore((s) => s.definirProximoIdZonaFoW);
+  const definirFoWAtivo = useStore((s) => s.definirFoWAtivo);
   const registrarLog = useStore((s) => s.registrarLog);
 
   const definirRascunho = useFowStore((s) => s.definirRascunho);
@@ -137,8 +138,13 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
       // cobrir luz: apaga EXATAMENTE o retângulo desenhado, recortando as regiões visíveis que
       // ele toca (o pedaço coberto continua em `vistas`, então vira memória). Antes isto removia
       // a região inteira por interseção — cobrir um canto apagava o cômodo todo.
+      const antes = useStore.getState().mapa.fow.visiveisAgora;
       cobrirAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
-      registrarLog('anotacao', 'luz apagada na área', null, 'privada');
+      // sem interseção com nada visível, `cobrirAreaFoW` é no-op (mesma referência) — não
+      // registra log de "apagou" quando na prática nada mudou (mentiria pro mestre).
+      if (useStore.getState().mapa.fow.visiveisAgora !== antes) {
+        registrarLog('anotacao', 'luz apagada na área', null, 'privada');
+      }
     }
   }, [adicionarRegiaoFoW, cobrirAreaFoW, definirRascunho, registrarLog]);
 
@@ -152,6 +158,15 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
   return (
     <>
       <div className="fow-toolbar">
+        <button
+          className="icone-botao"
+          data-ativo={fow.ativa ? 'true' : undefined}
+          onClick={() => definirFoWAtivo(!fow.ativa)}
+          title="ligar/desligar fog of war neste mapa (não apaga o que já foi revelado)"
+        >
+          fow
+        </button>
+        <span style={{ width: 1, background: 'var(--concrete-2)', alignSelf: 'stretch', margin: '0 0.2rem' }} />
         <button
           className="icone-botao"
           data-ativo={modo === 'revelar' ? 'true' : undefined}
@@ -216,7 +231,7 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
         onPointerCancel={onPointerUp}
       />
 
-      <FoWViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
+      <FoWViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} visaoMestre />
 
       {/* marca visual do rascunho durante o arrasto está dentro de FoWViewOverlay (RascunhoVisual),
           porque tem as coords relativas à imagem — assim não duplica lógica de letterbox. */}

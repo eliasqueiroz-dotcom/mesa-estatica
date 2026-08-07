@@ -54,6 +54,14 @@
   animation: fow-chiado 0.8s steps(4) infinite;
 }
 
+/* mestre (`FoWOverlay.tsx`, `[data-visao='mestre']`) precisa enxergar o mapa por baixo pra
+   desenhar com precisão — o jogador é quem recebe o efeito cheio (0.95, quase opaco). Sem
+   isso, a própria tela do mestre "explode" em ruído no primeiro revelar e ele não consegue
+   checar se a área marcada bateu. */
+.fow-camadas[data-visao='mestre'] .fow-camada[data-estado='nunca'] {
+  opacity: 0.32;
+}
+
 /* variantes por zona — troca a matiz do chiado. P&B puro é default (regra de arte.md: nunca
    "preto + único verde-neon" — aqui usamos âmbar --real e ciano --rede porque já carregam a
    semântica narrativa do mundo). Lentas (~5s) pra não vendar o olho. */
@@ -79,6 +87,14 @@
   -webkit-backdrop-filter: blur(3px) brightness(0.4) saturate(0.3);
   background: rgba(11, 13, 17, 0.55); /* véu escurecedor extra pro caso do backdrop falhar */
   opacity: 0.95;
+}
+
+/* mesma razão da camada "nunca" acima — mestre vê um véu bem mais fraco. */
+.fow-camadas[data-visao='mestre'] .fow-camada[data-estado='visto'] {
+  backdrop-filter: blur(1px) brightness(0.75) saturate(0.6);
+  -webkit-backdrop-filter: blur(1px) brightness(0.75) saturate(0.6);
+  background: rgba(11, 13, 17, 0.2);
+  opacity: 0.6;
 }
 
 /* scanlines fortes sobre a camada vista — `::before` repete o mesmo padrão do ruido.css mas

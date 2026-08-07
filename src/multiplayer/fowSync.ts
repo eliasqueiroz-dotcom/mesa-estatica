@@ -13,6 +13,7 @@ interface LinhaFow {
   vistas: RegiaoFoW[];
   visiveis_agora: RegiaoFoW[];
   proximo_id_zona: ZonaFoW | null;
+  ativa: boolean | null;
   version: number;
 }
 
@@ -42,6 +43,7 @@ export function iniciarSyncFoW(): () => void {
         vistas: Array.isArray(linha.vistas) ? linha.vistas : [],
         visiveisAgora: Array.isArray(linha.visiveis_agora) ? linha.visiveis_agora : [],
         proximoIdZona: linha.proximo_id_zona ?? null,
+        ativa: linha.ativa ?? false,
       };
       useStore.setState((s) => ({ mapa: { ...s.mapa, fow } }));
     } finally {
@@ -71,6 +73,7 @@ export function iniciarSyncFoW(): () => void {
         vistas: f.vistas,
         visiveis_agora: f.visiveisAgora,
         proximo_id_zona: f.proximoIdZona,
+        ativa: f.ativa,
       })
       .then(({ error }) => {
         if (error) console.error('[fowSync] push falhou', error);

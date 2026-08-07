@@ -7,6 +7,11 @@ import { montarMaskSvg, regiaoEmPx } from './fowGeometria';
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
   tamanho: { width: number; height: number };
+  /** true só quando renderizado por `FoWOverlay.tsx` (mestre) — reduz opacidade/blur das
+   *  camadas (`fow.css`, `[data-visao='mestre']`) pra ele sempre enxergar o mapa por baixo
+   *  enquanto desenha. Jogador (`MapaJogadorView.tsx`) nunca passa essa prop — recebe o efeito
+   *  cheio, opaco. */
+  visaoMestre?: boolean;
 }
 
 /**
@@ -28,7 +33,7 @@ interface Props {
  * mesmo padrão de `mapaPublicoSync.ts`), e só lê. Sem JS por frame: os três `mask` são
  * strings recompute só quando `vistas`/`visiveisAgora` mudam (raro — ~dezenas de regiões).
  */
-export default function FoWViewOverlay({ imgRenderRect, tamanho }: Props) {
+export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = false }: Props) {
   const fow = useStore((s) => s.mapa.fow);
 
   // burst de sintonia: quando `visiveisAgora` ganha uma região NOVA (não meramente perde),
@@ -76,9 +81,11 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho }: Props) {
   // `adicionarRegiaoFoW` adiciona em AMBAS as listas). Não precisamos de union — `vistas`
   // sozinho já é a janela completa do "tocou uma vez ou está visível agora".
   const todasVistas = fow.vistas;
-  // sem nenhuma região, o mapa fica limpo (FoW só existe depois que o mestre desenha) — mas o
-  // container e o rascunho continuam montados, senão o primeiro arrasto não mostra nada.
-  const temFog = todasVistas.length > 0;
+  // gate é o toggle explícito do mestre (`fow.ativa`), não `vistas.length` — sem regiões
+  // nenhumas E ativo, `montarMaskSvg([], true)` já devolve máscara branca total (mostra em
+  // tudo), então o mapa nasce 100% chiado "nunca visto" até o mestre revelar algo. Desligado,
+  // fica limpo mesmo com regiões já reveladas antes (não apaga `vistas`/`visiveisAgora`).
+  const temFog = fow.ativa;
   const somenteVistas = fow.vistas.filter((r) => !idsVisiveis.has(r.id)); // memória desligada
   const todasZonas = new Set<RegiaoFoW['zona']>(fow.vistas.map((r) => r.zona));
 
@@ -94,7 +101,12 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho }: Props) {
 
   return (
     <>
-      <div className="fow-camadas" style={estiloCamadas} data-burst={burst ? 'true' : undefined}>
+      <div
+        className="fow-camadas"
+        style={estiloCamadas}
+        data-burst={burst ? 'true' : undefined}
+        data-visao={visaoMestre ? 'mestre' : undefined}
+      >
         {temFog && (
         <>
           <div

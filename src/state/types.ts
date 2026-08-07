@@ -330,6 +330,11 @@ export interface EstadoFoW {
   visiveisAgora: RegiaoFoW[];
   /** próxima região traçada assume essa zona (toolbar GM). Determina matiz do chiado/transition. */
   proximoIdZona: ZonaFoW | null;
+  /** liga/desliga só a RENDERIZAÇÃO das 3 camadas — nunca apaga `vistas`/`visiveisAgora`.
+   *  Default `false`: mapa nasce limpo, sem forçar fog em cena que não vai usar a ferramenta
+   *  (combate, referência). Ligar mostra o mapa inteiro em chiado "nunca visto" até o mestre
+   *  revelar algo — desligar e religar preserva tudo que já foi revelado. */
+  ativa: boolean;
 }
 
 export type ModoLoopMidia = 'nenhum' | 'faixa' | 'lista';
