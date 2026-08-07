@@ -91,7 +91,7 @@ export function criarGradeInicial(): GradeMapa {
 
 /** Fog of war vazio — nenhuma região revelada, desligado por padrão (mestre liga por mapa). */
 export function criarFoWVazio(): EstadoFoW {
-  return { vistas: [], visiveisAgora: [], proximoIdZona: null, ativa: false };
+  return { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false };
 }
 
 export function criarSessaoPublica(): SessaoPublica {
@@ -149,7 +149,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

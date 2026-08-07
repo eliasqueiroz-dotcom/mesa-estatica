@@ -3,12 +3,12 @@ import { criarFoWVazio } from '../state/factories';
 import { paraEstadoFoW, paraLinha } from './fowSync';
 
 describe('paraLinha / paraEstadoFoW', () => {
-  it('round-trip preserva o fow (vistas, visiveisAgora, zona, ativa)', () => {
+  it('round-trip preserva o fow (vistas, visiveisAgora, zonaAtual, ativa)', () => {
     const fow = {
       ...criarFoWVazio(),
-      vistas: [{ id: 'r1', forma: 'rect' as const, x: 0, y: 0, w: 0.5, h: 0.5, zona: 'rua' as const }],
-      visiveisAgora: [{ id: 'r1', forma: 'rect' as const, x: 0, y: 0, w: 0.5, h: 0.5, zona: 'rua' as const }],
-      proximoIdZona: 'corporativo' as const,
+      vistas: [{ id: 'r1', forma: 'rect' as const, x: 0, y: 0, w: 0.5, h: 0.5 }],
+      visiveisAgora: [{ id: 'r1', forma: 'rect' as const, x: 0, y: 0, w: 0.5, h: 0.5 }],
+      zonaAtual: 'corporativo' as const,
       ativa: true,
     };
     const linha = paraLinha(fow);

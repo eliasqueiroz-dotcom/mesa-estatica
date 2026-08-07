@@ -312,7 +312,11 @@ export type ZonaFoW = 'rua' | 'corporativo';
 
 /** Região retangular (v1) — 0-1 normalizado à IMAGEM (mesmo espaço de TokenMapa.x/y, invariante
  *  #3 do ROADMAP). `forma` faz parte do tipo já em v1 pra v2 (polígonos) migrar sem shape break
- *  (acrescentar `'poly'` + `pontos?: Ponto[]` numa futura SCHEMA_VERSION). */
+ *  (acrescentar `'poly'` + `pontos?: Ponto[]` numa futura SCHEMA_VERSION).
+ *
+ *  Sem `zona` (removido na v28) — zona é atributo da CENA (`EstadoFoW.zonaAtual`), não da
+ *  região: guardar por região nunca funcionou de verdade, porque o tint só se aplicava quando
+ *  TODAS as regiões reveladas coincidiam na mesma zona. */
 export interface RegiaoFoW {
   id: string;
   forma: 'rect';
@@ -320,7 +324,6 @@ export interface RegiaoFoW {
   y: number; // 0-1, canto superior esquerdo
   w: number; // 0-1, largura
   h: number; // 0-1, altura
-  zona: ZonaFoW | null;
 }
 
 export interface EstadoFoW {
@@ -328,8 +331,10 @@ export interface EstadoFoW {
   vistas: RegiaoFoW[];
   /** luz atual — subset de `vistas`; `visiveisAgora ⊆ vistas` sempre que cobrir luz (mantém memória). */
   visiveisAgora: RegiaoFoW[];
-  /** próxima região traçada assume essa zona (toolbar GM). Determina matiz do chiado/transition. */
-  proximoIdZona: ZonaFoW | null;
+  /** Atmosfera da CENA — tinge o chiado "nunca visto" inteiro (rua=âmbar, corporativo=ciano,
+   *  `null`=P&B puro). Nome antigo `proximoIdZona` (migração v28) sugeria "por região" mas
+   *  nunca foi de verdade — a coluna do banco (`fow_estado.proximo_id_zona`) não mudou. */
+  zonaAtual: ZonaFoW | null;
   /** liga/desliga só a RENDERIZAÇÃO das 3 camadas — nunca apaga `vistas`/`visiveisAgora`.
    *  Default `false`: mapa nasce limpo, sem forçar fog em cena que não vai usar a ferramenta
    *  (combate, referência). Ligar mostra o mapa inteiro em chiado "nunca visto" até o mestre

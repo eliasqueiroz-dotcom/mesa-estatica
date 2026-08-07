@@ -7,7 +7,10 @@ type Cliente = NonNullable<typeof supabase>;
 
 const ID_FOW = 'fow';
 
-/** Linha do banco — mesmas colunas das migrations 0027/0028. Todos os campos jsonb são tipados aqui. */
+/** Linha do banco — mesmas colunas das migrations 0027/0028. Todos os campos jsonb são tipados
+ *  aqui. `proximo_id_zona` é a coluna original (migration 0027) — o nome local mudou pra
+ *  `zonaAtual` na v28 (zona virou atributo da cena, não por região), mas renomear a coluna
+ *  custaria uma migration à toa: ela já guardava um único scalar por linha, sempre foi isso. */
 export interface LinhaFow {
   id: string;
   vistas: RegiaoFoW[];
@@ -20,7 +23,7 @@ export interface LinhaFow {
 export const paraLinha = (f: EstadoFoW): Omit<LinhaFow, 'id' | 'version'> => ({
   vistas: f.vistas,
   visiveis_agora: f.visiveisAgora,
-  proximo_id_zona: f.proximoIdZona,
+  proximo_id_zona: f.zonaAtual,
   ativa: f.ativa,
 });
 
@@ -31,7 +34,7 @@ export const paraLinha = (f: EstadoFoW): Omit<LinhaFow, 'id' | 'version'> => ({
 export const paraEstadoFoW = (r: Pick<LinhaFow, 'vistas' | 'visiveis_agora' | 'proximo_id_zona' | 'ativa'>): EstadoFoW => ({
   vistas: Array.isArray(r.vistas) ? r.vistas : [],
   visiveisAgora: Array.isArray(r.visiveis_agora) ? r.visiveis_agora : [],
-  proximoIdZona: r.proximo_id_zona ?? null,
+  zonaAtual: r.proximo_id_zona ?? null,
   ativa: r.ativa ?? false,
 });
 

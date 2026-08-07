@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFowStore } from '../../state/fowStore';
 import { useStore } from '../../state/store';
-import type { RegiaoFoW } from '../../state/types';
 import { montarMaskSvg, regiaoEmPx, subtrairRegioes } from './fowGeometria';
 
 interface Props {
@@ -90,13 +89,6 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = f
   // REVELADA INTEIRA como memória degradada — inclusive a parte que continua acesa, que ficava
   // com as duas camadas empilhadas.
   const somenteVistas = subtrairRegioes(fow.vistas, fow.visiveisAgora);
-  const todasZonas = new Set<RegiaoFoW['zona']>(fow.vistas.map((r) => r.zona));
-
-  // Para a camada "nunca" (só onde NÃO há nenhuma região vista/visivel), a zona seria a do
-  // entorno — mas como P&B é default e só 1 zona por cena normalmente, preferimos: se há uma
-  // única zona marcada, ela tint o chiado todo; senão P&B puro. (Pode ser refinado em v2 com
-  // malhas por zona — hoje só dá um tom geral.)
-  const zonaGlobal = todasZonas.size === 1 ? [...todasZonas][0] : null;
 
   const maskNunca = montarMaskSvg(todasVistas, true);
   const maskVisto = montarMaskSvg(somenteVistas);
@@ -115,7 +107,7 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = f
           <div
             className="fow-camada"
             data-estado="nunca"
-            data-zona={zonaGlobal ?? undefined}
+            data-zona={fow.zonaAtual ?? undefined}
             style={{ maskImage: maskNunca, WebkitMaskImage: maskNunca }}
           />
           {/* Lista vazia = máscara toda preta (esconde tudo) — a camada existiria só pra ficar

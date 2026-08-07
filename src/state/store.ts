@@ -146,9 +146,14 @@ interface Acoes {
   cobrirLuzFoW: (id: string) => void;
   /** Apaga a luz só na área dada, recortando as regiões visíveis que ela toca. */
   cobrirAreaFoW: (area: Pick<RegiaoFoW, 'x' | 'y' | 'w' | 'h'>) => void;
+  /** Devolve a área dada pro "nunca visto" — soma da memória (`vistas`) E da luz atual
+   *  (`visiveisAgora`) juntas, recortando cada região que ela toca. Diferente do `×`
+   *  (`limparFoW`), que zera o mapa inteiro — isto é cirúrgico, só a área desenhada. */
+  esquecerAreaFoW: (area: Pick<RegiaoFoW, 'x' | 'y' | 'w' | 'h'>) => void;
   limparFoW: () => void;
-  /** Define a zona da próxima região traçada (`null` = P&B puro). */
-  definirProximoIdZonaFoW: (zona: ZonaFoW | null) => void;
+  /** Atmosfera da cena inteira (`null` = P&B puro) — tinge o chiado "nunca visto" onde quer que
+   *  ele apareça, não só a próxima região traçada. */
+  definirZonaFoW: (zona: ZonaFoW | null) => void;
   /** Liga/desliga a renderização do FoW pro mapa atual — nunca apaga `vistas`/`visiveisAgora`. */
   definirFoWAtivo: (ativa: boolean) => void;
 
@@ -457,6 +462,24 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   // não usava a ferramenta.
   if (versaoAnterior < 27 && estado.mapa?.fow && estado.mapa.fow.ativa === undefined) {
     estado.mapa.fow.ativa = false;
+  }
+  // v27 → v28: zona vira atributo da CENA (`zonaAtual`), não mais por região — o tint só fazia
+  // efeito quando TODAS as regiões reveladas coincidiam na mesma zona, então na prática já era
+  // um controle único; isso só torna o modelo honesto com o comportamento real. Renomeia
+  // `proximoIdZona` → `zonaAtual` (a coluna do banco, `proximo_id_zona`, não muda — só o nome
+  // local) e derruba o `zona` morto de cada região já revelada.
+  if (versaoAnterior < 28 && estado.mapa?.fow) {
+    const fow = estado.mapa.fow;
+    if ('proximoIdZona' in fow) {
+      fow.zonaAtual = fow.proximoIdZona ?? null;
+      delete fow.proximoIdZona;
+    } else if (fow.zonaAtual === undefined) {
+      fow.zonaAtual = null;
+    }
+    for (const lista of [fow.vistas, fow.visiveisAgora]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (Array.isArray(lista)) for (const r of lista as any[]) delete r.zona;
+    }
   }
   return estado as Store;
 }
@@ -1026,9 +1049,30 @@ export const useStore = create<Store>()(
           if (restantes.length === atuais.length && restantes.every((r, i) => r === atuais[i])) return s;
           return { mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: restantes } } };
         }),
+      /** "Esquecer": devolve a área desenhada pro nunca-visto, recortando (`subtrairCaixa`) TANTO
+       *  `vistas` quanto `visiveisAgora` — ao contrário de `cobrirAreaFoW`, que só apaga a luz e
+       *  mantém a memória, isto some com a visita inteira naquele pedaço. Único jeito de reverter
+       *  uma área específica sem usar o `×` (que zera o mapa todo). */
+      esquecerAreaFoW: (area) =>
+        set((s) => {
+          const cortar = (lista: RegiaoFoW[]) =>
+            lista.flatMap((r) =>
+              caixasIntersectam(r, area)
+                ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
+                : [r],
+            );
+          const vistas = cortar(s.mapa.fow.vistas);
+          const visiveisAgora = cortar(s.mapa.fow.visiveisAgora);
+          const vistasMudou = vistas.length !== s.mapa.fow.vistas.length || vistas.some((r, i) => r !== s.mapa.fow.vistas[i]);
+          const visiveisMudou =
+            visiveisAgora.length !== s.mapa.fow.visiveisAgora.length ||
+            visiveisAgora.some((r, i) => r !== s.mapa.fow.visiveisAgora[i]);
+          if (!vistasMudou && !visiveisMudou) return s;
+          return { mapa: { ...s.mapa, fow: { ...s.mapa.fow, vistas, visiveisAgora } } };
+        }),
       limparFoW: () => set((s) => ({ mapa: { ...s.mapa, fow: criarFoWVazio() } })),
-      definirProximoIdZonaFoW: (zona) =>
-        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, proximoIdZona: zona } } })),
+      definirZonaFoW: (zona) =>
+        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, zonaAtual: zona } } })),
       definirFoWAtivo: (ativa) =>
         set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, ativa } } })),
 
@@ -1303,12 +1347,14 @@ export const useStore = create<Store>()(
             grade: { ...base.mapa.grade, ...d.mapa?.grade },
             // FoW: aceita `fow` do payload; importa o que vier (por região: campos opcionais
             // caem no default). Imports sem `fow` (pré-F1) ficam com máscara vazia — mesa
-            // sem FoW, mesmo que antes de existir o recurso.
+            // sem FoW, mesmo que antes de existir o recurso. `zonaAtual ?? proximoIdZona`
+            // aceita export feito antes da v28 (campo renomeado — ver `migrate`).
             fow: d.mapa?.fow
               ? {
                   vistas: Array.isArray(d.mapa.fow.vistas) ? d.mapa.fow.vistas : [],
                   visiveisAgora: Array.isArray(d.mapa.fow.visiveisAgora) ? d.mapa.fow.visiveisAgora : [],
-                  proximoIdZona: d.mapa.fow.proximoIdZona ?? null,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  zonaAtual: d.mapa.fow.zonaAtual ?? (d.mapa.fow as any).proximoIdZona ?? null,
                   ativa: d.mapa.fow.ativa ?? false,
                 }
               : base.mapa.fow,

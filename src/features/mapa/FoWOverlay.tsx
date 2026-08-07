@@ -5,7 +5,7 @@ import type { ZonaFoW } from '../../state/types';
 import FoWViewOverlay from './FoWViewOverlay';
 import { retanguloConteudo, getImgRenderRect, type Ponto } from './mapaUtils';
 
-type Modo = 'revelar' | 'cobrirLuz' | 'desligado';
+type Modo = 'revelar' | 'cobrirLuz' | 'esquecer' | 'desligado';
 
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
@@ -31,6 +31,9 @@ interface Props {
  *     `visiveisAgora` que ele toca (`subtrairCaixa`), sobrando as bordas de fora. O pedaço
  *     coberto continua em `vistas`, então vira memória. Cobrir é apagar a luz exatamente ali,
  *     não descartar a região inteira que o retângulo encostou.
+ *   `modo: 'esquecer'` → `esquecerAreaFoW` faz o mesmo recorte em `vistas` E `visiveisAgora`
+ *     juntas — a área desenhada volta pro nunca-visto. Único jeito de reverter uma área
+ *     específica sem usar o `×`, que zera o mapa inteiro.
  *
  * Pegadinhas:
  *  - Coords em 0–1 da IMAGEM, não do container (`getImgRenderRect` + `retanguloConteudo`,
@@ -39,13 +42,19 @@ interface Props {
  *  - `limparFoW` zera tudo (e `fowSync.ts` propaga o estado vazio pro jugador). Sem confirmação
  *    extra: o tooltip já diz "apagar a memória? o papel não esquece." e o reset de mesa já
  *    tem duplo-confirma.
+ *  - Escolher `revelar`/`cobrirLuz`/`esquecer` LIGA o `fow` sozinho se estiver desligado — sem
+ *    isso, desenhar com a névoa desligada grava a região (sincroniza pro Supabase) mas não
+ *    aparece nada na tela, parecendo quebrado.
+ *  - `rua`/`corp` tingem a CENA inteira (`fow.zonaAtual`), não a região desenhada — aparecem
+ *    sempre que `fow` está ligado, não só durante `revelar`.
  */
 export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRef }: Props) {
   const fow = useStore((s) => s.mapa.fow);
   const adicionarRegiaoFoW = useStore((s) => s.adicionarRegiaoFoW);
   const cobrirAreaFoW = useStore((s) => s.cobrirAreaFoW);
+  const esquecerAreaFoW = useStore((s) => s.esquecerAreaFoW);
   const limparFoW = useStore((s) => s.limparFoW);
-  const definirProximoIdZonaFoW = useStore((s) => s.definirProximoIdZonaFoW);
+  const definirZonaFoW = useStore((s) => s.definirZonaFoW);
   const definirFoWAtivo = useStore((s) => s.definirFoWAtivo);
   const registrarLog = useStore((s) => s.registrarLog);
 
@@ -92,12 +101,11 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
         y: clamp01(p.y),
         w: 0.001,
         h: 0.001,
-        zona: fow.proximoIdZona,
-        modo: modo === 'cobrirLuz' ? 'cobrirLuz' : 'revelar',
+        modo,
         ativa: true,
       });
     },
-    [modo, posicaoNormalizada, definirRascunho, fow.proximoIdZona],
+    [modo, posicaoNormalizada, definirRascunho],
   );
 
   const onPointerMove = useCallback(
@@ -128,13 +136,10 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
     definirRascunho(null);
     if (!r || r.w < 0.005 || r.h < 0.005) return; // clique sem arrasto (acidental) → ignora
     if (r.modo === 'revelar') {
-      // Filtrar RegiaoFoW só os campos persistentes: 'forma','x','y','w','h','zona'.
-      adicionarRegiaoFoW({ forma: r.forma, x: r.x, y: r.y, w: r.w, h: r.h, zona: r.zona });
-      // microcopy (arte.md): log é em minúsculas, sem exclamacao. Cor por zona (`--real` rua /
-      // `--rede` corp) no log não existe no estado atual; deixamos como texto puro.
-      const tagZona = r.zona === 'rua' ? ' rua' : r.zona === 'corporativo' ? ' corp' : '';
-      registrarLog('anotacao', `memória estabelecida${tagZona}`, null, 'privada');
-    } else {
+      // Filtrar RegiaoFoW só os campos persistentes: 'forma','x','y','w','h'.
+      adicionarRegiaoFoW({ forma: r.forma, x: r.x, y: r.y, w: r.w, h: r.h });
+      registrarLog('anotacao', 'memória estabelecida', null, 'privada'); // microcopy: minúsculas, sem exclamação
+    } else if (r.modo === 'cobrirLuz') {
       // cobrir luz: apaga EXATAMENTE o retângulo desenhado, recortando as regiões visíveis que
       // ele toca (o pedaço coberto continua em `vistas`, então vira memória). Antes isto removia
       // a região inteira por interseção — cobrir um canto apagava o cômodo todo.
@@ -145,13 +150,24 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
       if (useStore.getState().mapa.fow.visiveisAgora !== antes) {
         registrarLog('anotacao', 'luz apagada na área', null, 'privada');
       }
+    } else {
+      // esquecer: some com a área desenhada de `vistas` E `visiveisAgora` — volta a ser
+      // nunca-visto. Mesmo cuidado de log honesto do `cobrirLuz`: sem interseção é no-op.
+      const antes = useStore.getState().mapa.fow;
+      esquecerAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
+      if (useStore.getState().mapa.fow !== antes) {
+        registrarLog('anotacao', 'memória apagada', null, 'privada');
+      }
     }
-  }, [adicionarRegiaoFoW, cobrirAreaFoW, definirRascunho, registrarLog]);
+  }, [adicionarRegiaoFoW, cobrirAreaFoW, esquecerAreaFoW, definirRascunho, registrarLog]);
 
-  const trocarModo = (m: 'revelar' | 'cobrirLuz') => setModo((atual) => (atual === m ? 'desligado' : m));
+  const trocarModo = (m: 'revelar' | 'cobrirLuz' | 'esquecer') => {
+    const proximo = modo === m ? 'desligado' : m;
+    if (proximo !== 'desligado' && !fow.ativa) definirFoWAtivo(true); // desenhar liga a névoa sozinho
+    setModo(proximo);
+  };
 
-  const trocarZona = (z: ZonaFoW | null) =>
-    definirProximoIdZonaFoW(fow.proximoIdZona === z ? null : z);
+  const trocarZona = (z: ZonaFoW | null) => definirZonaFoW(fow.zonaAtual === z ? null : z);
 
   const temFoW = fow.vistas.length > 0 || fow.visiveisAgora.length > 0;
 
@@ -183,25 +199,37 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
         >
           cobrir luz
         </button>
-        <span style={{ width: 1, background: 'var(--concrete-2)', alignSelf: 'stretch', margin: '0 0.2rem' }} />
         <button
           className="icone-botao"
-          data-ativo={fow.proximoIdZona === 'rua' ? 'true' : undefined}
-          onClick={() => trocarZona('rua')}
-          title="zona: rua (âmbar — analógico/humano)"
-          style={{ color: 'var(--real)' }}
+          data-ativo={modo === 'esquecer' ? 'true' : undefined}
+          onClick={() => trocarModo('esquecer')}
+          title="esquecer (some com a área — volta a nunca-visto)"
         >
-          rua
+          esquecer
         </button>
-        <button
-          className="icone-botao"
-          data-ativo={fow.proximoIdZona === 'corporativo' ? 'true' : undefined}
-          onClick={() => trocarZona('corporativo')}
-          title="zona: corporativo (ciano — rede/sistema)"
-          style={{ color: 'var(--rede)' }}
-        >
-          corp
-        </button>
+        {fow.ativa && (
+          <>
+            <span style={{ width: 1, background: 'var(--concrete-2)', alignSelf: 'stretch', margin: '0 0.2rem' }} />
+            <button
+              className="icone-botao"
+              data-ativo={fow.zonaAtual === 'rua' ? 'true' : undefined}
+              onClick={() => trocarZona('rua')}
+              title="atmosfera da cena: rua (âmbar — analógico/humano)"
+              style={{ color: 'var(--real)' }}
+            >
+              rua
+            </button>
+            <button
+              className="icone-botao"
+              data-ativo={fow.zonaAtual === 'corporativo' ? 'true' : undefined}
+              onClick={() => trocarZona('corporativo')}
+              title="atmosfera da cena: corporativo (ciano — rede/sistema)"
+              style={{ color: 'var(--rede)' }}
+            >
+              corp
+            </button>
+          </>
+        )}
         {temFoW && (
           <button
             className="icone-botao"

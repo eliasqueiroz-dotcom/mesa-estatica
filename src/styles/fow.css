@@ -218,3 +218,9 @@
   border-color: var(--ruido);
   background: rgba(168, 70, 62, 0.08);
 }
+
+/* neutro — "esquecer" devolve a área pro nunca-visto, não tem cor de zona nem de alerta. */
+.fow-rascunho[data-modo='esquecer'] {
+  border-color: var(--ink-faint);
+  background: rgba(198, 204, 214, 0.08);
+}
