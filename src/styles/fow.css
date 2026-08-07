@@ -43,6 +43,14 @@
   -webkit-mask-size: 100% 100%;
   mask-repeat: no-repeat;
   -webkit-mask-repeat: no-repeat;
+  /* CRÍTICO: sem isso a máscara não faz nada. `mask-image` apontando pra uma IMAGEM (não uma
+     referência a um elemento <mask> no DOM) resolve `mask-mode: match-source` pra `alpha`, não
+     `luminance` — e o SVG de `montarMaskSvg` (fowGeometria.ts) é 100% opaco em toda parte (só
+     varia a COR do fill, nunca o alpha), então em modo alpha a camada aparecia inteira, sempre,
+     em qualquer navegador que segue a spec (Chrome moderno inclusive). `luminance` é o que faz
+     branco=mostra/preto=oculta funcionar de verdade. */
+  mask-mode: luminance;
+  -webkit-mask-source-type: luminance; /* equivalente legado, alguns WebKit mais antigos */
 }
 
 /* ===== Camada 1 — nunca visto: chiado P&B total ===== */
