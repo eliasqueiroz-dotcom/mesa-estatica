@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useAoeStore, type AoeVivo } from '../state/aoeStore';
 import { criarDebouncePorChave } from './debounce';
+import { ehAoeVivo } from './validarPayload';
 
 /** Mesmo valor de `reguasSync.ts` — é feedback ao vivo de um desenho em andamento. */
 const ATRASO_PUSH_MS = 80;
@@ -34,7 +35,11 @@ export function iniciarSyncAoE(): () => void {
   const canal: RealtimeChannel = cliente
     .channel('aoe', { config: { broadcast: { self: false, ack: false }, private: true } })
     .on('broadcast', { event: 'aoe-template' }, ({ payload }) => {
-      const template = (payload as { template: AoeVivo }).template;
+      const template = (payload as { template?: unknown }).template;
+      if (!ehAoeVivo(template)) {
+        console.warn('[aoeSync] payload de aoe-template com shape invalido, descartado', payload);
+        return;
+      }
       aplicandoRemoto = true;
       try {
         useAoeStore.getState().definirTemplate(template);

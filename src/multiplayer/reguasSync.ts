@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useReguasStore, type ReguaViva } from '../state/reguasStore';
 import { criarDebouncePorChave } from './debounce';
+import { ehReguaViva } from './validarPayload';
 
 /** Mais curto que o de tokens (`tokensSync.ts` usa 150ms) — a régua é feedback ao vivo de uma
  *  medição em andamento, não uma posição que se assenta; quanto menor o atraso, mais junto do
@@ -34,7 +35,11 @@ export function iniciarSyncReguas(): () => void {
   const canal: RealtimeChannel = cliente
     .channel('reguas', { config: { broadcast: { self: false, ack: false }, private: true } })
     .on('broadcast', { event: 'regua' }, ({ payload }) => {
-      const regua = (payload as { regua: ReguaViva }).regua;
+      const regua = (payload as { regua?: unknown }).regua;
+      if (!ehReguaViva(regua)) {
+        console.warn('[reguasSync] payload de regua com shape invalido, descartado', payload);
+        return;
+      }
       aplicandoRemoto = true;
       try {
         // atualizadaEm sempre o relógio LOCAL de quem recebe, nunca o de quem mediu — relógios
@@ -45,7 +50,11 @@ export function iniciarSyncReguas(): () => void {
       }
     })
     .on('broadcast', { event: 'regua-fim' }, ({ payload }) => {
-      const { id } = payload as { id: string };
+      const id = (payload as { id?: unknown }).id;
+      if (typeof id !== 'string') {
+        console.warn('[reguasSync] payload de regua-fim com shape invalido, descartado', payload);
+        return;
+      }
       aplicandoRemoto = true;
       try {
         useReguasStore.getState().removerRegua(id);
