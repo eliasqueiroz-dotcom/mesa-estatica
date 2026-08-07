@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { caixasIntersectam, montarMaskSvg, pontoDentroRegiao, regiaoEmPx, subtrairCaixa } from './fowGeometria';
+import { caixasIntersectam, montarMaskSvg, pontoDentroRegiao, regiaoEmPx, subtrairCaixa, subtrairRegioes } from './fowGeometria';
 
 describe('pontoDentroRegiao', () => {
   const r = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
@@ -39,8 +39,20 @@ describe('regiaoEmPx', () => {
 });
 
 describe('montarMaskSvg', () => {
-  it('lista vazia resulta em `none` (camada não aparece em nenhuma região)', () => {
-    expect(montarMaskSvg([])).toBe('none');
+  // Regressão: isto devolvia `'none'`, que em CSS significa "SEM máscara" — a camada aparecia
+  // inteira, o oposto do pretendido. Era a causa de "a área revelada continua coberta": ao
+  // revelar, `vistas \ visiveisAgora` fica vazio e o véu escuro da camada `visto` cobria o mapa
+  // todo, inclusive o pedaço recém-revelado.
+  it('lista vazia (sem inverter) esconde a camada — base preta, nunca `none`', () => {
+    const mask = montarMaskSvg([]);
+    expect(mask).not.toBe('none');
+    expect(mask.startsWith('url("data:image/svg+xml,')).toBe(true);
+    expect(mask).toContain(encodeURIComponent("fill='#000'"));
+  });
+
+  it('lista vazia com inverter mostra a camada em tudo — base branca', () => {
+    const mask = montarMaskSvg([], true);
+    expect(mask).toContain(encodeURIComponent("fill='#fff'"));
   });
 
   it('uma região produz SVG com encode e rect branca na posição esperada', () => {
@@ -126,5 +138,36 @@ describe('subtrairCaixa', () => {
       expect(p.x + p.w).toBeLessThanOrEqual(a.x + a.w + 1e-9);
       expect(p.y + p.h).toBeLessThanOrEqual(a.y + a.h + 1e-9);
     }
+  });
+});
+
+describe('subtrairRegioes', () => {
+  const metadeEsquerda = { x: 0, y: 0, w: 0.5, h: 1 };
+
+  it('sem nada a remover devolve as regiões intactas', () => {
+    expect(subtrairRegioes([metadeEsquerda], [])).toEqual([metadeEsquerda]);
+  });
+
+  /** Regressão do bug do "cobrir luz": a diferença era feita por id, mas `cobrirAreaFoW` gera
+   *  ids novos pros pedaços recortados — a região revelada INTEIRA virava memória degradada,
+   *  inclusive a metade que continuava acesa. Geometricamente, só a parte coberta sobra. */
+  it('região acesa parcialmente coberta deixa como memória só o pedaço coberto', () => {
+    // metade esquerda revelada; a luz continua só na metade DE CIMA dela
+    const aindaAcesa = { x: 0, y: 0, w: 0.5, h: 0.5 };
+    const memoria = subtrairRegioes([metadeEsquerda], [aindaAcesa]);
+    expect(area(memoria)).toBeCloseTo(0.5 - 0.25, 6); // só a metade de baixo
+    for (const p of memoria) expect(p.y).toBeGreaterThanOrEqual(0.5 - 1e-9);
+  });
+
+  it('região totalmente acesa não deixa memória nenhuma', () => {
+    expect(subtrairRegioes([metadeEsquerda], [{ x: 0, y: 0, w: 1, h: 1 }])).toEqual([]);
+  });
+
+  it('remove em cadeia — várias caixas acesas sobre a mesma região', () => {
+    const restante = subtrairRegioes(
+      [{ x: 0, y: 0, w: 1, h: 1 }],
+      [{ x: 0, y: 0, w: 0.5, h: 1 }, { x: 0.5, y: 0, w: 0.25, h: 1 }],
+    );
+    expect(area(restante)).toBeCloseTo(0.25, 6);
   });
 });

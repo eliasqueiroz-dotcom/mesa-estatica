@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFowStore } from '../../state/fowStore';
 import { useStore } from '../../state/store';
 import type { RegiaoFoW } from '../../state/types';
-import { montarMaskSvg, regiaoEmPx } from './fowGeometria';
+import { montarMaskSvg, regiaoEmPx, subtrairRegioes } from './fowGeometria';
 
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
@@ -75,8 +75,6 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = f
   // proporções de tela distintas). `{x:0,y:0,w:1,h:1}` devolve exatamente o rect da imagem.
   const estiloCamadas = regiaoEmPx(imgRenderRect, { x: 0, y: 0, w: 1, h: 1 });
 
-  // conjuntos por id — `vistas \ visiveisAgora` (memória sem luz).
-  const idsVisiveis = new Set(fow.visiveisAgora.map((r) => r.id));
   // `vistas` já contém TODAS as regiões (incluindo as que estão em `visiveisAgora`, pois
   // `adicionarRegiaoFoW` adiciona em AMBAS as listas). Não precisamos de union — `vistas`
   // sozinho já é a janela completa do "tocou uma vez ou está visível agora".
@@ -86,7 +84,12 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = f
   // tudo), então o mapa nasce 100% chiado "nunca visto" até o mestre revelar algo. Desligado,
   // fica limpo mesmo com regiões já reveladas antes (não apaga `vistas`/`visiveisAgora`).
   const temFog = fow.ativa;
-  const somenteVistas = fow.vistas.filter((r) => !idsVisiveis.has(r.id)); // memória desligada
+  // `vistas \ visiveisAgora` GEOMÉTRICO, não por id: `cobrirAreaFoW` (store.ts) recorta a região
+  // acesa e gera ids NOVOS pros pedaços que sobram, então o id da entrada em `vistas` nunca mais
+  // bate com nada em `visiveisAgora`. Com a diferença por id, cobrir um cantinho marcava a região
+  // REVELADA INTEIRA como memória degradada — inclusive a parte que continua acesa, que ficava
+  // com as duas camadas empilhadas.
+  const somenteVistas = subtrairRegioes(fow.vistas, fow.visiveisAgora);
   const todasZonas = new Set<RegiaoFoW['zona']>(fow.vistas.map((r) => r.zona));
 
   // Para a camada "nunca" (só onde NÃO há nenhuma região vista/visivel), a zona seria a do
@@ -115,22 +118,29 @@ export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = f
             data-zona={zonaGlobal ?? undefined}
             style={{ maskImage: maskNunca, WebkitMaskImage: maskNunca }}
           />
-          <div
-            className="fow-camada"
-            data-estado="visto"
-            style={{
-              // posiciona o backdrop filter ONDE a memória existe, controled pela mask — mas o
-              // backdrop-filter só se aplica à visita sem luz: usamos gradient inline pra localizar.
-              // mask reaplica o mesmo setup das outras camadas.
-              maskImage: maskVisto,
-              WebkitMaskImage: maskVisto,
-            }}
-          />
-          <div
-            className="fow-camada"
-            data-estado="visivel"
-            style={{ maskImage: maskVisivel, WebkitMaskImage: maskVisivel }}
-          />
+          {/* Lista vazia = máscara toda preta (esconde tudo) — a camada existiria só pra ficar
+              invisível, e `backdrop-filter` em tela cheia é caro. Não montar é mais barato e
+              tem exatamente o mesmo resultado visual. */}
+          {somenteVistas.length > 0 && (
+            <div
+              className="fow-camada"
+              data-estado="visto"
+              style={{
+                // posiciona o backdrop filter ONDE a memória existe, controled pela mask — mas o
+                // backdrop-filter só se aplica à visita sem luz: usamos gradient inline pra localizar.
+                // mask reaplica o mesmo setup das outras camadas.
+                maskImage: maskVisto,
+                WebkitMaskImage: maskVisto,
+              }}
+            />
+          )}
+          {fow.visiveisAgora.length > 0 && (
+            <div
+              className="fow-camada"
+              data-estado="visivel"
+              style={{ maskImage: maskVisivel, WebkitMaskImage: maskVisivel }}
+            />
+          )}
         </>
       )}
       </div>

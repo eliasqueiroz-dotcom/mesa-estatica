@@ -50,10 +50,15 @@ export function montarMaskSvg(
   regioes: Pick<RegiaoFoW, 'x' | 'y' | 'w' | 'h'>[],
   inverter = false,
 ): string {
-  if (regioes.length === 0 && !inverter) return 'none';
-  if (regioes.length === 0 && inverter) {
-    // nada a excluir — máscara totalmente branca (mostra em tudo).
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='1000'><rect width='1000' height='1000' fill='#fff'/></svg>`;
+  if (regioes.length === 0) {
+    // NUNCA devolver `mask-image: none` aqui: em CSS isso significa "sem máscara", ou seja, a
+    // camada aparece INTEIRA — o oposto de "não aparece em região nenhuma". Era exatamente esse
+    // o bug de "a área revelada continua coberta": revelar põe a região em `vistas` E em
+    // `visiveisAgora`, então `vistas \ visiveisAgora` fica vazio e a camada `visto` (véu escuro
+    // + backdrop-filter) cobria o mapa todo, inclusive o que acabou de ser revelado.
+    // `inverter` só escolhe a cor da base: branca mostra em tudo, preta esconde em tudo.
+    const base = inverter ? '#fff' : '#000';
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='1000' height='1000'><rect width='1000' height='1000' fill='${base}'/></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
   }
   const corMostra = '#fff';
@@ -127,4 +132,19 @@ export function subtrairCaixa(a: Caixa, b: Caixa): Caixa[] {
     }
   }
   return partes;
+}
+
+/**
+ * `regioes` menos TODAS as caixas de `remover` — diferença GEOMÉTRICA, não por id.
+ *
+ * É o que separa "vista mas apagada" de "vista e acesa" na renderização. Fazer isso por id não
+ * funciona: `cobrirAreaFoW` (store.ts) recorta a região acesa e gera ids novos pros pedaços que
+ * sobram, então o id da entrada em `vistas` deixa de existir em `visiveisAgora` e a região
+ * inteira era classificada como memória degradada — até a parte que continuava acesa.
+ */
+export function subtrairRegioes(regioes: Caixa[], remover: Caixa[]): Caixa[] {
+  if (remover.length === 0) return regioes;
+  return regioes.flatMap((r) =>
+    remover.reduce<Caixa[]>((partes, b) => partes.flatMap((p) => subtrairCaixa(p, b)), [r]),
+  );
 }
