@@ -26,7 +26,7 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
   const podeRolar = ready && !rolando;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
       {!modo2D && (
         <div
           id="dice-bandeja-jogador"
