@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import DadosTab from '../features/dados/DadosTab';
 import QuickRollOverlay from '../features/dados/QuickRollOverlay';
+import RolagemAoVivoPlayer from '../features/dados/RolagemAoVivoPlayer';
 import FichasTab from '../features/fichas/FichasTab';
 import MapaTab from '../features/mapa/MapaTab';
 import MidiaPlayerGM from '../features/midia/MidiaPlayerGM';
@@ -26,9 +27,11 @@ import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
 import { iniciarSyncPing } from '../multiplayer/pingSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
+import { iniciarSyncRolagemAoVivo } from '../multiplayer/rolagemAoVivoSync';
 import { iniciarSyncSessaoPublica } from '../multiplayer/sessaoPublicaSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
+import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import AvisoSupabaseAusente from './AvisoSupabaseAusente';
 import LogTab from './LogTab';
 import StatusIndicador from './StatusIndicador';
@@ -125,6 +128,7 @@ export default function App() {
   const [aba, setAba] = useState<AbaId>('personagens');
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
+  const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
 
   const abrirControle = () => {
     window.open(
@@ -153,6 +157,7 @@ export default function App() {
     let pararSoundpad = () => {};
     let pararAoE = () => {};
     let pararFoW = () => {};
+    let pararRolagemAoVivo = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -170,6 +175,7 @@ export default function App() {
       pararSoundpad = iniciarSyncSoundpad();
       pararAoE = iniciarSyncAoE();
       pararFoW = iniciarSyncFoW();
+      pararRolagemAoVivo = iniciarSyncRolagemAoVivo();
     });
     return () => {
       cancelado = true;
@@ -187,6 +193,7 @@ export default function App() {
       pararSoundpad();
       pararAoE();
       pararFoW();
+      pararRolagemAoVivo();
     };
   }, []);
 
@@ -248,6 +255,10 @@ export default function App() {
             {ABAS.map((a) => {
               const atalho = ATALHOS[a.id];
               const ativa = aba === a.id;
+              // aviso discreto (mesmo espírito do botão ATK ciano do CombatOverlay quando o
+              // combate começa): a aba Dados acende na cor de quem está rolando, se o mestre
+              // não estiver nela vendo ao vivo.
+              const rolandoFora = !ativa && a.id === 'dados' && rolagemAoVivo;
               return (
                 <button
                   key={a.id}
@@ -256,7 +267,9 @@ export default function App() {
                   style={
                     ativa
                       ? { borderColor: 'var(--rede)', color: 'var(--rede)', boxShadow: '0 0 0 1px var(--rede-glow)' }
-                      : undefined
+                      : rolandoFora
+                        ? { borderColor: rolagemAoVivo.cor, color: rolagemAoVivo.cor }
+                        : undefined
                   }
                 >
                   {atalho} {a.label}
@@ -268,6 +281,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <MidiaPlayerGM />
           <SoundpadPlayer />
+          <RolagemAoVivoPlayer />
           <VinculoMestre />
           <ExportarImportar abrirControle={abrirControle} />
         </div>

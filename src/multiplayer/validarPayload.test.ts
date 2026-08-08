@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ehAoeVivo, ehPingVivo, ehReguaViva } from './validarPayload';
+import { ehAoeVivo, ehPingVivo, ehReguaViva, ehRolagemAoVivo } from './validarPayload';
 
 describe('ehReguaViva', () => {
   const valida = {
@@ -81,5 +81,53 @@ describe('ehPingVivo', () => {
     expect(ehPingVivo({})).toBe(false);
     expect(ehPingVivo(null)).toBe(false);
     expect(ehPingVivo(undefined)).toBe(false);
+  });
+});
+
+describe('ehRolagemAoVivo', () => {
+  const valida = {
+    id: 'r1',
+    termos: [{ sides: 20, qty: 1 }],
+    valores: [15],
+    colorsetBase: 'rede' as const,
+    cor: '#4fc1d4',
+    origem: 'Helena',
+    tipo: 'teste' as const,
+  };
+
+  it('aceita uma rolagem bem formada', () => {
+    expect(ehRolagemAoVivo(valida)).toBe(true);
+  });
+
+  it('aceita colorsetBase "ruido" (Sanidade/Surto/Trauma)', () => {
+    expect(ehRolagemAoVivo({ ...valida, colorsetBase: 'ruido' })).toBe(true);
+  });
+
+  it('rejeita colorsetBase fora do conjunto conhecido', () => {
+    expect(ehRolagemAoVivo({ ...valida, colorsetBase: 'roxo' })).toBe(false);
+  });
+
+  it('rejeita termos ausente, vazio ou malformado', () => {
+    expect(ehRolagemAoVivo({ ...valida, termos: undefined })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, termos: [] })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, termos: [{ sides: 'nao-numero', qty: 1 }] })).toBe(false);
+  });
+
+  it('rejeita valores ausente ou com item não numérico', () => {
+    expect(ehRolagemAoVivo({ ...valida, valores: undefined })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, valores: [15, 'x'] })).toBe(false);
+  });
+
+  it('rejeita campos com tipo errado', () => {
+    expect(ehRolagemAoVivo({ ...valida, id: 42 })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, cor: 7 })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, origem: null })).toBe(false);
+    expect(ehRolagemAoVivo({ ...valida, tipo: 5 })).toBe(false);
+  });
+
+  it('rejeita payload vazio', () => {
+    expect(ehRolagemAoVivo({})).toBe(false);
+    expect(ehRolagemAoVivo(null)).toBe(false);
+    expect(ehRolagemAoVivo(undefined)).toBe(false);
   });
 });

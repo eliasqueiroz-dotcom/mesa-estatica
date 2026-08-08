@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import DiceBox, { type RollResults } from '@3d-dice/dice-box-threejs';
-import { COLORSETS, type ColorsetId } from './colorsets';
+import DiceBox, { type RollResults, type CustomColorset } from '@3d-dice/dice-box-threejs';
+import { COLORSETS, colorsetComCor, type ColorsetId } from './colorsets';
 import type { ConsumirForcadosFn, TipoRolagemForcada } from './registroForcados';
 import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
 
@@ -21,7 +21,19 @@ export interface GrupoResultado {
 /** Alias de compatibilidade — os roladores foram escritos contra este nome. */
 export type RollGroupResult = GrupoResultado;
 
-function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[] {
+/** Colorset ou fundo/vidro fixo (rede/ruído) ou fundo/vidro + cor do jogador nos números —
+ *  ver `colorsetComCor` em `colorsets.ts`. */
+export type ColorsetSpec = ColorsetId | { base: ColorsetId; cor: string };
+
+function chaveColorset(spec: ColorsetSpec): string {
+  return typeof spec === 'string' ? spec : `${spec.base}:${spec.cor}`;
+}
+
+function resolverColorset(spec: ColorsetSpec): CustomColorset {
+  return typeof spec === 'string' ? COLORSETS[spec] : colorsetComCor(spec.base, spec.cor);
+}
+
+export function normalizarTermos(notacao: string | RollTermo | RollTermo[]): RollTermo[] {
   if (typeof notacao === 'string') {
     return notacao.split('+').map((parte) => {
       const [qty, sides] = parte.trim().toLowerCase().split('d').map(Number);
@@ -121,9 +133,12 @@ export async function rolarFallback2D(
 interface PedidoRolagem {
   termos: RollTermo[];
   onComplete: (grupos: GrupoResultado[]) => void;
-  colorset: ColorsetId;
+  colorset: ColorsetSpec;
   personagemId: string | null;
   tipo: TipoRolagemForcada;
+  /** presente só em `reproduzir()`: valores já conhecidos (vindos do broadcast), notação
+   *  `termos@valores` pronta — bypassa `montarNotacao`/fila de forçados/servidor. */
+  notacaoForcada?: string;
 }
 
 export function useDiceBox(
@@ -143,8 +158,10 @@ export function useDiceBox(
   /** espelho síncrono de `rolando` — a lib não enfileira roll() concorrente (ver rolar() abaixo),
    *  então o guard de "já tem uma rolagem em andamento" precisa ser lido antes do setState assentar. */
   const rolandoRef = useRef(false);
-  /** evita chamar updateConfig (recarrega tema) toda rolagem — só quando o colorset pedido muda. */
-  const colorsetAtualRef = useRef<ColorsetId>('rede');
+  /** evita chamar updateConfig (recarrega tema) toda rolagem — só quando o colorset pedido muda.
+   *  chave string (`chaveColorset`) porque agora o colorset pode ser fixo ('rede'/'ruido') ou
+   *  dinâmico (base + cor do jogador). */
+  const colorsetAtualRef = useRef<string>('rede');
   /** fila de rolagens pedidas enquanto a bandeja já estava ocupada — tocam sozinhas, em ordem,
    *  assim que a rolagem em andamento assenta. Nenhum clique se perde. */
   const filaRef = useRef<PedidoRolagem[]>([]);
@@ -230,11 +247,14 @@ export function useDiceBox(
     try {
       // só recarrega o tema se o colorset pedido for diferente do atual — updateConfig é async
       // e refaz o loadTheme, então evitar isso em toda rolagem honesta (padrão 'rede').
-      if (pedido.colorset !== colorsetAtualRef.current) {
-        await box.updateConfig({ theme_customColorset: COLORSETS[pedido.colorset] });
-        colorsetAtualRef.current = pedido.colorset;
+      const chave = chaveColorset(pedido.colorset);
+      if (chave !== colorsetAtualRef.current) {
+        await box.updateConfig({ theme_customColorset: resolverColorset(pedido.colorset) });
+        colorsetAtualRef.current = chave;
       }
-      const notacao = await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto, consumirForcadosFn, pedido.tipo);
+      const notacao =
+        pedido.notacaoForcada ??
+        (await montarNotacao(pedido.termos, pedido.personagemId, resolverRemoto, consumirForcadosFn, pedido.tipo));
       const r = await box.roll(notacao);
       pedido.onComplete(paraGrupos(r));
     } catch (e: unknown) {
@@ -253,7 +273,7 @@ export function useDiceBox(
   const rolar = (
     notacao: string | RollTermo | RollTermo[],
     onComplete: (grupos: GrupoResultado[]) => void,
-    colorset: ColorsetId = 'rede',
+    colorset: ColorsetSpec = 'rede',
     personagemId: string | null = null,
     tipo: TipoRolagemForcada = 'teste',
   ) => {
@@ -275,5 +295,44 @@ export function useDiceBox(
     void executarRolagem(pedido);
   };
 
-  return { ready, erro, rolando, modo2D, rolar };
+  /** Reproduz uma rolagem cujos valores já são conhecidos (chegou pelo broadcast de
+   *  `rolagemAoVivoSync.ts`) — mesmo mecanismo de dado forçado que `montarNotacao` já usa pro
+   *  mestre, só que a origem do valor é remota, não a fila de `forcarRolagem.ts`. Nunca chama
+   *  `resolverRemoto`/`consumirForcadosFn`: os valores já vieram prontos, forçar de novo (ou
+   *  tentar o servidor) reescreveria o resultado que todo mundo já viu no log. */
+  const reproduzir = (
+    termos: RollTermo[],
+    valores: number[],
+    colorset: ColorsetSpec,
+    onComplete: (grupos: GrupoResultado[]) => void,
+  ) => {
+    if (modo2D) {
+      let cursor = 0;
+      const grupos: GrupoResultado[] = termos.map((t) => {
+        const rolls = Array.from({ length: t.qty }, () => ({ value: valores[cursor++] ?? 0 }));
+        return { qty: t.qty, sides: t.sides, value: rolls.reduce((soma, r) => soma + r.value, 0), rolls };
+      });
+      onComplete(grupos);
+      return;
+    }
+    if (!boxRef.current) return;
+    const base = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
+    const pedido: PedidoRolagem = {
+      termos,
+      onComplete,
+      colorset,
+      personagemId: null,
+      tipo: 'qualquer',
+      notacaoForcada: `${base}@${valores.join(',')}`,
+    };
+    if (rolandoRef.current) {
+      filaRef.current.push(pedido);
+      return;
+    }
+    rolandoRef.current = true;
+    setRolando(true);
+    void executarRolagem(pedido);
+  };
+
+  return { ready, erro, rolando, modo2D, rolar, reproduzir };
 }

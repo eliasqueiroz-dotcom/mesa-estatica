@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import DadosTabJogador from '../features/dados/DadosTabJogador';
 import QuickRollOverlayJogador from '../features/dados/QuickRollOverlayJogador';
+import RolagemAoVivoPlayer from '../features/dados/RolagemAoVivoPlayer';
 import FichaEditor from '../features/fichas/FichaEditor';
 import CombateJogadorView from '../features/iniciativa/CombateJogadorView';
 import MapaJogadorView from '../features/mapa/MapaJogadorView';
@@ -27,8 +28,10 @@ import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncPing } from '../multiplayer/pingSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
+import { iniciarSyncRolagemAoVivo } from '../multiplayer/rolagemAoVivoSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
+import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
 import AvisoSupabaseAusente from './AvisoSupabaseAusente';
@@ -63,6 +66,7 @@ export default function PlayerApp() {
   const [aba, setAba] = useState<AbaId>('sessao');
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
+  const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
 
   useHidratarSessaoPublica();
   useHidratarMapaPublico();
@@ -89,6 +93,7 @@ export default function PlayerApp() {
     let pararSoundpad = () => {};
     let pararAoE = () => {};
     let pararFoW = () => {};
+    let pararRolagemAoVivo = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
       if (cancelado) return;
@@ -107,6 +112,9 @@ export default function PlayerApp() {
       // (`is_gm()` no insert/update/delete) garante no servidor que nem vazar a anon key
       // permite escrever no banco.
       pararFoW = iniciarSyncFoW();
+      // simétrico: aqui é quem de fato PUBLICA (DadosTabJogador.tsx/QuickRollOverlayJogador.tsx
+      // chamam rolagemAoVivoStore.definirAtual), o mestre só recebe.
+      pararRolagemAoVivo = iniciarSyncRolagemAoVivo();
     });
     return () => {
       cancelado = true;
@@ -117,6 +125,7 @@ export default function PlayerApp() {
       pararSoundpad();
       pararAoE();
       pararFoW();
+      pararRolagemAoVivo();
     };
   }, []);
 
@@ -168,6 +177,9 @@ export default function PlayerApp() {
           <nav style={{ display: 'flex', gap: '0.4rem' }}>
             {ABAS.map((a) => {
               const ativa = aba === a.id;
+              // aviso discreto (mesmo espírito do botão ATK ciano do CombatOverlay): a aba
+              // Dados acende na cor de quem está rolando, se o jogador não estiver vendo ao vivo.
+              const rolandoFora = !ativa && a.id === 'dados' && rolagemAoVivo;
               return (
                 <button
                   key={a.id}
@@ -175,7 +187,9 @@ export default function PlayerApp() {
                   style={
                     ativa
                       ? { borderColor: 'var(--rede)', color: 'var(--rede)', boxShadow: '0 0 0 1px var(--rede-glow)' }
-                      : undefined
+                      : rolandoFora
+                        ? { borderColor: rolagemAoVivo.cor, color: rolagemAoVivo.cor }
+                        : undefined
                   }
                 >
                   {a.label}
@@ -186,6 +200,7 @@ export default function PlayerApp() {
         </div>
         <MidiaPlayerJogador />
         <SoundpadPlayer />
+        <RolagemAoVivoPlayer />
       </header>
       <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>

@@ -1,5 +1,6 @@
-import { useDiceBox } from '../../dice/useDiceBox';
+import { normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
+import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import type { Ficha } from '../../state/types';
 import RoladorSanidadeJogador from './RoladorSanidadeJogador';
 import RoladorSurtoJogador from './RoladorSurtoJogador';
@@ -25,6 +26,29 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
   const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja-jogador', active, 100, resolverRolagemJogador);
   const podeRolar = ready && !rolando;
 
+  // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
+  // wrapper único em vez de tocar nos 6 call sites de rolar() espalhados pelos roladores abaixo.
+  const rolarEBroadcast: typeof rolar = (notacao, onComplete, colorset, personagemId, tipo) => {
+    rolar(
+      notacao,
+      (grupos) => {
+        onComplete(grupos);
+        useRolagemAoVivoStore.getState().definirAtual({
+          id: crypto.randomUUID(),
+          termos: normalizarTermos(notacao),
+          valores: grupos.flatMap((g) => g.rolls.map((r) => r.value)),
+          colorsetBase: typeof colorset === 'string' ? colorset : 'rede',
+          cor: ficha.corVisual,
+          origem: ficha.nome || 'jogador',
+          tipo: tipo ?? 'teste',
+        });
+      },
+      colorset,
+      personagemId,
+      tipo,
+    );
+  };
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
       {!modo2D && (
@@ -49,11 +73,11 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       {erro && !modo2D && <p style={{ color: 'var(--ruido)' }}>erro: {erro}</p>}
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
-      <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
-      <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
-      <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
-      <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolar} />
-      <RolagemLivreJogador fichaId={ficha.id} ready={podeRolar} rolar={rolar} />
+      <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
+      <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
+      <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
+      <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
+      <RolagemLivreJogador fichaId={ficha.id} ready={podeRolar} rolar={rolarEBroadcast} />
     </div>
   );
 }

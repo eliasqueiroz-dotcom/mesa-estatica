@@ -24,3 +24,10 @@ export const COLORSETS: Record<'rede' | 'ruido', CustomColorset> = {
 };
 
 export type ColorsetId = keyof typeof COLORSETS;
+
+/** Colorset por jogador: fundo/vidro continua pelo tipo de rolagem (rede/ruído), números saem
+ *  na cor do jogador (`ficha.corVisual`) em vez do âmbar/ciano fixo — usado pela sincronização
+ *  ao vivo (`rolagemAoVivoStore.ts`) pra quem está vendo saber de quem é o dado. */
+export function colorsetComCor(base: ColorsetId, cor: string): CustomColorset {
+  return { ...COLORSETS[base], foreground: cor };
+}

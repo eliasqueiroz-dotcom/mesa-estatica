@@ -2,6 +2,7 @@ import type { Ponto } from '../features/mapa/mapaUtils';
 import type { ReguaViva } from '../state/reguasStore';
 import type { AoeVivo } from '../state/aoeStore';
 import type { PingVivo } from '../state/pingsStore';
+import type { RolagemAoVivo } from '../state/rolagemAoVivoStore';
 
 /**
  * Confere o shape mínimo de payloads de broadcast (`reguasSync.ts`, `aoeSync.ts`) antes de
@@ -47,4 +48,27 @@ export function ehPingVivo(v: unknown): v is PingVivo {
   if (!v || typeof v !== 'object') return false;
   const p = v as Record<string, unknown>;
   return typeof p.id === 'string' && typeof p.autorId === 'string' && typeof p.cor === 'string' && ehPonto(p.ponto);
+}
+
+function ehRollTermo(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const t = v as Record<string, unknown>;
+  return Number.isFinite(t.sides) && Number.isFinite(t.qty);
+}
+
+export function ehRolagemAoVivo(v: unknown): v is RolagemAoVivo {
+  if (!v || typeof v !== 'object') return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.id === 'string' &&
+    typeof r.cor === 'string' &&
+    typeof r.origem === 'string' &&
+    typeof r.tipo === 'string' &&
+    (r.colorsetBase === 'rede' || r.colorsetBase === 'ruido') &&
+    Array.isArray(r.termos) &&
+    r.termos.length > 0 &&
+    r.termos.every(ehRollTermo) &&
+    Array.isArray(r.valores) &&
+    r.valores.every((x) => Number.isFinite(x))
+  );
 }

@@ -70,15 +70,13 @@ Recap automático de sessão a partir do log · indicador sutil de Sanidade no j
 
 Quatro frentes levantadas em 06/08, depois da caça a bugs. O levantamento técnico de cada uma já foi feito; o que está aqui é o desenho e as pegadinhas descobertas, não código.
 
-### 1. Dado rolando visível e audível para todos
+### 1. ~~Dado rolando visível para todos~~ — concluído em 08/08
 
-Hoje a animação acontece só na tela de quem rolou; os outros recebem o resultado em texto no log, depois que o dado já caiu. Objetivo: todo mundo (jogadores e mestre) vê o dado girar e ouve, na aba Dados e na rolagem rápida; quem estiver em outra aba percebe que alguém rolou e pode ir olhar.
+Rolagem de JOGADOR (aba Dados e QuickRoll) agora transmite pro resto da mesa: canal broadcast `dados` (migração 0030, mesmo padrão simétrico de `pingSync.ts`, autorizado só por `authenticated`) carrega `{ id, termos, valores, colorsetBase, cor, origem, tipo }`; `RolagemAoVivoPlayer.tsx` (bandeja própria, sempre montada no header — resolveu a lacuna de nada ficar montado fora da aba Dados) reproduz com `useDiceBox.reproduzir()`, reaproveitando o mecanismo de dado forçado (`termos@valores`). Números saem na cor do jogador (`colorsetComCor`, `ficha.corVisual`), nome de quem rolou aparece no header, e a aba "Dados" acende na cor do jogador se quem está vendo estiver em outra aba (mesmo padrão do botão ATK do `CombatOverlay`). Rolagem do MESTRE nunca é transmitida — só os componentes `*Jogador.tsx` chamam `rolagemAoVivoStore.definirAtual`, sigilo por bundle, não checagem em runtime.
 
-- **A base já existe**: o mecanismo de dado forçado (`useDiceBox.ts`, sufixo `@v1,v2`) faz a lib cair em valores predeterminados — é exatamente o que reproduzir a rolagem de outra pessoa exige. `aoeSync.ts`/`reguasSync.ts` são o padrão de canal broadcast privado (migração 0025). O soundpad é o padrão de "evento por carimbo" que chega a todos, incluindo o cuidado de excluir o carimbo do fetch inicial pra não disparar em quem acabou de entrar.
-- **Desenho**: canal broadcast novo `dados` (privado, com policy em `realtime.messages`). Quem rola resolve os valores localmente como hoje e transmite `{ id, termos, valores, colorset, origem }`; cada cliente reproduz a animação com os mesmos valores. Como todos animam, o som já sai em todos de graça.
-- ~~**Som da física ligado**~~ (06/08) — `sounds: true` + `volume: 0.5` no DiceBox; os mp3 vêm no pacote da lib e o `postinstall` já copia pra `public/`. É som local de quem rola, não o "audível pra todos" acima, mas na prática cobre a mesa porque o mestre compartilha a janela no Discord. Não precisa de gesto de desbloqueio: rolar já é um clique.
-- **As quatro lacunas reais**: nenhuma bandeja fica montada fora da aba Dados/overlay (precisa de uma sempre montada no header, como o `SoundpadPlayer`); `rolar()` não é chamável de fora do componente (hoje o único gatilho externo é a prop-contador `pedidoRolagem`); áudio exige gesto do usuário e só o jogador tem botão de desbloqueio, o mestre não; e precisa de dedupe por id pra não reanimar um dado depois de reconectar.
-- **Aviso fora da aba**: carimbo no store (mesmo padrão de `ultimoDisparo`) + destaque na aba Dados. Não existe nada de "atividade nova" no app hoje.
+**Pendente pra virar realidade em produção**: a migração 0030 precisa ser aplicada no projeto Supabase de verdade (mesmo passo manual que faltou pra `ping` até a 0029 existir) — testado só localmente com typecheck/lint/`npm test`, o roundtrip entre dois clientes reais (mestre com `GM_TOKEN` + link de jogador vinculado) ainda não foi verificado ao vivo por não ter as credenciais desta sessão.
+
+Nota: som da física continua desligado (`sounds: false` em `useDiceBox.ts`) — a entrada "Som da física ligado (06/08)" que existia aqui estava desatualizada (o carregamento serial de 28 mp3 travava o `ready` por segundos e foi revertido depois); não faz parte deste item.
 
 ### 2. Ambiente de desenvolvimento isolado da mesa oficial — **só depois de 29/08**
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { montarNotacao, rolarFallback2D } from './useDiceBox';
+import { montarNotacao, normalizarTermos, rolarFallback2D } from './useDiceBox';
 import { consumirForcados, enfileirarForcado, limparForcados } from './forcarRolagem';
 import { extrairResultadosSanidade, parseDado } from '../features/dados/RoladorSanidade';
 
@@ -78,6 +78,27 @@ describe('montarNotacao', () => {
   it('entrada "qualquer" cai na próxima rolagem de quem for', async () => {
     enfileirarForcado([7], null, 'qualquer');
     expect(await montarNotacao([{ sides: 20, qty: 1 }], 'joao', undefined, consumirForcados)).toBe('1d20@7');
+  });
+});
+
+describe('normalizarTermos', () => {
+  // usada pelo wrapper `rolarEBroadcast` (DadosTabJogador.tsx/QuickRollOverlayJogador.tsx) pra
+  // reconstruir os termos a partir da notação e publicar no rolagemAoVivoStore — a ordem aqui
+  // precisa bater com a ordem dos valores em `grupos`, senão o broadcast reproduz o dado errado.
+  it('um termo só', () => {
+    expect(normalizarTermos('1d20')).toEqual([{ qty: 1, sides: 20 }]);
+  });
+
+  it('múltiplos termos combinados, na mesma ordem da notação', () => {
+    expect(normalizarTermos('1d20+2d8')).toEqual([
+      { qty: 1, sides: 20 },
+      { qty: 2, sides: 8 },
+    ]);
+  });
+
+  it('objeto ou lista de RollTermo passam direto', () => {
+    expect(normalizarTermos({ sides: 6, qty: 3 })).toEqual([{ sides: 6, qty: 3 }]);
+    expect(normalizarTermos([{ sides: 6, qty: 3 }])).toEqual([{ sides: 6, qty: 3 }]);
   });
 });
 

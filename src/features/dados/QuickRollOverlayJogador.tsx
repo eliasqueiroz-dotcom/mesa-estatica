@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDiceBox } from '../../dice/useDiceBox';
+import { normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
+import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 
@@ -37,9 +38,32 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
 
+  // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
+  // mesmo wrapper de DadosTabJogador.tsx, aqui só com os dois call sites locais.
+  const rolarEBroadcast: typeof rolar = (notacao, onComplete, colorset, personagemId, tipo) => {
+    rolar(
+      notacao,
+      (grupos) => {
+        onComplete(grupos);
+        useRolagemAoVivoStore.getState().definirAtual({
+          id: crypto.randomUUID(),
+          termos: normalizarTermos(notacao),
+          valores: grupos.flatMap((g) => g.rolls.map((r) => r.value)),
+          colorsetBase: typeof colorset === 'string' ? colorset : 'rede',
+          cor: ficha.corVisual,
+          origem: ficha.nome || 'jogador',
+          tipo: tipo ?? 'teste',
+        });
+      },
+      colorset,
+      personagemId,
+      tipo,
+    );
+  };
+
   const rolarSimples = () => {
     setResultadoRoll(null);
-    rolar(
+    rolarEBroadcast(
       '1d20',
       (grupos) => {
         const valor = grupos[0]?.rolls[0]?.value ?? 0;
@@ -67,7 +91,7 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
 
   const rolarPericia = () => {
     setResultadoRoll(null);
-    rolar(
+    rolarEBroadcast(
       '1d20',
       (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
