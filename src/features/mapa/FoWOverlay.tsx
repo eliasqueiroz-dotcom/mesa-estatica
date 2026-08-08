@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFowStore } from '../../state/fowStore';
 import { useStore } from '../../state/store';
 import type { ZonaFoW } from '../../state/types';
@@ -39,9 +39,10 @@ interface Props {
  *  - Coords em 0–1 da IMAGEM, não do container (`getImgRenderRect` + `retanguloConteudo`,
  *    invariante #3 do ROADMAP). Usar `e.currentTarget.getBoundingClientRect()` direto daria
  *    delta de borda/padding — mestre e jogador desalinhariam.
- *  - `limparFoW` zera tudo (e `fowSync.ts` propaga o estado vazio pro jugador). Sem confirmação
- *    extra: o tooltip já diz "apagar a memória? o papel não esquece." e o reset de mesa já
- *    tem duplo-confirma.
+ *  - `limparFoW` zera tudo — `vistas`, `visiveisAgora`, `zonaAtual` E `ativa` (desliga o FoW do
+ *    mapa, não só limpa o histórico) — e `fowSync.ts` propaga o estado vazio pro jogador.
+ *    Irreversível, então pede confirmação num modal (mesmo padrão de `ResetSessao.tsx`), não
+ *    `window.confirm` nativo — destoava do resto da UI.
  *  - Escolher `revelar`/`cobrirLuz`/`esquecer` LIGA o `fow` sozinho se estiver desligado — sem
  *    isso, desenhar com a névoa desligada grava a região (sincroniza pro Supabase) mas não
  *    aparece nada na tela, parecendo quebrado.
@@ -61,8 +62,18 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
   const definirRascunho = useFowStore((s) => s.definirRascunho);
 
   const [modo, setModo] = useState<Modo>('desligado');
+  const [modalApagarAberto, setModalApagarAberto] = useState(false);
   const desenhandoRef = useRef(false);
   const origemRef = useRef<Ponto | null>(null);
+
+  useEffect(() => {
+    if (!modalApagarAberto) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModalApagarAberto(false);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [modalApagarAberto]);
 
   const posicaoNormalizada = useCallback(
     (e: { clientX: number; clientY: number }): Ponto | null => {
@@ -233,16 +244,61 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
         {temFoW && (
           <button
             className="icone-botao"
-            onClick={() => {
-              if (window.confirm('apagar a memória? o papel não esquece.')) limparFoW();
-            }}
-            title="apagar a memória? o papel não esquece."
+            onClick={() => setModalApagarAberto(true)}
+            title="apagar toda a memória do FoW neste mapa (revelado e coberto) e desligar — não dá pra desfazer"
             style={{ color: 'var(--ruido)' }}
           >
             ×
           </button>
         )}
       </div>
+
+      {modalApagarAberto && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(11, 13, 17, 0.6)',
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setModalApagarAberto(false)}
+        >
+          <div
+            className="secao"
+            style={{
+              width: 400,
+              maxWidth: '90vw',
+              borderColor: 'var(--ruido)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, color: 'var(--ruido)' }}>apagar memória do FoW</h3>
+            <p className="vazio" style={{ margin: 0 }}>
+              apaga tudo que foi revelado e coberto neste mapa, e desliga o FoW. o papel não
+              esquece — não dá pra desfazer.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+              <button
+                className="perigo"
+                onClick={() => {
+                  limparFoW();
+                  setModalApagarAberto(false);
+                }}
+              >
+                apagar memória
+              </button>
+              <button onClick={() => setModalApagarAberto(false)}>cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         className="fow-camada-captura"
