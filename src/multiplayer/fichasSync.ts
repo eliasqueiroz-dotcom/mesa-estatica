@@ -8,7 +8,7 @@ import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
-const ATRASO_PUSH_MS = 700;
+const ATRASO_PUSH_MS = 500;
 
 type Cliente = NonNullable<typeof supabase>;
 
