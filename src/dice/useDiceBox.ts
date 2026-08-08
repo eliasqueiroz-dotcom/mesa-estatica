@@ -4,10 +4,6 @@ import { COLORSETS, type ColorsetId } from './colorsets';
 import type { ConsumirForcadosFn, TipoRolagemForcada } from './registroForcados';
 import { resolverRolagemRemota } from '../multiplayer/rolagemRemota';
 
-/** Volume do som da física dos dados (0–1). Abaixo do soundpad (0.8) de propósito: o dado toca
- *  em toda rolagem, então incomoda mais que um efeito pontual — e concorre com a música. */
-const VOLUME_DADOS = 0.5;
-
 /** Termo de rolagem — ex: { sides: 20, qty: 2 } = 2d20. */
 export interface RollTermo {
   sides: number;
@@ -183,13 +179,14 @@ export function useDiceBox(
       theme_material: 'glass',
       theme_customColorset: COLORSETS.rede,
       baseScale,
-      // Som da física (colisão + superfície de feltro, casando com `theme_surface`). Os mp3 vêm
-      // no pacote da lib e o `postinstall` já os copia pra public/ — nada de rede em runtime.
-      // Isto é som LOCAL de quem rola, não o "dado audível pra todos" do roadmap (aquele precisa
-      // do canal de broadcast); na prática já cobre a mesa porque o mestre compartilha a janela
-      // no Discord. Não precisa de gesto de desbloqueio: rolar já é um clique.
-      sounds: true,
-      volume: VOLUME_DADOS,
+      // Som da física (colisão + superfície de feltro) desligado: `initialize()` só marca
+      // `ready` DEPOIS de `loadSounds()` terminar, e a lib carrega 28 arquivos de áudio em
+      // série (um `await` por arquivo, não paralelo) — "nada de rede em runtime" (os mp3 são
+      // locais, copiados pelo postinstall) não significa instantâneo, e a "física dos dados"
+      // ficava travada por segundos antes do dado ficar clicável. Ligar de novo exige mudar
+      // a lib pra carregar som em paralelo sem bloquear `ready` (não é uma opção de config
+      // pública dela hoje) — até lá, `false` é o que sempre funcionou rápido.
+      sounds: false,
       shadows: true,
     });
     boxRef.current = box;
