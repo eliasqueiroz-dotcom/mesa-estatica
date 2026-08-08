@@ -85,7 +85,7 @@ export default function RoladorTabelas({ ready, rolar: rolarNaBandeja }: Rolador
   };
 
   return (
-    <section className="secao">
+    <section className="secao" style={{ gridColumn: modo === 'editar' ? 'span 2' : undefined }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 className="label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Tabelas
