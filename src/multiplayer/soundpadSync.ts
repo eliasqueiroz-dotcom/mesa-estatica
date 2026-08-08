@@ -69,6 +69,7 @@ export function iniciarSyncSoundpad(): () => void {
 
   let aplicandoRemoto = false;
   let sonsAnteriores = useStore.getState().soundpad.sons;
+  const pendencias = new Set<string>();
 
   const aplicar = (fn: (s: ReturnType<typeof useStore.getState>) => void) => {
     aplicandoRemoto = true;
@@ -111,6 +112,7 @@ export function iniciarSyncSoundpad(): () => void {
     });
 
   const agendarUpsert = criarDebouncePorChave<SomSoundpad>(ATRASO_PUSH_MS, (_chave, som) => {
+    pendencias.delete(_chave);
     cliente
       .from('soundpad_sons')
       .upsert(paraLinha(som), { onConflict: 'slot' })
@@ -125,7 +127,10 @@ export function iniciarSyncSoundpad(): () => void {
     if (state.soundpad.sons !== prevState.soundpad.sons) {
       const { upserts, removidos } = computarDiffSons(sonsAnteriores, state.soundpad.sons);
       sonsAnteriores = state.soundpad.sons;
-      for (const som of upserts) agendarUpsert(String(som.slot), som);
+      for (const som of upserts) {
+        pendencias.add(String(som.slot));
+        agendarUpsert(String(som.slot), som);
+      }
       for (const som of removidos) {
         // mesma trava de `fichasSync`: só apaga se o × da UI marcou de propósito, nunca por
         // inferência de diff (uma aba de mestre desatualizada apagaria o slot de todos).
@@ -164,11 +169,13 @@ export function iniciarSyncSoundpad(): () => void {
         const s = useStore.getState();
         if (payload.eventType === 'DELETE') {
           const slotRemovido = (payload.old as { slot: number }).slot;
+          if (pendencias.has(String(slotRemovido))) return;
           useStore.setState({
             soundpad: { ...s.soundpad, sons: s.soundpad.sons.filter((x) => x.slot !== slotRemovido) },
           });
         } else {
           const som = paraSom(payload.new as LinhaSom);
+          if (pendencias.has(String(som.slot))) return;
           useStore.setState({
             soundpad: { ...s.soundpad, sons: [...s.soundpad.sons.filter((x) => x.slot !== som.slot), som] },
           });

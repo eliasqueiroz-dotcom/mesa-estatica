@@ -49,6 +49,7 @@ export function iniciarSyncMidiaFaixas(): () => void {
 
   let aplicandoRemoto = false;
   let faixasAnteriores = useStore.getState().midia.faixas;
+  const pendencias = new Set<string>();
 
   cliente
     .from('midia_faixas')
@@ -66,6 +67,7 @@ export function iniciarSyncMidiaFaixas(): () => void {
     });
 
   const agendarUpsert = criarDebouncePorChave<FaixaMidia>(ATRASO_PUSH_MS, (_id, faixa) => {
+    pendencias.delete(_id);
     cliente
       .from('midia_faixas')
       .upsert(paraLinha(faixa))
@@ -80,7 +82,10 @@ export function iniciarSyncMidiaFaixas(): () => void {
     const { upserts, removidos } = computarDiffFaixas(faixasAnteriores, state.midia.faixas);
     faixasAnteriores = state.midia.faixas;
 
-    for (const faixa of upserts) agendarUpsert(faixa.id, faixa);
+    for (const faixa of upserts) {
+      pendencias.add(faixa.id);
+      agendarUpsert(faixa.id, faixa);
+    }
     // só apaga no servidor se o botão "excluir" marcou o id de propósito — ver
     // remocaoExplicita.ts.
     for (const id of removidos) {
@@ -103,9 +108,11 @@ export function iniciarSyncMidiaFaixas(): () => void {
         const s = useStore.getState();
         if (payload.eventType === 'DELETE') {
           const idRemovido = (payload.old as { id: string }).id;
+          if (pendencias.has(idRemovido)) return;
           useStore.setState({ midia: { ...s.midia, faixas: s.midia.faixas.filter((f) => f.id !== idRemovido) } });
         } else {
           const faixa = paraFaixa(payload.new as LinhaFaixa);
+          if (pendencias.has(faixa.id)) return;
           const existe = s.midia.faixas.some((f) => f.id === faixa.id);
           const faixas = existe
             ? s.midia.faixas.map((f) => (f.id === faixa.id ? faixa : f))

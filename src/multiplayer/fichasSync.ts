@@ -161,8 +161,10 @@ export function iniciarSyncFichas(): () => void {
   // libera quando TODAS as aplicações remotas em voo terminarem.
   let aplicandoRemotoContagem = 0;
   let fichasAnteriores = useStore.getState().fichas;
+  const pendencias = new Set<string>();
 
   const agendarPush = criarDebouncePorChave<Ficha>(ATRASO_PUSH_MS, (_id, ficha) => {
+    pendencias.delete(_id);
     empurrarFicha(cliente, ficha).catch((e) =>
       console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
     );
@@ -176,7 +178,10 @@ export function iniciarSyncFichas(): () => void {
 
     for (const ficha of state.fichas) {
       const anterior = fichasAnteriores.find((f) => f.id === ficha.id);
-      if (anterior !== ficha) agendarPush(ficha.id, ficha);
+      if (anterior !== ficha) {
+          pendencias.add(ficha.id);
+          agendarPush(ficha.id, ficha);
+        }
     }
     for (const idAntigo of idsAnteriores) {
       // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
@@ -214,7 +219,7 @@ export function iniciarSyncFichas(): () => void {
       const fichaRemota = await buscarEMontar(cliente, id);
       const fichaLocalAgora = useStore.getState().fichas.find((f) => f.id === id);
 
-      if (fichaLocalAgora !== fichaLocalAntes) {
+      if (fichaLocalAgora !== fichaLocalAntes || pendencias.has(id)) {
         // Edição local aconteceu durante o fetch — ela vence (mantém o que está na tela) e
         // agenda o push que o guard engoliu; `fichaLocalAgora` undefined = o mestre removeu a
         // ficha nesse meio-tempo, então nem re-adiciona `fichaRemota` (evitaria ressuscitar uma

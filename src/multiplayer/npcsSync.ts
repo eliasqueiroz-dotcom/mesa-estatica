@@ -143,8 +143,10 @@ export function iniciarSyncNpcs(): () => void {
   // a terminar zerar a flag enquanto o segundo ainda está em voo (loop exponencial de eco).
   let aplicandoRemotoContagem = 0;
   let npcsAnteriores = useStore.getState().npcs;
+  const pendencias = new Set<string>();
 
   const agendarPush = criarDebouncePorChave<Npc>(ATRASO_PUSH_MS, (_id, npc) => {
+    pendencias.delete(_id);
     empurrarNpc(cliente, npc).catch((e) => console.error('[npcsSync] push falhou', e));
   });
 
@@ -156,7 +158,10 @@ export function iniciarSyncNpcs(): () => void {
 
     for (const npc of state.npcs) {
       const anterior = npcsAnteriores.find((n) => n.id === npc.id);
-      if (anterior !== npc) agendarPush(npc.id, npc);
+      if (anterior !== npc) {
+          pendencias.add(npc.id);
+          agendarPush(npc.id, npc);
+        }
     }
     for (const idAntigo of idsAnteriores) {
       // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
@@ -193,7 +198,7 @@ export function iniciarSyncNpcs(): () => void {
       const npcRemoto = await buscarEMontar(cliente, id);
       const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
 
-      if (npcLocalAgora !== npcLocalAntes) {
+      if (npcLocalAgora !== npcLocalAntes || pendencias.has(id)) {
         if (npcLocalAgora) agendarPush(id, npcLocalAgora);
         return;
       }

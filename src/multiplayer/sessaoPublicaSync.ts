@@ -97,8 +97,10 @@ export function iniciarSyncSessaoPublica(): () => void {
   // Contador, não boolean — ver comentário equivalente em fichasSync.ts: mais seguro contar do
   // que assumir que `aplicarRemoto` nunca sobrepõe outra chamada em voo.
   let aplicandoRemotoContagem = 0;
+  const pendente = { valor: false };
 
   const agendarPush = criarDebouncePorChave<SessaoPublica>(ATRASO_PUSH_MS, (_chave, sessaoPublica) => {
+    pendente.valor = false;
     cliente
       .from('sessao_publica')
       .upsert({ id: ID_SESSAO, ...paraLinha(sessaoPublica) })
@@ -112,6 +114,7 @@ export function iniciarSyncSessaoPublica(): () => void {
     // só existe UMA "linha" (sessaoPublica inteira) — a chave do debounce é sempre a mesma,
     // então uma rajada de teclas junta tudo num push só (mesmo princípio de fichasSync.ts, só
     // que por objeto inteiro em vez de por id de coleção).
+    pendente.valor = true;
     agendarPush(ID_SESSAO, state.sessaoPublica);
   });
 
@@ -127,7 +130,7 @@ export function iniciarSyncSessaoPublica(): () => void {
       const { data, error } = await cliente.from('sessao_publica').select('*').eq('id', ID_SESSAO).maybeSingle();
       const sessaoPublicaAgora = useStore.getState().sessaoPublica;
 
-      if (sessaoPublicaAgora !== sessaoPublicaAntes) {
+      if (sessaoPublicaAgora !== sessaoPublicaAntes || pendente.valor) {
         agendarPush(ID_SESSAO, sessaoPublicaAgora);
         return;
       }
