@@ -184,7 +184,20 @@ export function iniciarSyncNpcs(): () => void {
   const aplicarRemoto = async (id: string) => {
     aplicandoRemotoContagem++;
     try {
+      // Snapshot ANTES do fetch — mesmo motivo de fichasSync.ts: se o NPC local mudar enquanto
+      // `buscarEMontar` está em voo (a guarda acima impede o subscriber de agendar push
+      // enquanto isso), o remoto buscado ANTES dessa edição sobrescreveria a edição do mestre
+      // sem nunca reenviá-la. Se mudou, a edição local vence e reagenda o push que a guarda
+      // engoliu.
+      const npcLocalAntes = useStore.getState().npcs.find((n) => n.id === id);
       const npcRemoto = await buscarEMontar(cliente, id);
+      const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
+
+      if (npcLocalAgora !== npcLocalAntes) {
+        if (npcLocalAgora) agendarPush(id, npcLocalAgora);
+        return;
+      }
+
       if (!npcRemoto) return;
       const s = useStore.getState();
       const existe = s.npcs.some((n) => n.id === id);

@@ -2,10 +2,17 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { SessaoPublica } from '../state/types';
+import { criarDebouncePorChave } from './debounce';
 
 type Cliente = NonNullable<typeof supabase>;
 
 const ID_SESSAO = 'sessao';
+
+/** Mesmo valor/motivo de `fichasSync.ts`/`npcsSync.ts` — sem isso, cada tecla digitada em
+ *  "cena atual"/"caso"/"local atual"/"objetivo" etc. dispara um upsert, cujo eco do Supabase
+ *  chega atrasado e pode sobrescrever o que já foi digitado depois (letras "somem" no meio da
+ *  digitação — visto ao vivo). */
+const ATRASO_PUSH_MS = 400;
 
 export interface Linha {
   id: string;
@@ -87,27 +94,45 @@ export function iniciarSyncSessaoPublica(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
-  // Contador, não boolean — ver comentário equivalente em fichasSync.ts. Aqui a janela de
-  // corrida é mais estreita (só 1 tabela, sem await entre marcar a flag e o setState), mas
-  // edições rápidas em sequência (texto sem debounce, ROADMAP já documenta isso) ainda podem
-  // disparar `aplicarRemoto` concorrentes — mais seguro contar do que assumir que nunca sobrepõe.
+  // Contador, não boolean — ver comentário equivalente em fichasSync.ts: mais seguro contar do
+  // que assumir que `aplicarRemoto` nunca sobrepõe outra chamada em voo.
   let aplicandoRemotoContagem = 0;
 
-  const unsubscribeLocal = useStore.subscribe((state, prevState) => {
-    if (aplicandoRemotoContagem > 0 || state.sessaoPublica === prevState.sessaoPublica) return;
+  const agendarPush = criarDebouncePorChave<SessaoPublica>(ATRASO_PUSH_MS, (_chave, sessaoPublica) => {
     cliente
       .from('sessao_publica')
-      .upsert({ id: ID_SESSAO, ...paraLinha(state.sessaoPublica) })
+      .upsert({ id: ID_SESSAO, ...paraLinha(sessaoPublica) })
       .then(({ error }) => {
         if (error) console.error('[sessaoPublicaSync] push falhou', error);
       });
   });
 
+  const unsubscribeLocal = useStore.subscribe((state, prevState) => {
+    if (aplicandoRemotoContagem > 0 || state.sessaoPublica === prevState.sessaoPublica) return;
+    // só existe UMA "linha" (sessaoPublica inteira) — a chave do debounce é sempre a mesma,
+    // então uma rajada de teclas junta tudo num push só (mesmo princípio de fichasSync.ts, só
+    // que por objeto inteiro em vez de por id de coleção).
+    agendarPush(ID_SESSAO, state.sessaoPublica);
+  });
+
   const aplicarRemoto = async () => {
-    const { data, error } = await cliente.from('sessao_publica').select('*').eq('id', ID_SESSAO).maybeSingle();
-    if (error || !data) return;
     aplicandoRemotoContagem++;
     try {
+      // Snapshot ANTES do fetch — mesmo motivo de fichasSync.ts: se `sessaoPublica` mudar
+      // enquanto o `select` está em voo (a guarda acima impede o subscriber de agendar push
+      // enquanto isso), o remoto buscado ANTES dessa edição sobrescreveria a edição do mestre
+      // sem nunca reenviá-la. Se mudou, a edição local vence e reagenda o push que a guarda
+      // engoliu.
+      const sessaoPublicaAntes = useStore.getState().sessaoPublica;
+      const { data, error } = await cliente.from('sessao_publica').select('*').eq('id', ID_SESSAO).maybeSingle();
+      const sessaoPublicaAgora = useStore.getState().sessaoPublica;
+
+      if (sessaoPublicaAgora !== sessaoPublicaAntes) {
+        agendarPush(ID_SESSAO, sessaoPublicaAgora);
+        return;
+      }
+
+      if (error || !data) return;
       useStore.setState({ sessaoPublica: paraSessaoPublica(data as Linha) });
     } finally {
       aplicandoRemotoContagem--;
