@@ -26,6 +26,7 @@ export default function RoladorTabelas() {
   const adicionarEntradaTabela = useStore((s) => s.adicionarEntradaTabela);
   const atualizarEntradaTabela = useStore((s) => s.atualizarEntradaTabela);
   const removerEntradaTabela = useStore((s) => s.removerEntradaTabela);
+  const restaurarTabelasPadrao = useStore((s) => s.restaurarTabelasPadrao);
   const registrarLog = useStore((s) => s.registrarLog);
 
   const [modo, setModo] = useState<'rolar' | 'editar'>('rolar');
@@ -106,6 +107,18 @@ export default function RoladorTabelas() {
                   ))}
                 </select>
                 <button className="icone-botao acento" onClick={() => setTabelaId(adicionarTabela())} title="nova tabela" style={{ whiteSpace: 'nowrap' }}>+</button>
+                <button
+                  className="icone-botao"
+                  onClick={() => {
+                    const restauradas = restaurarTabelasPadrao();
+                    if (restauradas.length > 0) {
+                      const atualizadas = useStore.getState().tabelas;
+                      setTabelaId(atualizadas[atualizadas.length - 1]?.id ?? '');
+                    }
+                  }}
+                  title="restaurar tabelas padrão"
+                  style={{ fontSize: 11, color: 'var(--real)' }}
+                >restaurar</button>
                 {tabelas.length > 1 && (
                   <button
                     className="icone-botao"

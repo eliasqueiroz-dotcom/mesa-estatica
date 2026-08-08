@@ -110,6 +110,8 @@ interface Acoes {
   adicionarEntradaTabela: (tabelaId: string) => string;
   atualizarEntradaTabela: (tabelaId: string, entradaId: string, patch: Partial<Omit<EntradaTabela, 'id'>>) => void;
   removerEntradaTabela: (tabelaId: string, entradaId: string) => void;
+  /** Re-adiciona tabelas seed que foram deletadas (por nome — não duplica as que já existem). */
+  restaurarTabelasPadrao: () => string[];
 
   /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
   rolarIniciativaTodos: () => void;
@@ -828,6 +830,17 @@ export const useStore = create<Store>()(
             t.id === tabelaId ? { ...t, entradas: t.entradas.filter((e) => e.id !== entradaId) } : t,
           ),
         })),
+      /** Re-adiciona as tabelas seed que foram deletadas, por nome — não duplica as que já
+       *  existem. Retorna os nomes das tabelas que foram restauradas (vazio = nada faltava). */
+      restaurarTabelasPadrao: () => {
+        const atuais = get().tabelas;
+        const seed = criarTabelasSeed();
+        const nomesExistentes = new Set(atuais.map((t) => t.nome));
+        const faltando = seed.filter((s) => !nomesExistentes.has(s.nome));
+        if (faltando.length === 0) return [];
+        set((s) => ({ tabelas: [...s.tabelas, ...faltando] }));
+        return faltando.map((t) => t.nome);
+      },
 
       rolarIniciativaTodos: () => {
         const { fichas, npcs } = get();
