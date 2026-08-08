@@ -4,3 +4,4 @@ export * from './traumas';
 export * from './armas';
 export * from './antecedentes';
 export * from './dificuldades';
+export * from './tabelasSeed';

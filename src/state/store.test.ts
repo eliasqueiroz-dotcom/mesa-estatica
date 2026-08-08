@@ -1160,6 +1160,22 @@ describe('migrate', () => {
     const estado = migrate({ mapa: { fow } }, 27);
     expect(estado.mapa.fow).toEqual(fow);
   });
+
+  it('v28 → v29: injeta 3 tabelas default quando ausente', () => {
+    const estado = migrate({ npcs: [] }, 28);
+    expect(estado.tabelas).toHaveLength(3);
+    expect(estado.tabelas.map((t: { nome: string }) => t.nome).sort()).toEqual([
+      'encontros de rua',
+      'gancho de surto',
+      'ruídos noturnos',
+    ]);
+  });
+
+  it('v28 → v29: preserva tabelas já existentes', () => {
+    const minha = [{ id: 't1', nome: 'minha', lados: 12, entradas: [] }];
+    const estado = migrate({ tabelas: minha }, 28);
+    expect(estado.tabelas).toEqual(minha);
+  });
 });
 
 describe('adicionarPista/atualizarPista/removerPista', () => {

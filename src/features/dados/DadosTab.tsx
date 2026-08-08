@@ -5,6 +5,7 @@ import RoladorSanidade from './RoladorSanidade';
 import RoladorSurto from './RoladorSurto';
 import RoladorTrauma from './RoladorTrauma';
 import RolagemLivre from './RolagemLivre';
+import RoladorTabelas from './RoladorTabelas';
 
 export default function DadosTab({ active = true }: { active?: boolean }) {
   const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja', active, 100, undefined, consumirForcados);
@@ -43,6 +44,7 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
       <RoladorSurto ready={podeRolar} rolar={rolar} />
       <RoladorTrauma ready={podeRolar} rolar={rolar} />
       <RolagemLivre ready={podeRolar} rolar={rolar} />
+      <RoladorTabelas />
     </div>
   );
 }

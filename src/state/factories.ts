@@ -1,5 +1,8 @@
 import type { Atributo } from '../rules/data/pericias';
+import { criarTabelasSeed } from '../rules/data/tabelasSeed';
 import type { EstadoFoW, EstadoGlobal, EstadoMidia, EstadoSoundpad, Ficha, GradeMapa, Npc, NpcAcao, Pista, SessaoPrivada, SessaoPublica } from './types';
+
+export { criarTabelasSeed };
 
 const gerarId = () => crypto.randomUUID();
 
@@ -149,7 +152,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -166,6 +169,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     soundpad: criarEstadoSoundpad(),
     log: [],
     rollsLog: [],
+    tabelas: criarTabelasSeed(),
     config: { basePV: 20 },
   };
 }

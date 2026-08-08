@@ -387,6 +387,27 @@ export interface EstadoSoundpad {
   ultimoDisparo: { slot: number; em: string } | null;
 }
 
+/** Uma entrada de tabela aleatória cobre uma faixa de rolagem `min`–`max` (inclusive).
+ *  Mesma ideia da Tabela de Surto (`EntradaSurto.d20`), mas com ranges pra acomodar d100
+ *  sem 100 linhas. Editável pelo GM na aba Dados. */
+export interface EntradaTabela {
+  id: string;
+  min: number;
+  max: number;
+  texto: string;
+}
+
+/** Tabela aleatória editável pelo GM — rola `lados` faces, consulta `entradas` por range.
+ *  Não sincroniza via Supabase (GM-only, fica no localStorage + export JSON). As 3 tabelas
+ *  default (encontros de rua, ruídos noturnos, gancho de surto) vêm como seed na migrate
+ *  v26→v27 e podem ser editadas, adicionadas ou removidas. */
+export interface TabelaAleatoria {
+  id: string;
+  nome: string;
+  lados: number;
+  entradas: EntradaTabela[];
+}
+
 export interface EstadoGlobal {
   schemaVersion: number;
   sessaoPublica: SessaoPublica;
@@ -401,5 +422,6 @@ export interface EstadoGlobal {
   soundpad: EstadoSoundpad;
   log: EntradaLog[];
   rollsLog: EntradaRoll[];
+  tabelas: TabelaAleatoria[];
   config: EstadoConfig;
 }
