@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Avatar from '../../../components/Avatar';
 import { comprimirImagemAvatar } from '../../../lib/comprimirImagem';
+import { uploadImagemStorage } from '../../../multiplayer/uploadImagemStorage';
 import { ANTECEDENTES } from '../../../rules/data/antecedentes';
 import SeletorCor from '../SeletorCor';
 import type { SecaoFichaProps } from '../tipos';
@@ -14,8 +15,12 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
     if (!arquivo) return;
     setComprimindo(true);
     try {
-      const dataUrl = await comprimirImagemAvatar(arquivo);
+      const { dataUrl, blob } = await comprimirImagemAvatar(arquivo);
       onChange({ foto: dataUrl });
+      // path com o id da própria ficha — a policy de dono (migração 0031) depende disso pra
+      // deixar o jogador subir a própria foto, não só o GM.
+      const url = await uploadImagemStorage(`fichas/${ficha.id}`, blob);
+      if (url) onChange({ foto: url });
     } catch {
       window.alert('sinal corrompido — não foi possível ler essa imagem.');
     } finally {

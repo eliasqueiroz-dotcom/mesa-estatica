@@ -1,11 +1,21 @@
 import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
+import { criarDebouncePorChave } from './debounce';
 import type { GradeMapa } from '../state/types';
 
 type Cliente = NonNullable<typeof supabase>;
 
 const ID_MAPA = 'mapa';
+
+/** Mesmo valor de `fichasSync.ts`/`npcsSync.ts` — junta a rajada de `pointermove` de um
+ *  arrasto de grid (dezenas por segundo, `MapaTab.tsx`) numa escrita só. Sem isso, cada
+ *  micro-ajuste da grade reenviava a imagem do mapa inteira (base64) pro Postgres e, por
+ *  Realtime, pra tela de cada jogador conectado — o item que mais pesou no egress do projeto
+ *  (ver investigação de 08/08). Enquanto a imagem não migra pra Supabase Storage (planejado em
+ *  mesa-estatica-multiplayer-completo.md, ainda não feito), o debounce é o que evita o
+ *  sangramento durante o uso normal. */
+const ATRASO_PUSH_MS = 500;
 
 interface Linha {
   id: string;
@@ -27,21 +37,7 @@ export function iniciarSyncMapaPublico(): () => void {
 
   let aplicandoRemotoContagem = 0;
 
-  const unsubscribeLocal = useStore.subscribe((state, prevState) => {
-    if (aplicandoRemotoContagem > 0) return;
-    if (state.mapa.imagemDataUrl === prevState.mapa.imagemDataUrl && state.mapa.grade === prevState.mapa.grade) return;
-    cliente
-      .from('mapa_publico')
-      .upsert({ id: ID_MAPA, imagem_data_url: state.mapa.imagemDataUrl, grade: state.mapa.grade })
-      .then(({ error }) => {
-        if (error) console.error('[mapaPublicoSync] push falhou', error);
-      });
-  });
-
-  const aplicarRemoto = async () => {
-    const { data, error } = await cliente.from('mapa_publico').select('*').eq('id', ID_MAPA).maybeSingle();
-    if (error || !data) return;
-    const linha = data as Linha;
+  const aplicarLinha = (linha: Linha) => {
     aplicandoRemotoContagem++;
     try {
       // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
@@ -52,13 +48,41 @@ export function iniciarSyncMapaPublico(): () => void {
     }
   };
 
+  const agendarPush = criarDebouncePorChave<{ imagemDataUrl: string | null; grade: GradeMapa }>(ATRASO_PUSH_MS, (_chave, valor) => {
+    cliente
+      .from('mapa_publico')
+      .upsert({ id: ID_MAPA, imagem_data_url: valor.imagemDataUrl, grade: valor.grade })
+      .then(({ error }) => {
+        if (error) console.error('[mapaPublicoSync] push falhou', error);
+      });
+  });
+
+  const unsubscribeLocal = useStore.subscribe((state, prevState) => {
+    if (aplicandoRemotoContagem > 0) return;
+    if (state.mapa.imagemDataUrl === prevState.mapa.imagemDataUrl && state.mapa.grade === prevState.mapa.grade) return;
+    agendarPush(ID_MAPA, { imagemDataUrl: state.mapa.imagemDataUrl, grade: state.mapa.grade });
+  });
+
   // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts) — sem linha ainda é no-op.
-  void aplicarRemoto();
+  cliente
+    .from('mapa_publico')
+    .select('*')
+    .eq('id', ID_MAPA)
+    .maybeSingle()
+    .then(({ data, error }) => {
+      if (error || !data) return;
+      aplicarLinha(data as Linha);
+    });
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('mapa-publico-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, () => {
-      void aplicarRemoto();
+    // usa o payload que o próprio evento já traz — evita um segundo download da imagem via
+    // `select('*')' a cada mudança (a linha inteira já vem no `postgres_changes`, refazer a
+    // busca dobrava o tráfego da mesma imagem sem necessidade).
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, (payload) => {
+      const linha = payload.new as Linha | null;
+      if (!linha) return;
+      aplicarLinha(linha);
     })
     .subscribe(assinarStatusCanal('mapa-publico-sync'));
 

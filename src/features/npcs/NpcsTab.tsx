@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { corPv, useIniciativa } from '../../hooks/useIniciativa';
 import { comprimirImagemAvatar } from '../../lib/comprimirImagem';
+import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
@@ -94,8 +95,10 @@ export default function NpcsTab() {
     if (!arquivo) return;
     setComprimindoFotoIds((prev) => new Set(prev).add(id));
     try {
-      const dataUrl = await comprimirImagemAvatar(arquivo);
+      const { dataUrl, blob } = await comprimirImagemAvatar(arquivo);
       atualizarNpc(id, { foto: dataUrl });
+      const url = await uploadImagemStorage(`npcs/${id}`, blob);
+      if (url) atualizarNpc(id, { foto: url });
     } catch {
       window.alert('sinal corrompido — não foi possível ler essa imagem.');
     } finally {

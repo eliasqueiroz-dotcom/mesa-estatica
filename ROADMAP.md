@@ -104,6 +104,20 @@ Onze pontos de rolagem usavam `Math.random()` direto e ignoravam a fila: iniciat
 - **Bug achado no caminho**: `rolarIniciativa` rolava um d20 pra toda ficha/NPC da mesa e filtrava depois — inofensivo com `Math.random`, mas consumiria forçados de quem nem estava rolando. Agora filtra antes.
 - **Fica de fora**: o sorteio de trauma continua honesto pela decisão já documentada; com `tipo` na fila o risco original some, então dá pra reconsiderar depois.
 
+### 5. Migrar imagens pra Supabase Storage — em andamento (08/08)
+
+Egress do Supabase bateu 126% do limite free (6.31 GB / 5 GB). Causa: fundo do mapa, foto de NPC e foto de ficha ficam como **base64 embutido em coluna Postgres** (`mapa_publico.imagem_data_url`, `npcs_publico.foto`, `characters_publico.foto`) — nunca cacheável pelo navegador, então toda reconexão de jogador ou mudança de campo na linha rebaixa a imagem inteira de novo. Já saiu uma correção paliativa (debounce + parar de refazer `select('*')` em `mapaPublicoSync.ts`, commit `a4d4f74`). A solução definitiva — imagem no Storage, só a URL na tabela — já estava prevista em `mesa-estatica-multiplayer-completo.md` (linhas 473/481-484) e nunca foi implementada. Grande demais pra uma sessão, dividida em fases:
+
+- [x] **Fase 1** — bucket + RLS: reusou `midia` com prefixo `img/` (mesmo precedente do soundpad em `0020_soundpad.sql`); migração `0031_storage_imagens_ficha_dono.sql` com as 2 policies extras pra dono de ficha poder subir a própria foto (`characters_publico_update_dono_ou_gm` tinha espelho faltando no Storage — sem isso o jogador perderia a capacidade que já tem na tabela).
+- [x] **Fase 2** — `comprimirImagem.ts`/`comprimirImagemAvatar()` passam a retornar `{ dataUrl, blob }` (via `canvas.toBlob` na mesma instância, sem redesenhar) — `dataUrl` continua pro caminho local/offline, `blob` sobe pro Storage.
+- [x] **Fase 3** — helper `uploadImagemStorage.ts`: sobe o blob, devolve a URL pública ou `null` (sem Supabase configurado ou erro — quem chama cai pra `dataUrl` local sem quebrar). Testado (`uploadImagemStorage.test.ts`).
+- [x] **Fase 4** — trocou os 3 fluxos (`MapaTab.tsx`, `NpcsTab.tsx`, `IdentidadeSection.tsx`): pintura otimista com `dataUrl`, troca pela URL do Storage quando o upload terminar. Verificado ao vivo no navegador (upload real via canvas → File → input, os 3 fluxos) — pintura otimista funcionando, fallback gracioso quando o Storage rejeita (sessão sem `GM_TOKEN` nesta máquina, RLS bloqueou como esperado, sem crash).
+- [ ] **Fase 5** (opcional, baixa prioridade) — `npcsSync.ts`/`fichasSync.ts` trocam o `select('*')` redundante em `aplicarRemoto` por `payload.new`, mesmo ajuste já feito em `mapaPublicoSync.ts`. Menos urgente depois da Fase 4 (linha já fica pequena).
+- [ ] **Fase 6** — script `scripts/migrar-imagens-storage.mjs` pra subir as imagens já existentes na campanha atual (ainda em base64) pro Storage e trocar a coluna pela URL. Mexe em dado de produção — só roda com confirmação explícita, de preferência pelo próprio usuário (precisa da `SUPABASE_SERVICE_ROLE_KEY`, que nunca deve passar pelo assistente). **Só roda depois da migração 0031 estar aplicada no projeto real.**
+- [x] **Fase 7 (parcial)** — `npm test`/`tsc`/`eslint` limpos + rodada de navegador nos 3 fluxos. Ficou de fora: teste unitário dedicado de `comprimirImagem.ts` — jsdom não implementa `canvas.getContext('2d')` sem o pacote nativo `canvas` (instalar quebraria "clone limpo" em algumas máquinas, CLAUDE.md); a cobertura real ficou por conta da rodada de navegador.
+
+**Pendente pra virar realidade em produção**: como toda migração de schema, a `0031_storage_imagens_ficha_dono.sql` precisa ser aplicada no projeto Supabase real antes das Fases 1-4 fazerem efeito fora desta máquina (mesmo passo manual do SQL Editor já usado pras migrações 0029/0030).
+
 ## Checklist do dia da sessão
 
 - [ ] `npm run build` + `npm run preview` funcionando (e o site publicado abrindo)

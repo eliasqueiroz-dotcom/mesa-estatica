@@ -9,6 +9,7 @@ import TokenScene from '../../tokens3d/TokenScene';
 import { nomeCondicao } from '../../rules/data/condicoesCombate';
 import AoEOverlay from './AoEOverlay';
 import { comprimirImagem } from '../../lib/comprimirImagem';
+import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
 import CombatOverlay from './CombatOverlay';
 import CrachasOverlay from './CrachasOverlay';
 import FoWOverlay from './FoWOverlay';
@@ -126,8 +127,13 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     setErro(null);
     setCarregando(true);
     try {
-      const dataUrl = await comprimirImagem(arquivo);
+      const { dataUrl, blob } = await comprimirImagem(arquivo);
+      // pintura otimista: imediata, funciona sem Supabase configurado (modo local). Se o
+      // upload pro Storage completar, troca pela URL leve — é o que sai sincronizado em vez
+      // do base64 (egress; ver mapaPublicoSync.ts).
       atualizarMapa({ imagemDataUrl: dataUrl });
+      const url = await uploadImagemStorage('mapa', blob);
+      if (url) atualizarMapa({ imagemDataUrl: url });
     } catch {
       setErro('não foi possível carregar essa imagem.');
     } finally {
