@@ -14,6 +14,7 @@ import AoEViewOverlay from './AoEViewOverlay';
 import CombatOverlayJogador from './CombatOverlayJogador';
 import CrachasOverlayJogador from './CrachasOverlayJogador';
 import FoWViewOverlay from './FoWViewOverlay';
+import { pontoDentroRegiao } from './fowGeometria';
 import PingOverlay from './PingOverlay';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlayJogador from './TokenOverlayJogador';
@@ -165,6 +166,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   const mover = (e: React.PointerEvent) => {
     if (!arrastandoRef.current || !meuToken || !containerRef.current) return;
     const { x, y } = posicaoDoPonteiro(e);
+    if (mapa.fow.ativa && !mapa.fow.visiveisAgora.some((r) => pontoDentroRegiao({ x, y }, r))) return;
     moverTokenMapa(meuToken.id, x, y);
   };
 
