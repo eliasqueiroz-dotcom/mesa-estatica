@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { criarFichaVazia } from '../state/factories';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { criarEstadoInicial, criarFichaVazia } from '../state/factories';
+import { useStore } from '../state/store';
 import { paraFichaPublica, paraLinhaPublico } from './fichasSync';
 
 describe('paraLinhaPublico / paraFichaPublica', () => {
@@ -31,5 +32,205 @@ describe('paraLinhaPublico / paraFichaPublica', () => {
     const linha = paraLinhaPublico({ ...criarFichaVazia(), foto: null }, 20);
     expect(linha.foto).toBeNull();
     expect(paraFichaPublica(linha).foto).toBeNull();
+  });
+});
+
+// ===== guard de corrida (iniciarSyncFichas) =====
+const h = vi.hoisted(() => ({ clienteAtual: null as unknown }));
+vi.mock('../lib/supabaseClient', () => ({
+  get supabase() {
+    return h.clienteAtual;
+  },
+}));
+vi.mock('../lib/statusMesa', () => ({
+  assinarStatusCanal: vi.fn(() => vi.fn()),
+  desconectarCanal: vi.fn(),
+  useStatusMesa: {
+    getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
+    setState: vi.fn(),
+    subscribe: vi.fn(),
+  },
+}));
+
+const { iniciarSyncFichas } = await import('./fichasSync');
+
+function criarClienteComControle() {
+  const resolvers: Array<(data: any) => void> = [];
+  const handlers: Array<(payload: any) => void> = [];
+
+  function criarBuilder(): any {
+    const builder: any = {};
+    builder.select = vi.fn(() => builder);
+    builder.eq = vi.fn(() => builder);
+    builder.maybeSingle = vi.fn(() => {
+      return new Promise<any>((resolve) => {
+        resolvers.push((data: any) => resolve({ data, error: null }));
+      });
+    });
+    builder.then = (onFulfilled: (result: { data: any; error: null }) => void) => {
+      return new Promise((resolve) => {
+        resolvers.push((data: any) => {
+          resolve(onFulfilled({ data, error: null }));
+        });
+      });
+    };
+    builder.insert = vi.fn(() => Promise.resolve({ error: null }));
+    builder.upsert = vi.fn(() => Promise.resolve({ error: null }));
+    builder.update = vi.fn(() => ({
+      eq: vi.fn(() => ({
+        then: (cb: (r: any) => void) => cb({ error: null }),
+      })),
+    }));
+    builder.delete = vi.fn(() => ({
+      eq: vi.fn(() => ({
+        then: (cb: (r: any) => void) => cb({ error: null }),
+      })),
+      not: vi.fn(() => ({
+        is: vi.fn(() => ({
+          then: (cb: (r: any) => void) => cb({ error: null }),
+        })),
+      })),
+    }));
+    return builder;
+  }
+
+  const from = vi.fn(() => criarBuilder());
+
+  const channelObj: any = {};
+  channelObj.on = vi.fn((_event: string, _filter: object, handler: (payload: any) => void) => {
+    handlers.push(handler);
+    return channelObj;
+  });
+  channelObj.subscribe = vi.fn((cb: (status: string) => void) => {
+    cb('SUBSCRIBED');
+    return channelObj;
+  });
+  const channel = vi.fn(() => channelObj);
+  const removeChannel = vi.fn();
+
+  return { from, channel, channelObj, handlers, resolvers, removeChannel };
+}
+
+function fichaRemotaPublica(id: string, nome: string) {
+  return {
+    id, nome, cor_visual: '#4fc1d4', foto: null,
+    pv_atual: 20, pv_maximo: 35, defesa: 10,
+    surtos_ativos: [],
+  };
+}
+
+function fichaRemotaPrivada(id: string) {
+  return {
+    id,
+    owner_token: 'tok-' + id,
+    auth_uid: null,
+    dados: {
+      jogador: '',
+      antecedenteId: null,
+      motivo: '',
+      perguntaQueTeDefine: '',
+      respostaPergunta: '',
+      gancho: '',
+      vinculos: [],
+      atributos: { vigor: 2, agilidade: 1, intelecto: 1, percepcao: 1, presenca: 1, vontade: 1 },
+      pericias: {},
+      determinacao: 1,
+      sanidadeAtual: 10,
+      traumas: [],
+      kitAntecedente: '',
+      contatoOuRecurso: '',
+      contatoUsadoNesteCaso: false,
+      outrosItens: '',
+      armas: [],
+      reguladores: [],
+      acessos: 0,
+      anestesiaAte: null,
+      dinheiroReal: 500,
+      dinheiroPonto: 800,
+      anotacoes: '',
+      pvAtual: 20,
+      surtosAtivos: [],
+    },
+  };
+}
+
+describe('iniciarSyncFichas — guard de corrida', () => {
+  let mock: ReturnType<typeof criarClienteComControle>;
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+    mock = criarClienteComControle();
+    h.clienteAtual = {
+      from: mock.from,
+      channel: mock.channel,
+      removeChannel: mock.removeChannel,
+    };
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+  });
+
+  it('edição local concorrente vence o dado remoto obtido antes da edição', async () => {
+    const fichaId = 'ficha-remota-1';
+    useStore.getState().adicionarFicha();
+    const localId = useStore.getState().fichas[0].id;
+    useStore.getState().atualizarFicha(localId, { nome: 'Helena Local' });
+
+    cleanup = iniciarSyncFichas();
+
+    // aguarda a microtask da busca inicial agendar os fetches
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([]); // characters_publico vazio
+    mock.resolvers[1]([]); // characters_privado vazio
+
+    // dispara evento remoto
+    const handler = mock.handlers[0];
+    expect(handler).toBeDefined();
+    handler({ new: { id: fichaId }, old: {} });
+
+    // aguarda buscarEMontar iniciar (2 maybeSingle: publico + privado)
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+
+    // edita localmente ANTES do fetch remoto resolver
+    useStore.getState().atualizarFicha(localId, { nome: 'Helena Editada Durante Fetch' });
+
+    // resolve o fetch remoto com dados antigos
+    mock.resolvers[2](fichaRemotaPublica(fichaId, 'Helena Remota'));
+    mock.resolvers[3](fichaRemotaPrivada(fichaId));
+
+    await vi.waitFor(() => {
+      const fichas = useStore.getState().fichas;
+      return fichas.some((f) => f.id === fichaId);
+    });
+
+    const helenaLocal = useStore.getState().fichas.find((f) => f.id === localId);
+    expect(helenaLocal?.nome).toBe('Helena Editada Durante Fetch');
+  });
+
+  it('sem edição concorrente, dado remoto é aplicado normalmente', async () => {
+    cleanup = iniciarSyncFichas();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([]);
+    mock.resolvers[1]([]);
+
+    const fichaId = 'ficha-remota-2';
+    const handler = mock.handlers[0];
+    handler({ new: { id: fichaId }, old: {} });
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+
+    mock.resolvers[2](fichaRemotaPublica(fichaId, 'Helena do Servidor'));
+    mock.resolvers[3](fichaRemotaPrivada(fichaId));
+
+    await vi.waitFor(() => {
+      const fichas = useStore.getState().fichas;
+      return fichas.some((f) => f.id === fichaId && f.nome === 'Helena do Servidor');
+    });
   });
 });

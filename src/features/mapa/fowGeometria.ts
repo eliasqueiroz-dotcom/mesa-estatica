@@ -1,4 +1,4 @@
-import type { RegiaoFoW } from '../../state/types';
+import type { EstadoFoW, RegiaoFoW } from '../../state/types';
 import type { Ponto } from './mapaUtils';
 
 /** Coordenadas (0-1 da imagem) → px (com offset do letterbox), prontas pra `style.left/top/width`.
@@ -80,6 +80,13 @@ export function montarMaskSvg(
     rectStr +
     `</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+/** true se o jogador pode mover o token pro ponto `p` com FoW no estado `fow` — sempre true se
+ *  FoW está desligado; senão exige estar dentro de alguma região visiveisAgora. */
+export function podeMoverTokenParaFoW(fow: Pick<EstadoFoW, 'ativa' | 'visiveisAgora'>, p: Ponto): boolean {
+  if (!fow.ativa) return true;
+  return fow.visiveisAgora.some((r) => pontoDentroRegiao(p, r));
 }
 
 /** Retângulo simples em 0-1 da imagem — o shape geométrico de `RegiaoFoW` sem id/forma/zona. */

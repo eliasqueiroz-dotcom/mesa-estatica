@@ -8,7 +8,7 @@ import { eraRemocaoExplicita } from './remocaoExplicita';
 
 /** Reordenar/adicionar/remover não é um arrasto contínuo — mesmo valor de fichas/npcs, não
  *  precisa do 150ms mais curto de `tokensSync.ts`. */
-const ATRASO_PUSH_MS = 400;
+const ATRASO_PUSH_MS = 700;
 
 export interface LinhaFaixa {
   id: string;

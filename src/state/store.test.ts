@@ -1053,6 +1053,62 @@ describe('definirZonaFoW', () => {
   });
 });
 
+describe('limparFoW', () => {
+  beforeEach(() => {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 });
+    useStore.getState().definirZonaFoW('rua');
+  });
+
+  it('zera vistas, visiveisAgora E ativa', () => {
+    useStore.getState().limparFoW();
+    const fow = useStore.getState().mapa.fow;
+    expect(fow.vistas).toEqual([]);
+    expect(fow.visiveisAgora).toEqual([]);
+    expect(fow.ativa).toBe(false);
+    expect(fow.zonaAtual).toBeNull();
+  });
+});
+
+describe('removerRegiaoFoW', () => {
+  it('remove de vistas e visiveisAgora pelo id, mantendo outras regiões', () => {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    const idA = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 })!;
+    const idB = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0.5, y: 0, w: 0.5, h: 1 })!;
+    useStore.getState().removerRegiaoFoW(idA);
+    const fow = useStore.getState().mapa.fow;
+    expect(fow.vistas.map((r) => r.id)).toEqual([idB]);
+    expect(fow.visiveisAgora.map((r) => r.id)).toEqual([idB]);
+  });
+});
+
+describe('cobrirLuzFoW', () => {
+  it('remove só de visiveisAgora — a região permanece em vistas', () => {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    const id = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 })!;
+    useStore.getState().cobrirLuzFoW(id);
+    const fow = useStore.getState().mapa.fow;
+    expect(fow.visiveisAgora).toEqual([]);
+    expect(fow.vistas).toHaveLength(1);
+    expect(fow.vistas[0].id).toBe(id);
+  });
+});
+
+describe('adicionarRegiaoFoW', () => {
+  it('gera id, entra em vistas E visiveisAgora', () => {
+    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    const id = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+    expect(id).toBeDefined();
+    expect(typeof id).toBe('string');
+    const fow = useStore.getState().mapa.fow;
+    expect(fow.vistas).toHaveLength(1);
+    expect(fow.visiveisAgora).toHaveLength(1);
+    expect(fow.vistas[0].id).toBe(id);
+    expect(fow.visiveisAgora[0].id).toBe(id);
+    expect(fow.vistas[0]).toMatchObject({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+  });
+});
+
 // ===== migrate (schema versionado do persist) =====
 // Caminho DIFERENTE de importarJSON (acima) — migrate só roda na reidratação do
 // localStorage pelo zustand/persist. Cobre as migrações mais recentes/arriscadas, não as

@@ -12,7 +12,7 @@ const ID_SESSAO = 'sessao';
  *  "cena atual"/"caso"/"local atual"/"objetivo" etc. dispara um upsert, cujo eco do Supabase
  *  chega atrasado e pode sobrescrever o que já foi digitado depois (letras "somem" no meio da
  *  digitação — visto ao vivo). */
-const ATRASO_PUSH_MS = 400;
+const ATRASO_PUSH_MS = 700;
 
 export interface Linha {
   id: string;

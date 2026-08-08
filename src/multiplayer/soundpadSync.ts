@@ -5,7 +5,7 @@ import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
-const ATRASO_PUSH_MS = 400;
+const ATRASO_PUSH_MS = 700;
 
 export interface LinhaSom {
   id: string;

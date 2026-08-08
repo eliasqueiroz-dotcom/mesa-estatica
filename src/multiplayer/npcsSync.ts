@@ -8,7 +8,7 @@ import { eraRemocaoExplicita } from './remocaoExplicita';
 type Cliente = NonNullable<typeof supabase>;
 
 /** Mesmo motivo/valor de `fichasSync.ts` — ver `ATRASO_PUSH_MS` lá. */
-const ATRASO_PUSH_MS = 400;
+const ATRASO_PUSH_MS = 700;
 
 export interface LinhaPublico {
   id: string;

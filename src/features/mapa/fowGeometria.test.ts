@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { caixasIntersectam, montarMaskSvg, pontoDentroRegiao, regiaoEmPx, subtrairCaixa, subtrairRegioes } from './fowGeometria';
+import { caixasIntersectam, montarMaskSvg, podeMoverTokenParaFoW, pontoDentroRegiao, regiaoEmPx, subtrairCaixa, subtrairRegioes } from './fowGeometria';
 
 describe('pontoDentroRegiao', () => {
   const r = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
@@ -171,3 +171,29 @@ describe('subtrairRegioes', () => {
     expect(area(restante)).toBeCloseTo(0.25, 6);
   });
 });
+
+describe('podeMoverTokenParaFoW', () => {
+  const regiao = { id: 'r1', forma: 'rect' as const, x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
+
+  it('fow desligado → sempre true, mesmo com visiveisAgora vazio', () => {
+    expect(podeMoverTokenParaFoW({ ativa: false, visiveisAgora: [] }, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(podeMoverTokenParaFoW({ ativa: false, visiveisAgora: [] }, { x: 0, y: 0 })).toBe(true);
+  });
+
+  it('fow ligado, ponto dentro de visiveisAgora → true', () => {
+    expect(podeMoverTokenParaFoW({ ativa: true, visiveisAgora: [regiao] }, { x: 0.5, y: 0.5 })).toBe(true);
+  });
+
+  it('fow ligado, ponto fora de visiveisAgora → false', () => {
+    expect(podeMoverTokenParaFoW({ ativa: true, visiveisAgora: [regiao] }, { x: 0, y: 0 })).toBe(false);
+  });
+
+  it('fow ligado, visiveisAgora vazio → false (bloqueia tudo)', () => {
+    expect(podeMoverTokenParaFoW({ ativa: true, visiveisAgora: [] }, { x: 0.5, y: 0.5 })).toBe(false);
+  });
+
+  it('fow ligado, ponto só está em vistas (não em visiveisAgora) → false', () => {
+    expect(podeMoverTokenParaFoW({ ativa: true, visiveisAgora: [] }, { x: 0.5, y: 0.5 })).toBe(false);
+  });
+});
+
