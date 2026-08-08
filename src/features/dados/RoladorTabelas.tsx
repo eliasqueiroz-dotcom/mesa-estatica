@@ -1,14 +1,29 @@
 import { useState } from 'react';
-import { rolarDadoComForcados } from '../../dice/registroForcados';
+import type { ColorsetId } from '../../dice/colorsets';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
+import type { RollGroupResult } from '../../dice/useDiceBox';
 import { resolverTabela, validarCoberturaTabela } from '../../rules/data/tabelasSeed';
 import { useStore } from '../../state/store';
 
+interface RoladorTabelasProps {
+  ready: boolean;
+  rolar: (
+    notacao: string,
+    onComplete: (r: RollGroupResult[]) => void,
+    colorset?: ColorsetId,
+    personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
+  ) => void;
+}
+
 /**
  * Rolador de Tabelas Aleatórias (ROADMAP F6) — ferramenta GM-only de improvisação: rola um
- * dado de `lados` faces, consulta a entradas da tabela selecionada por range (min–max) e
- * mostra o resultado inline + registra no log como `"anotação"` privada. Não disputa a bandeja
- * 3D dos outros roladores — rola síncrono via `rolarDadoComForcados` (honesto por padrão,
- * respeita a fila de forçados do mestre se houver).
+ * dado de `lados` faces na bandeja 3D compartilhada (mesma `rolar`/`ready` dos outros 5
+ * roladores da aba, `DadosTab.tsx`), consulta a entrada da tabela selecionada por range
+ * (min–max) e mostra o resultado inline. Registra no log como `"anotação"` privada E na seção
+ * "Rolagens" (`registrarRoll`, sempre `visibilidade: 'privada'`) — mesmo padrão do "rolar
+ * privado" de `RolagemLivre.tsx`, só que sem toggle público/privado: a ferramenta inteira é
+ * GM-only (badge "privado — só o mestre" no cabeçalho), então nunca faz sentido nascer pública.
  *
  * Tem dois modos (toggle no header da seção):
  *   · `rolar`  — dropdown de tabela + botão + resultado. Default.
@@ -16,9 +31,10 @@ import { useStore } from '../../state/store';
  *     add/remove entrada, add/remove tabela. Validação visual de gaps/overlaps via
  *     `validarCoberturaTabela` (aviso, não bloqueia — o GM pode ter gaps intencionais).
  *
- * Sem state efêmero compartilhado — tudo lê/escreve direto em `useStore.tabelas` (persistente).
+ * Sem state efêmero persistente — `tabelas` vem de `useStore` (persistente); `rolando` é só
+ * pra desabilitar o botão durante a animação, mesmo padrão dos outros roladores.
  */
-export default function RoladorTabelas() {
+export default function RoladorTabelas({ ready, rolar: rolarNaBandeja }: RoladorTabelasProps) {
   const tabelas = useStore((s) => s.tabelas);
   const adicionarTabela = useStore((s) => s.adicionarTabela);
   const atualizarTabela = useStore((s) => s.atualizarTabela);
@@ -28,27 +44,53 @@ export default function RoladorTabelas() {
   const removerEntradaTabela = useStore((s) => s.removerEntradaTabela);
   const restaurarTabelasPadrao = useStore((s) => s.restaurarTabelasPadrao);
   const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const [modo, setModo] = useState<'rolar' | 'editar'>('rolar');
   const [tabelaId, setTabelaId] = useState('');
   const [resultado, setResultado] = useState<{ rolagem: number; texto: string; tabelaNome: string } | null>(null);
+  const [rolando, setRolando] = useState(false);
 
   const tabela = tabelas.find((t) => t.id === tabelaId) ?? tabelas[0] ?? null;
 
   const rolar = () => {
     if (!tabela) return;
-    const valor = rolarDadoComForcados(tabela.lados, null, 'qualquer');
-    const entrada = resolverTabela(tabela, valor);
-    const texto = entrada?.texto ?? '(nenhuma entrada cobre esse valor — gap na tabela)';
-    setResultado({ rolagem: valor, texto, tabelaNome: tabela.nome });
-    const tag = entrada ? '' : ' [gap]';
-    registrarLog('anotacao', `${tabela.nome} · d${tabela.lados} → ${valor} — ${texto}${tag}`, null, 'privada');
+    setRolando(true);
+    rolarNaBandeja(
+      `1d${tabela.lados}`,
+      (grupos) => {
+        const valor = grupos[0]?.value ?? 0;
+        const entrada = resolverTabela(tabela, valor);
+        const texto = entrada?.texto ?? '(nenhuma entrada cobre esse valor — gap na tabela)';
+        setResultado({ rolagem: valor, texto, tabelaNome: tabela.nome });
+        const tag = entrada ? '' : ' [gap]';
+        registrarLog('anotacao', `${tabela.nome} · d${tabela.lados} → ${valor} — ${texto}${tag}`, null, 'privada');
+        // mesmo padrão de RolagemLivre.tsx (rolagem privada): entra também na seção "Rolagens"
+        // (rollsLog), sempre privada — a ferramenta inteira é GM-only, sem toggle público/privado.
+        // O mestre pode "revelar" depois se quiser (LogView.tsx, RolsSection).
+        registrarRoll({
+          origem: tabela.nome,
+          personagemId: null,
+          formula: `1d${tabela.lados}`,
+          total: valor,
+          bruto: valor,
+          visibilidade: 'privada',
+        });
+        setRolando(false);
+      },
+      undefined,
+      null,
+      'qualquer',
+    );
   };
 
   return (
     <section className="secao">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="label" style={{ margin: 0 }}>Tabelas</h3>
+        <h3 className="label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Tabelas
+          <span className="badge">privado — só o mestre</span>
+        </h3>
         <button
           className="icone-botao"
           onClick={() => setModo((m) => (m === 'rolar' ? 'editar' : 'rolar'))}
@@ -75,7 +117,7 @@ export default function RoladorTabelas() {
             </div>
           </div>
 
-          <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!tabela} onClick={rolar}>
+          <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || !tabela || rolando} onClick={rolar}>
             rolar{tabela ? ` ${tabela.nome}` : ''}
           </button>
 
@@ -114,6 +156,7 @@ export default function RoladorTabelas() {
                     if (restauradas.length > 0) {
                       const atualizadas = useStore.getState().tabelas;
                       setTabelaId(atualizadas[atualizadas.length - 1]?.id ?? '');
+                      registrarLog('anotacao', `tabelas restauradas: ${restauradas.join(', ')}`, null, 'privada');
                     }
                   }}
                   title="restaurar tabelas padrão"
@@ -122,8 +165,13 @@ export default function RoladorTabelas() {
                 {tabelas.length > 1 && (
                   <button
                     className="icone-botao"
-                    onClick={() => { if (tabela && window.confirm(`apagar a tabela "${tabela.nome}"?`)) { removerTabela(tabela.id); setTabelaId(''); } }}
-                    title="apagar tabela"
+                    onClick={() => {
+                      if (tabela && window.confirm(`apagar a tabela "${tabela.nome}"? o papel não esquece.`)) {
+                        removerTabela(tabela.id);
+                        setTabelaId('');
+                      }
+                    }}
+                    title="apagar tabela? o papel não esquece."
                     style={{ color: 'var(--ruido)' }}
                   >×</button>
                 )}
@@ -162,8 +210,9 @@ export default function RoladorTabelas() {
                       max={tabela.lados}
                       value={e.min}
                       onChange={(ev) => atualizarEntradaTabela(tabela.id, e.id, { min: Number(ev.target.value) || 1 })}
-                      style={{ width: 42, flexShrink: 0 }}
+                      style={{ width: 54, flexShrink: 0 }}
                       title="mínimo"
+                      aria-label="mínimo"
                     />
                     <span className="vazio" style={{ paddingTop: '0.35rem', fontSize: 12 }}>a</span>
                     <input
@@ -172,18 +221,20 @@ export default function RoladorTabelas() {
                       max={tabela.lados}
                       value={e.max}
                       onChange={(ev) => atualizarEntradaTabela(tabela.id, e.id, { max: Number(ev.target.value) || 1 })}
-                      style={{ width: 42, flexShrink: 0 }}
+                      style={{ width: 54, flexShrink: 0 }}
                       title="máximo"
+                      aria-label="máximo"
                     />
                     <input
                       value={e.texto}
                       onChange={(ev) => atualizarEntradaTabela(tabela.id, e.id, { texto: ev.target.value })}
                       placeholder={`entrada ${i + 1}`}
                       style={{ flex: 1 }}
+                      aria-label={`texto da entrada ${i + 1}`}
                     />
                     <button
                       className="icone-botao"
-                      onClick={() => removerEntradaTabela(tabela.id, e.id)}
+                      onClick={() => { if (window.confirm('apagar esta entrada?')) removerEntradaTabela(tabela.id, e.id); }}
                       title="remover entrada"
                       style={{ color: 'var(--ruido)', flexShrink: 0 }}
                     >×</button>

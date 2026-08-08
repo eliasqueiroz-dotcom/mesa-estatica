@@ -15,7 +15,7 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
   const podeRolar = ready && !rolando;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
       {!modo2D && (
         <div
           id="dice-bandeja"
@@ -44,7 +44,7 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
       <RoladorSurto ready={podeRolar} rolar={rolar} />
       <RoladorTrauma ready={podeRolar} rolar={rolar} />
       <RolagemLivre ready={podeRolar} rolar={rolar} />
-      <RoladorTabelas />
+      <RoladorTabelas ready={podeRolar} rolar={rolar} />
     </div>
   );
 }
