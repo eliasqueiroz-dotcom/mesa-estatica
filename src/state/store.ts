@@ -21,12 +21,14 @@ import {
   criarPistaVazia,
   criarSessaoPrivada,
   criarSessaoPublica,
+  criarTabelasSeed,
   SCHEMA_VERSION,
 } from './factories';
 import type {
   EntradaIniciativa,
   EntradaLog,
   EntradaRoll,
+  EntradaTabela,
   EstadoGlobal,
   EstadoMapa,
   EstadoMidia,
@@ -39,6 +41,7 @@ import type {
   SessaoPrivada,
   SessaoPublica,
   SurtoAtivo,
+  TabelaAleatoria,
   TipoLog,
   TokenMapa,
   ZonaFoW,
@@ -98,6 +101,15 @@ interface Acoes {
   adicionarPista: () => string;
   atualizarPista: (id: string, patch: Partial<Pista>) => void;
   removerPista: (id: string) => void;
+
+  // ===== Tabelas Aleatórias (ROADMAP F6) =====
+  /** Cria tabela vazia (1d20, 1 entrada 1-20), retorna id. */
+  adicionarTabela: () => string;
+  atualizarTabela: (id: string, patch: Partial<Pick<TabelaAleatoria, 'nome' | 'lados'>>) => void;
+  removerTabela: (id: string) => void;
+  adicionarEntradaTabela: (tabelaId: string) => string;
+  atualizarEntradaTabela: (tabelaId: string, entradaId: string, patch: Partial<Omit<EntradaTabela, 'id'>>) => void;
+  removerEntradaTabela: (tabelaId: string, entradaId: string) => void;
 
   /** Rola d20+Agilidade pra cada ficha e cada NPC, ordena e substitui a tabela de iniciativa. */
   rolarIniciativaTodos: () => void;
@@ -481,6 +493,14 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
       if (Array.isArray(lista)) for (const r of lista as any[]) delete r.zona;
     }
   }
+  // v28 → v29: tabelas aleatórias editáveis pelo GM (ROADMAP F6). Injeta as 3 tabelas default
+  // (encontros de rua, ruídos noturnos, gancho de surto) com seed temático de São Paulo
+  // distópica — o GM pode editar, adicionar ou remover a partir daí. `tabelas` é GM-only, não
+  // sincroniza via Supabase (fica no localStorage + export JSON). Preserva tabelas já
+  // existentes (não reescreve quem já migrou antes).
+  if (versaoAnterior < 29 && !estado.tabelas) {
+    estado.tabelas = criarTabelasSeed();
+  }
   return estado as Store;
 }
 
@@ -768,6 +788,46 @@ export const useStore = create<Store>()(
       atualizarPista: (id, patch) =>
         set((s) => ({ pistas: s.pistas.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
       removerPista: (id) => set((s) => ({ pistas: s.pistas.filter((p) => p.id !== id) })),
+
+      // ===== Tabelas Aleatórias (ROADMAP F6) =====
+      adicionarTabela: () => {
+        const id = crypto.randomUUID();
+        set((s) => ({
+          tabelas: [
+            ...s.tabelas,
+            { id, nome: 'nova tabela', lados: 20, entradas: [{ id: crypto.randomUUID(), min: 1, max: 20, texto: '' }] },
+          ],
+        }));
+        return id;
+      },
+      atualizarTabela: (id, patch) =>
+        set((s) => ({ tabelas: s.tabelas.map((t) => (t.id === id ? { ...t, ...patch } : t)) })),
+      removerTabela: (id) => set((s) => ({ tabelas: s.tabelas.filter((t) => t.id !== id) })),
+      adicionarEntradaTabela: (tabelaId) => {
+        const entradaId = crypto.randomUUID();
+        set((s) => ({
+          tabelas: s.tabelas.map((t) =>
+            t.id === tabelaId
+              ? { ...t, entradas: [...t.entradas, { id: entradaId, min: 1, max: 1, texto: '' }] }
+              : t,
+          ),
+        }));
+        return entradaId;
+      },
+      atualizarEntradaTabela: (tabelaId, entradaId, patch) =>
+        set((s) => ({
+          tabelas: s.tabelas.map((t) =>
+            t.id === tabelaId
+              ? { ...t, entradas: t.entradas.map((e) => (e.id === entradaId ? { ...e, ...patch } : e)) }
+              : t,
+          ),
+        })),
+      removerEntradaTabela: (tabelaId, entradaId) =>
+        set((s) => ({
+          tabelas: s.tabelas.map((t) =>
+            t.id === tabelaId ? { ...t, entradas: t.entradas.filter((e) => e.id !== entradaId) } : t,
+          ),
+        })),
 
       rolarIniciativaTodos: () => {
         const { fichas, npcs } = get();
@@ -1265,10 +1325,10 @@ export const useStore = create<Store>()(
       dispararBurstRuido: () => set({ ultimoBurstRuidoEm: Date.now() }),
 
       exportarJSON: () => {
-        const { fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, config, sessaoPublica, sessaoPrivada, schemaVersion } =
+        const { fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, tabelas, config, sessaoPublica, sessaoPrivada, schemaVersion } =
           get();
         return JSON.stringify(
-          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, config },
+          { schemaVersion, sessaoPublica, sessaoPrivada, fichas, fichaAtivaId, npcs, pistas, iniciativa, mapa, midia, soundpad, log, rollsLog, tabelas, config },
           null,
           2,
         );
@@ -1393,6 +1453,7 @@ export const useStore = create<Store>()(
           },
           log: d.log ?? [],
           rollsLog: d.rollsLog ?? [],
+          tabelas: Array.isArray(d.tabelas) ? d.tabelas : base.tabelas,
           config: { ...base.config, ...d.config },
         });
         const estadoNormalizado = normalizar(dados);
