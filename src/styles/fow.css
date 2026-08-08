@@ -90,10 +90,16 @@
 /* ===== Camada 2 — visto, sem luz agora: frame congelado degradado ===== */
 .fow-camada[data-estado='visto'] {
   /* `backdrop-filter` precisa estar LIGADO a um backdrop — o div é transparente (sem background)
-     e o backdrop é o `<img>` abaixo. Funciona em Chrome/Discord capture; fallback documentado. */
-  backdrop-filter: blur(3px) brightness(0.4) saturate(0.3);
-  -webkit-backdrop-filter: blur(3px) brightness(0.4) saturate(0.3);
-  background: rgba(11, 13, 17, 0.55); /* véu escurecedor extra pro caso do backdrop falhar */
+     e o backdrop é o `<img>` abaixo. Funciona em Chrome/Discord capture; fallback documentado.
+     Raio de blur grande de propósito (~metade do diâmetro do token, 36px): `backdrop-filter`
+     reamostra o que está atrás EM TEMPO REAL, então um blur raso (3px) borra detalhe estático
+     mas deixa MOVIMENTO passar — um token se mexendo lê como "mancha colorida andando" mesmo
+     escurecido, porque movimento é muito mais saliente que nitidez. 18px é o suficiente pra
+     virar mancha irreconhecível, pequeno o bastante pra feições grandes do mapa ainda darem
+     uma noção vaga de espaço (o pedido é "leve visão", não opaco — isso já é o "nunca visto"). */
+  backdrop-filter: blur(18px) brightness(0.25) saturate(0.2);
+  -webkit-backdrop-filter: blur(18px) brightness(0.25) saturate(0.2);
+  background: rgba(11, 13, 17, 0.72); /* véu escurecedor extra pro caso do backdrop falhar */
   opacity: 0.95;
 }
 
