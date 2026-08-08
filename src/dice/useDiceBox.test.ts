@@ -105,16 +105,32 @@ describe('normalizarTermos', () => {
 describe('formatarNotacaoResultado', () => {
   // usado pelo aviso de rolagem ao vivo (RolagemAoVivoPlayer.tsx) pra mostrar o resultado
   // depois que o dado assenta — ex.: "Helena está rolando…" → "Helena 1d20 → 4".
-  it('um termo só', () => {
+  it('um termo só, sem bônus: forma simples', () => {
     expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }], [4])).toBe('1d20 → 4');
   });
 
-  it('soma múltiplos dados do mesmo termo (ex: surto 2d20)', () => {
+  it('soma múltiplos dados do mesmo termo, sem bônus: continua forma simples (ex: surto 2d20)', () => {
     expect(formatarNotacaoResultado([{ qty: 2, sides: 20 }], [10, 15])).toBe('2d20 → 25');
   });
 
-  it('múltiplos termos combinados, na mesma ordem da notação', () => {
-    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }, { qty: 1, sides: 4 }], [12, 3])).toBe('1d20+1d4 → 15');
+  it('um termo com bônus: detalha "1d20: 5 + 2 = 7"', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }], [5], 2)).toBe('1d20: 5 + 2 = 7');
+  });
+
+  it('um termo com bônus negativo: "1d20: 10 + -3 = 7"', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }], [10], -3)).toBe('1d20: 10 + -3 = 7');
+  });
+
+  it('bônus zero é tratado como "sem bônus" (forma simples)', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }], [4], 0)).toBe('1d20 → 4');
+  });
+
+  it('múltiplos termos combinados, sem bônus: detalha cada termo "1d20: 2 + 1d6: 6 = 8"', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }, { qty: 1, sides: 6 }], [2, 6])).toBe('1d20: 2 + 1d6: 6 = 8');
+  });
+
+  it('múltiplos termos com bônus: cada termo, depois o bônus, depois o total', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }, { qty: 1, sides: 4 }], [12, 3], 1)).toBe('1d20: 12 + 1d4: 3 + 1 = 16');
   });
 });
 

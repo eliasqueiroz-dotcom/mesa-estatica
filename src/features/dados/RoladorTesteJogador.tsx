@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult } from '../../dice/useDiceBox';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { useStore } from '../../state/store';
@@ -14,6 +15,8 @@ interface Props {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
+    bonus?: number,
   ) => void;
 }
 
@@ -39,15 +42,15 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
 
   const rolarTeste = () => {
     setRolando(true);
+    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
+    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
+    const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
+    const grauPericia = ficha.pericias[periciaId] ?? 0;
+    const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
     rolar(
       '1d20',
       (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
-        const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-        const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-        const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
-        const grauPericia = ficha.pericias[periciaId] ?? 0;
-        const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
         setResultado({ d20, modificador, total: d20 + modificador });
         setRolando(false);
 
@@ -65,6 +68,8 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
       },
       'rede',
       ficha.id,
+      undefined,
+      modificador || undefined,
     );
   };
 

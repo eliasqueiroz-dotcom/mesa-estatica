@@ -34,7 +34,16 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
 
   // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
   // wrapper único em vez de tocar nos 6 call sites de rolar() espalhados pelos roladores abaixo.
-  const rolarEBroadcast: typeof rolar = (notacao, onComplete, colorset, personagemId, tipo) => {
+  // `bonus` (7º parâmetro, opcional) é o modificador de perícia/atributo — não passa pela
+  // física, só entra no total mostrado pelo aviso ao vivo (formatarNotacaoResultado).
+  const rolarEBroadcast = (
+    notacao: Parameters<typeof rolar>[0],
+    onComplete: Parameters<typeof rolar>[1],
+    colorset?: Parameters<typeof rolar>[2],
+    personagemId?: Parameters<typeof rolar>[3],
+    tipo?: Parameters<typeof rolar>[4],
+    bonus?: number,
+  ) => {
     rolar(
       notacao,
       (grupos) => {
@@ -49,6 +58,7 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
           cor: ficha.corVisual,
           origem: ficha.nome || 'jogador',
           tipo: tipo ?? 'teste',
+          bonus,
         });
       },
       colorset,

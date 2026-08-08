@@ -17,11 +17,21 @@ export interface RolagemAoVivo {
   /** nome de quem rolou, pro aviso "X está rolando". */
   origem: string;
   tipo: TipoRolagemForcada;
+  /** modificador plano somado ao(s) dado(s) (perícia+atributo, bônus manual...) — não é um
+   *  dado, não passa pela física; só entra no total mostrado pelo aviso ao vivo
+   *  (`formatarNotacaoResultado`). Ausente/undefined quando a rolagem não tem bônus. */
+  bonus?: number;
 }
 
 interface RolagemAoVivoState {
   atual: RolagemAoVivo | null;
   definirAtual: (r: RolagemAoVivo | null) => void;
+  /** Espelha o `visivel` de `RolagemAoVivoPlayer.tsx` (dado rolando + graça mostrando o
+   *  resultado) — `atual` nunca volta a `null` sozinho, então não serve pra saber se o aviso
+   *  ainda está em tela; `mostrando` é o que outros lugares (destaque da aba "Dados" em
+   *  `App.tsx`/`PlayerApp.tsx`) devem ler pra saber quando desligar o realce. */
+  mostrando: boolean;
+  definirMostrando: (v: boolean) => void;
 }
 
 /**
@@ -37,6 +47,8 @@ interface RolagemAoVivoState {
 export const useRolagemAoVivoStore = create<RolagemAoVivoState>((set) => ({
   atual: null,
   definirAtual: (r) => set({ atual: r }),
+  mostrando: false,
+  definirMostrando: (v) => set({ mostrando: v }),
 }));
 
 /** Ids de rolagens que o PRÓPRIO cliente publicou — sem isso, o jogador que rolou reproduziria

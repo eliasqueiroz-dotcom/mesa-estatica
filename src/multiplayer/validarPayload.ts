@@ -69,6 +69,7 @@ export function ehRolagemAoVivo(v: unknown): v is RolagemAoVivo {
     r.termos.length > 0 &&
     r.termos.every(ehRollTermo) &&
     Array.isArray(r.valores) &&
-    r.valores.every((x) => Number.isFinite(x))
+    r.valores.every((x) => Number.isFinite(x)) &&
+    (r.bonus === undefined || Number.isFinite(r.bonus))
   );
 }

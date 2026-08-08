@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
@@ -19,6 +20,8 @@ interface Props {
     onComplete: (r: RollGroupResult[]) => void,
     colorset?: ColorsetId,
     personagemId?: string | null,
+    tipo?: TipoRolagemForcada,
+    bonus?: number,
   ) => void;
 }
 
@@ -42,12 +45,15 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
     setRolando(true);
     setTeste(null);
     setResolvido(false);
+    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
+    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
+    // mesma fórmula de resolverTeste (não dá pra chamá-la antes de ter o d20) — penalidade de
+    // ferido só se aplica a vigor/agilidade, então pra vontade o modificador é só o atributo.
+    const modificador = ficha.atributos.vontade;
     rolar(
       [{ sides: 20, qty: 1 }],
       (grupos) => {
         const d20 = grupos[0].rolls[0].value;
-        const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-        const ferido = estaFerido(ficha.pvAtual, pvMaximo);
         const r = resolverTeste({
           d20,
           atributoId: 'vontade',
@@ -63,6 +69,8 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
       },
       'ruido',
       ficha.id,
+      undefined,
+      modificador || undefined,
     );
   };
 

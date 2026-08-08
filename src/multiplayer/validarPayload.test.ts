@@ -118,6 +118,19 @@ describe('ehRolagemAoVivo', () => {
     expect(ehRolagemAoVivo({ ...valida, valores: [15, 'x'] })).toBe(false);
   });
 
+  it('bonus é opcional — ausente continua válido', () => {
+    expect(ehRolagemAoVivo(valida)).toBe(true);
+  });
+
+  it('aceita bonus numérico (inclusive negativo)', () => {
+    expect(ehRolagemAoVivo({ ...valida, bonus: 3 })).toBe(true);
+    expect(ehRolagemAoVivo({ ...valida, bonus: -2 })).toBe(true);
+  });
+
+  it('rejeita bonus não numérico', () => {
+    expect(ehRolagemAoVivo({ ...valida, bonus: 'dois' })).toBe(false);
+  });
+
   it('rejeita campos com tipo errado', () => {
     expect(ehRolagemAoVivo({ ...valida, id: 42 })).toBe(false);
     expect(ehRolagemAoVivo({ ...valida, cor: 7 })).toBe(false);

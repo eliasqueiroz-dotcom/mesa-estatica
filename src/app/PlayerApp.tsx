@@ -67,6 +67,7 @@ export default function PlayerApp() {
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
+  const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
 
   useHidratarSessaoPublica();
   useHidratarMapaPublico();
@@ -178,8 +179,10 @@ export default function PlayerApp() {
             {ABAS.map((a) => {
               const ativa = aba === a.id;
               // aviso discreto (mesmo espírito do botão ATK ciano do CombatOverlay): a aba
-              // Dados acende na cor de quem está rolando, se o jogador não estiver vendo ao vivo.
-              const rolandoFora = !ativa && a.id === 'dados' && rolagemAoVivo;
+              // Dados acende na cor de quem está rolando, se o jogador não estiver vendo ao vivo —
+              // some sozinho alguns segundos depois do dado assentar (`mostrando` espelha o
+              // `visivel` de RolagemAoVivoPlayer.tsx; `atual` nunca volta a null sozinho).
+              const rolandoFora = !ativa && a.id === 'dados' && mostrandoRolagemAoVivo && rolagemAoVivo;
               return (
                 <button
                   key={a.id}

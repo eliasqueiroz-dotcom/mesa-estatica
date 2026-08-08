@@ -129,6 +129,7 @@ export default function App() {
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
+  const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
 
   const abrirControle = () => {
     window.open(
@@ -257,8 +258,10 @@ export default function App() {
               const ativa = aba === a.id;
               // aviso discreto (mesmo espírito do botão ATK ciano do CombatOverlay quando o
               // combate começa): a aba Dados acende na cor de quem está rolando, se o mestre
-              // não estiver nela vendo ao vivo.
-              const rolandoFora = !ativa && a.id === 'dados' && rolagemAoVivo;
+              // não estiver nela vendo ao vivo — some sozinho alguns segundos depois do dado
+              // assentar (`mostrando` espelha o `visivel` de RolagemAoVivoPlayer.tsx; `atual`
+              // nunca volta a null sozinho, então não serve pra saber se ainda está em tela).
+              const rolandoFora = !ativa && a.id === 'dados' && mostrandoRolagemAoVivo && rolagemAoVivo;
               return (
                 <button
                   key={a.id}

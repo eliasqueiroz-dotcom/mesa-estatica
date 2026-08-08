@@ -43,14 +43,32 @@ export function normalizarTermos(notacao: string | RollTermo | RollTermo[]): Rol
   return Array.isArray(notacao) ? notacao : [notacao];
 }
 
-/** Formata "1d20 → 4" a partir dos termos/valores brutos de uma rolagem — usado pelo aviso de
- *  rolagem ao vivo (`RolagemAoVivoPlayer.tsx`) pra mostrar o resultado depois que o dado assenta.
- *  Mostra só o valor bruto dos dados, não o total final com modificador de perícia/atributo
- *  (isso é calculado fora do useDiceBox, no componente que rola, e não viaja no broadcast). */
-export function formatarNotacaoResultado(termos: RollTermo[], valores: number[]): string {
-  const notacao = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
-  const total = valores.reduce((soma, v) => soma + v, 0);
-  return `${notacao} → ${total}`;
+/**
+ * Formata o resultado de uma rolagem pro aviso ao vivo (`RolagemAoVivoPlayer.tsx`), depois que
+ * o dado assenta. Duas formas:
+ *  - um termo só, sem bônus: "1d20 → 4" (caso simples, sem repetir o óbvio).
+ *  - termos múltiplos e/ou com bônus: detalha cada termo — "1d20: 2 + 1d6: 6 = 8" (dados
+ *    combinados, ex. RolagemLivreJogador) ou "1d20: 5 + 2 = 7" (bônus plano somado depois).
+ * `bonus` nunca passa pela física do dado — é o modificador de perícia/atributo, calculado fora
+ * do useDiceBox por quem rolou.
+ */
+export function formatarNotacaoResultado(termos: RollTermo[], valores: number[], bonus?: number): string {
+  const totalDados = valores.reduce((soma, v) => soma + v, 0);
+  const total = totalDados + (bonus ?? 0);
+
+  if (termos.length === 1 && !bonus) {
+    const notacao = `${termos[0].qty}d${termos[0].sides}`;
+    return `${notacao} → ${total}`;
+  }
+
+  let cursor = 0;
+  const partes = termos.map((t) => {
+    const somaTermo = valores.slice(cursor, cursor + t.qty).reduce((soma, v) => soma + v, 0);
+    cursor += t.qty;
+    return `${t.qty}d${t.sides}: ${somaTermo}`;
+  });
+  if (bonus) partes.push(String(bonus));
+  return `${partes.join(' + ')} = ${total}`;
 }
 
 /**

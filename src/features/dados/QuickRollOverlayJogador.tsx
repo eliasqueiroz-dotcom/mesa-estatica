@@ -39,8 +39,17 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
 
   // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
-  // mesmo wrapper de DadosTabJogador.tsx, aqui só com os dois call sites locais.
-  const rolarEBroadcast: typeof rolar = (notacao, onComplete, colorset, personagemId, tipo) => {
+  // mesmo wrapper de DadosTabJogador.tsx, aqui só com os dois call sites locais. `bonusRolagem`
+  // (6º parâmetro, opcional) é o modificador de perícia/atributo — não passa pela física, só
+  // entra no total mostrado pelo aviso ao vivo (formatarNotacaoResultado).
+  const rolarEBroadcast = (
+    notacao: Parameters<typeof rolar>[0],
+    onComplete: Parameters<typeof rolar>[1],
+    colorset?: Parameters<typeof rolar>[2],
+    personagemId?: Parameters<typeof rolar>[3],
+    tipo?: Parameters<typeof rolar>[4],
+    bonusRolagem?: number,
+  ) => {
     rolar(
       notacao,
       (grupos) => {
@@ -55,6 +64,7 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
           cor: ficha.corVisual,
           origem: ficha.nome || 'jogador',
           tipo: tipo ?? 'teste',
+          bonus: bonusRolagem,
         });
       },
       colorset,
@@ -88,20 +98,22 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       },
       'rede',
       ficha.id,
+      undefined,
+      bonus || undefined,
     );
   };
 
   const rolarPericia = () => {
     setResultadoRoll(null);
+    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
+    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
+    const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
+    const grauPericia = ficha.pericias[periciaId] ?? 0;
+    const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
     rolarEBroadcast(
       '1d20',
       (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
-        const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-        const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-        const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
-        const grauPericia = ficha.pericias[periciaId] ?? 0;
-        const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
         setResultadoRoll({ d20, modificador, total: d20 + modificador });
 
         const nome = ficha.nome || 'Personagem';
@@ -118,6 +130,8 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       },
       'rede',
       ficha.id,
+      undefined,
+      modificador || undefined,
     );
   };
 
