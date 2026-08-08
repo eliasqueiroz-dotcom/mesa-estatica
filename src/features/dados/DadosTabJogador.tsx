@@ -1,6 +1,7 @@
 import { normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
+import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoVivo';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
-import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
+import { marcarComoProprio, useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import type { Ficha } from '../../state/types';
 import RoladorSanidadeJogador from './RoladorSanidadeJogador';
 import RoladorSurtoJogador from './RoladorSurtoJogador';
@@ -23,8 +24,13 @@ interface Props {
  * perda) — ver comentário em `RoladorSanidadeJogador.tsx`.
  */
 export default function DadosTabJogador({ ficha, active = true }: Props) {
-  const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja-jogador', active, 100, resolverRolagemJogador);
+  const { ready, rolando, erro, modo2D, rolar, reproduzir } = useDiceBox('dice-bandeja-jogador', active, 100, resolverRolagemJogador);
   const podeRolar = ready && !rolando;
+
+  // rolagem de OUTRO jogador também anima aqui quando a aba Dados está aberta — a própria
+  // rolagem deste jogador é filtrada dentro do hook (ehRolagemPropria), senão a bandeja tocaria
+  // o resultado duas vezes seguidas.
+  useReproduzirRolagemAoVivo(reproduzir, ready);
 
   // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
   // wrapper único em vez de tocar nos 6 call sites de rolar() espalhados pelos roladores abaixo.
@@ -33,8 +39,10 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       notacao,
       (grupos) => {
         onComplete(grupos);
+        const id = crypto.randomUUID();
+        marcarComoProprio(id);
         useRolagemAoVivoStore.getState().definirAtual({
-          id: crypto.randomUUID(),
+          id,
           termos: normalizarTermos(notacao),
           valores: grupos.flatMap((g) => g.rolls.map((r) => r.value)),
           colorsetBase: typeof colorset === 'string' ? colorset : 'rede',

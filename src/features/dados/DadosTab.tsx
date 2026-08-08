@@ -1,5 +1,6 @@
 import { useDiceBox } from '../../dice/useDiceBox';
 import { consumirForcados } from '../../dice/forcarRolagem';
+import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoVivo';
 import RoladorTeste from './RoladorTeste';
 import RoladorSanidade from './RoladorSanidade';
 import RoladorSurto from './RoladorSurto';
@@ -8,11 +9,17 @@ import RolagemLivre from './RolagemLivre';
 import RoladorTabelas from './RoladorTabelas';
 
 export default function DadosTab({ active = true }: { active?: boolean }) {
-  const { ready, rolando, erro, modo2D, rolar } = useDiceBox('dice-bandeja', active, 100, undefined, consumirForcados);
+  const { ready, rolando, erro, modo2D, rolar, reproduzir } = useDiceBox('dice-bandeja', active, 100, undefined, consumirForcados);
   // os 5 roladores compartilham UMA bandeja física — a lib não protege roll() concorrente
   // (ver comentário em useDiceBox.rolar), então "pronto pra rolar" tem que valer pra todos ao
   // mesmo tempo: enquanto qualquer um está rolando, os botões dos outros também ficam desabilitados.
   const podeRolar = ready && !rolando;
+
+  // rolagem de jogador (rolagemAoVivoStore) também anima aqui quando a aba Dados está aberta —
+  // não só no mini-aviso do header (RolagemAoVivoPlayer). `ready` já cobre "esta aba está
+  // ativa" (useDiceBox zera `ready` quando `active` é false); a fila de useDiceBox intercala
+  // com uma rolagem do mestre em andamento, sem precisar coordenar aqui.
+  useReproduzirRolagemAoVivo(reproduzir, ready);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>

@@ -3,7 +3,7 @@ import { normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
+import { marcarComoProprio, useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 
@@ -45,8 +45,10 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       notacao,
       (grupos) => {
         onComplete(grupos);
+        const id = crypto.randomUUID();
+        marcarComoProprio(id);
         useRolagemAoVivoStore.getState().definirAtual({
-          id: crypto.randomUUID(),
+          id,
           termos: normalizarTermos(notacao),
           valores: grupos.flatMap((g) => g.rolls.map((r) => r.value)),
           colorsetBase: typeof colorset === 'string' ? colorset : 'rede',

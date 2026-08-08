@@ -43,6 +43,16 @@ export function normalizarTermos(notacao: string | RollTermo | RollTermo[]): Rol
   return Array.isArray(notacao) ? notacao : [notacao];
 }
 
+/** Formata "1d20 → 4" a partir dos termos/valores brutos de uma rolagem — usado pelo aviso de
+ *  rolagem ao vivo (`RolagemAoVivoPlayer.tsx`) pra mostrar o resultado depois que o dado assenta.
+ *  Mostra só o valor bruto dos dados, não o total final com modificador de perícia/atributo
+ *  (isso é calculado fora do useDiceBox, no componente que rola, e não viaja no broadcast). */
+export function formatarNotacaoResultado(termos: RollTermo[], valores: number[]): string {
+  const notacao = termos.map((t) => `${t.qty}d${t.sides}`).join('+');
+  const total = valores.reduce((soma, v) => soma + v, 0);
+  return `${notacao} → ${total}`;
+}
+
 /**
  * Monta a notação da lib. Rolagem honesta por padrão: "1d8+1d20".
  *

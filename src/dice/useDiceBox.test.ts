@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { montarNotacao, normalizarTermos, rolarFallback2D } from './useDiceBox';
+import { formatarNotacaoResultado, montarNotacao, normalizarTermos, rolarFallback2D } from './useDiceBox';
 import { consumirForcados, enfileirarForcado, limparForcados } from './forcarRolagem';
 import { extrairResultadosSanidade, parseDado } from '../features/dados/RoladorSanidade';
 
@@ -99,6 +99,22 @@ describe('normalizarTermos', () => {
   it('objeto ou lista de RollTermo passam direto', () => {
     expect(normalizarTermos({ sides: 6, qty: 3 })).toEqual([{ sides: 6, qty: 3 }]);
     expect(normalizarTermos([{ sides: 6, qty: 3 }])).toEqual([{ sides: 6, qty: 3 }]);
+  });
+});
+
+describe('formatarNotacaoResultado', () => {
+  // usado pelo aviso de rolagem ao vivo (RolagemAoVivoPlayer.tsx) pra mostrar o resultado
+  // depois que o dado assenta — ex.: "Helena está rolando…" → "Helena 1d20 → 4".
+  it('um termo só', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }], [4])).toBe('1d20 → 4');
+  });
+
+  it('soma múltiplos dados do mesmo termo (ex: surto 2d20)', () => {
+    expect(formatarNotacaoResultado([{ qty: 2, sides: 20 }], [10, 15])).toBe('2d20 → 25');
+  });
+
+  it('múltiplos termos combinados, na mesma ordem da notação', () => {
+    expect(formatarNotacaoResultado([{ qty: 1, sides: 20 }, { qty: 1, sides: 4 }], [12, 3])).toBe('1d20+1d4 → 15');
   });
 });
 

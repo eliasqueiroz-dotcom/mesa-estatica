@@ -38,3 +38,19 @@ export const useRolagemAoVivoStore = create<RolagemAoVivoState>((set) => ({
   atual: null,
   definirAtual: (r) => set({ atual: r }),
 }));
+
+/** Ids de rolagens que o PRÓPRIO cliente publicou — sem isso, o jogador que rolou reproduziria
+ *  a própria rolagem de novo ao ler o store de volta (o mesmo `definirAtual` que dispara o
+ *  broadcast pros outros também aciona os consumidores locais: `RolagemAoVivoPlayer.tsx` no
+ *  header, e agora `DadosTab.tsx`/`DadosTabJogador.tsx` reproduzindo na própria bandeja — sem o
+ *  filtro, a bandeja de quem rolou tocaria o mesmo resultado duas vezes seguidas). Set simples,
+ *  sem limpeza ativa: poucas rolagens por sessão, memória irrelevante. */
+const idsProprios = new Set<string>();
+
+export function marcarComoProprio(id: string): void {
+  idsProprios.add(id);
+}
+
+export function ehRolagemPropria(id: string): boolean {
+  return idsProprios.has(id);
+}

@@ -198,9 +198,11 @@ export default function PlayerApp() {
             })}
           </nav>
         </div>
-        <MidiaPlayerJogador />
-        <SoundpadPlayer />
-        <RolagemAoVivoPlayer />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <SoundpadPlayer />
+          <RolagemAoVivoPlayer />
+          <MidiaPlayerJogador />
+        </div>
       </header>
       <DestaqueSuperior />
       <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
