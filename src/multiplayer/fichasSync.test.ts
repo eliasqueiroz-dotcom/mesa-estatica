@@ -154,6 +154,14 @@ function fichaRemotaPrivada(id: string) {
   };
 }
 
+/** Shape real do `select('dados')` em `characters_privado` (owner_token/auth_uid nunca são
+ *  lidos por fichasSync.ts — só a Edge Function vincular-jogador os usa, via service_role) —
+ *  garante que `buscarEMontar`/`buscarTodas` continuam montando a Ficha certa com esse select
+ *  mais estreito, não só com o `select('*')` antigo que os outros helpers acima simulam. */
+function fichaRemotaPrivadaEstreita(id: string) {
+  return { dados: fichaRemotaPrivada(id).dados };
+}
+
 describe('iniciarSyncFichas — guard de corrida', () => {
   let mock: ReturnType<typeof criarClienteComControle>;
   let cleanup: (() => void) | undefined;
@@ -204,8 +212,7 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     mock.resolvers[3](fichaRemotaPrivada(fichaId));
 
     await vi.waitFor(() => {
-      const fichas = useStore.getState().fichas;
-      return fichas.some((f) => f.id === fichaId);
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true);
     });
 
     const helenaLocal = useStore.getState().fichas.find((f) => f.id === localId);
@@ -229,8 +236,55 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     mock.resolvers[3](fichaRemotaPrivada(fichaId));
 
     await vi.waitFor(() => {
-      const fichas = useStore.getState().fichas;
-      return fichas.some((f) => f.id === fichaId && f.nome === 'Helena do Servidor');
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId && f.nome === 'Helena do Servidor')).toBe(true);
     });
+  });
+
+  it('monta a ficha corretamente com o select estreito de characters_privado (só {dados}, sem owner_token/auth_uid)', async () => {
+    cleanup = iniciarSyncFichas();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([]);
+    mock.resolvers[1]([]);
+
+    const fichaId = 'ficha-remota-select-estreito';
+    const handler = mock.handlers[0];
+    handler({ new: { id: fichaId }, old: {} });
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+
+    mock.resolvers[2](fichaRemotaPublica(fichaId, 'Helena Estreita'));
+    mock.resolvers[3](fichaRemotaPrivadaEstreita(fichaId));
+
+    // `expect` dentro do waitFor é o que faz ele de fato repetir até a condição bater (ou
+    // estourar o timeout) — um `return fichas.some(...)` sem `expect` resolve na primeira
+    // checagem mesmo que dê falso, porque `vi.waitFor` só reage a exceção lançada, não ao
+    // valor de retorno (achado depurando esta mudança: os testes de guarda de corrida
+    // pré-existentes tinham exatamente esse padrão vazio na última espera — corrigidos também).
+    await vi.waitFor(() => {
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true);
+    });
+
+    const ficha = useStore.getState().fichas.find((f) => f.id === fichaId);
+    expect(ficha?.nome).toBe('Helena Estreita');
+    expect(ficha?.atributos.vigor).toBe(2);
+    expect(ficha?.determinacao).toBe(1);
+  });
+
+  it('busca inicial (buscarTodas) monta fichas certas com o select estreito de characters_privado', async () => {
+    const fichaId = 'ficha-busca-inicial-estreita';
+    cleanup = iniciarSyncFichas();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([fichaRemotaPublica(fichaId, 'Helena da Busca Inicial')]);
+    mock.resolvers[1]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true);
+    });
+
+    const ficha = useStore.getState().fichas.find((f) => f.id === fichaId);
+    expect(ficha?.nome).toBe('Helena da Busca Inicial');
+    expect(ficha?.atributos.vigor).toBe(2);
   });
 });

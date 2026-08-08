@@ -30,6 +30,12 @@ interface LinhaPrivado {
   dados: FichaPrivadaDados;
 }
 
+/** Shape do `select('dados')` em `characters_privado` — `buscarEMontar`/`buscarTodas` só leem
+ *  essa coluna (owner_token/auth_uid são exclusivos da Edge Function vincular-jogador, via
+ *  service_role, fora do RLS do client); pedir só o que se usa evita rebuscar o JSON da ficha
+ *  inteira mais dois UUIDs que nunca são lidos aqui. */
+type LinhaPrivadoDados = Pick<LinhaPrivado, 'dados'>;
+
 export const paraLinhaPublico = (ficha: Ficha, basePV: BasePV): LinhaPublico => ({
   id: ficha.id,
   nome: ficha.nome,
@@ -51,11 +57,11 @@ export const paraFichaPublica = (r: LinhaPublico): FichaPublica => ({
 async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null> {
   const [{ data: publico }, { data: privado }] = await Promise.all([
     cliente.from('characters_publico').select('*').eq('id', id).maybeSingle(),
-    cliente.from('characters_privado').select('*').eq('id', id).maybeSingle(),
+    cliente.from('characters_privado').select('dados').eq('id', id).maybeSingle(),
   ]);
   if (!publico || !privado) return null;
   const linhaPublico = publico as LinhaPublico;
-  const dadosPrivados = (privado as LinhaPrivado).dados;
+  const dadosPrivados = (privado as LinhaPrivadoDados).dados;
   // Backward-compatibilidade: dados antigos (antes da mudança no FichaPrivadaDados que
   // passou a incluir pvAtual/surtosAtivos em characters_privado.dados) não têm esses
   // campos no JSON de dados — eles só existiam em characters_publico. Para não quebrar,
@@ -74,10 +80,10 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null
 async function buscarTodas(cliente: Cliente): Promise<Ficha[]> {
   const [{ data: publicos }, { data: privados }] = await Promise.all([
     cliente.from('characters_publico').select('*'),
-    cliente.from('characters_privado').select('*'),
+    cliente.from('characters_privado').select('id, dados'),
   ]);
   if (!publicos || !privados) return [];
-  const privadosPorId = new Map((privados as LinhaPrivado[]).map((p) => [p.id, p]));
+  const privadosPorId = new Map((privados as (LinhaPrivadoDados & { id: string })[]).map((p) => [p.id, p]));
   const fichas: Ficha[] = [];
   for (const publico of publicos as LinhaPublico[]) {
     const privado = privadosPorId.get(publico.id);

@@ -202,10 +202,12 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     mock.resolvers[2](npcRemoto(npcId, 'Guarda Remoto'));
     mock.resolvers[3](linhasPrivadasVazias(npcId));
 
-    // deixa as promises resolverem
+    // deixa as promises resolverem — `expect` dentro do waitFor é o que faz ele repetir de
+    // verdade até bater (ou estourar o timeout); um `return npcs.some(...)` sem `expect`
+    // resolve na primeira checagem mesmo com falso, porque `vi.waitFor` só reage a exceção
+    // lançada, não ao valor de retorno.
     await vi.waitFor(() => {
-      const npcs = useStore.getState().npcs;
-      return npcs.some((n) => n.id === npcId);
+      expect(useStore.getState().npcs.some((n) => n.id === npcId)).toBe(true);
     });
 
     // a edição local deve ter sobrevivido
@@ -232,8 +234,7 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     mock.resolvers[3](linhasPrivadasVazias(npcId));
 
     await vi.waitFor(() => {
-      const npcs = useStore.getState().npcs;
-      return npcs.some((n) => n.id === npcId && n.nome === 'Guarda do Servidor');
+      expect(useStore.getState().npcs.some((n) => n.id === npcId && n.nome === 'Guarda do Servidor')).toBe(true);
     });
   });
 });
