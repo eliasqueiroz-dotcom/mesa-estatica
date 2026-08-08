@@ -5,6 +5,11 @@ import type { RollGroupResult } from '../../dice/useDiceBox';
 import { resolverTabela, validarCoberturaTabela } from '../../rules/data/tabelasSeed';
 import { useStore } from '../../state/store';
 
+/** Faces de dado com suporte a dado 3D físico no @3d-dice/dice-box-threejs.
+ *  Fora desse conjunto, a rolagem é virtual (Math.random) e o banner/log
+ *  mostram "rolagem virtual". */
+const DADOS_3D = new Set([2, 3, 4, 6, 8, 10, 12, 20, 100]);
+
 interface RoladorTabelasProps {
   ready: boolean;
   rolar: (
@@ -53,35 +58,39 @@ export default function RoladorTabelas({ ready, rolar: rolarNaBandeja }: Rolador
 
   const tabela = tabelas.find((t) => t.id === tabelaId) ?? tabelas[0] ?? null;
 
+  const resolver = (valor: number) => {
+    if (!tabela) return;
+    const entrada = resolverTabela(tabela, valor);
+    const texto = entrada?.texto ?? '(nenhuma entrada cobre esse valor — gap na tabela)';
+    const virtualTag = DADOS_3D.has(tabela.lados) ? '' : ' [rolagem virtual]';
+    setResultado({ rolagem: valor, texto: texto + virtualTag, tabelaNome: tabela.nome });
+    const tag = entrada ? '' : ' [gap]';
+    registrarLog('anotacao', `${tabela.nome} · d${tabela.lados}${virtualTag} → ${valor} — ${texto}${tag}`, null, 'privada');
+    registrarRoll({
+      origem: tabela.nome,
+      personagemId: null,
+      formula: `1d${tabela.lados}`,
+      total: valor,
+      bruto: valor,
+      visibilidade: 'privada',
+    });
+    setRolando(false);
+  };
+
   const rolar = () => {
     if (!tabela) return;
     setRolando(true);
-    rolarNaBandeja(
-      `1d${tabela.lados}`,
-      (grupos) => {
-        const valor = grupos[0]?.value ?? 0;
-        const entrada = resolverTabela(tabela, valor);
-        const texto = entrada?.texto ?? '(nenhuma entrada cobre esse valor — gap na tabela)';
-        setResultado({ rolagem: valor, texto, tabelaNome: tabela.nome });
-        const tag = entrada ? '' : ' [gap]';
-        registrarLog('anotacao', `${tabela.nome} · d${tabela.lados} → ${valor} — ${texto}${tag}`, null, 'privada');
-        // mesmo padrão de RolagemLivre.tsx (rolagem privada): entra também na seção "Rolagens"
-        // (rollsLog), sempre privada — a ferramenta inteira é GM-only, sem toggle público/privado.
-        // O mestre pode "revelar" depois se quiser (LogView.tsx, RolsSection).
-        registrarRoll({
-          origem: tabela.nome,
-          personagemId: null,
-          formula: `1d${tabela.lados}`,
-          total: valor,
-          bruto: valor,
-          visibilidade: 'privada',
-        });
-        setRolando(false);
-      },
-      undefined,
-      null,
-      'qualquer',
-    );
+    if (DADOS_3D.has(tabela.lados)) {
+      rolarNaBandeja(
+        `1d${tabela.lados}`,
+        (grupos) => resolver(grupos[0]?.value ?? 0),
+        undefined,
+        null,
+        'qualquer',
+      );
+    } else {
+      setTimeout(() => resolver(Math.floor(Math.random() * tabela.lados) + 1), 0);
+    }
   };
 
   return (
