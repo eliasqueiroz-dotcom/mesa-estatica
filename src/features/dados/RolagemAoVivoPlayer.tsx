@@ -4,8 +4,9 @@ import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoViv
 import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 
 /** Tempo que "X está rolando…" fica visível — some assim que o dado assenta e o texto vira
- *  resultado (não precisa de graça própria, a transição já é o próprio `aoTerminar`). */
-const GRACA_RESULTADO_MS = 1800;
+ *  resultado (não precisa de graça própria, a transição já é o próprio `aoTerminar`).
+ *  ~12s total (física ~2s + graça 10s) pra mesa toda ver o número. */
+const GRACA_RESULTADO_MS = 10000;
 
 /**
  * Reproduz a rolagem de outro jogador (chegou por `rolagemAoVivoSync.ts`) — montado no
@@ -44,7 +45,11 @@ export default function RolagemAoVivoPlayer() {
       marcarVisivel(true);
     },
     aoTerminar: (r) => {
-      setRotulo({ nome: r.origem, cor: r.cor, texto: formatarNotacaoResultado(r.termos, r.valores, r.bonus) });
+      const texto =
+        r.tipo === 'surto'
+          ? `d20A=${r.valores[0]} d20B=${r.valores[1]}`
+          : formatarNotacaoResultado(r.termos, r.valores, r.bonus);
+      setRotulo({ nome: r.origem, cor: r.cor, texto });
       graceRef.current = setTimeout(() => marcarVisivel(false), GRACA_RESULTADO_MS);
     },
   });
