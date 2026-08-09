@@ -75,10 +75,9 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
 
         const origem = ficha.nome || 'Personagem';
         const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
-        const rotulo = r.sucesso ? 'sucesso' : 'falha';
         registrarLog(
           'teste',
-          `${origem} · ${rotulo} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          `${origem} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
           ficha.id,
           visibilidade,
         );
@@ -94,23 +93,15 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
     } else if (modo === 'npc' && npc) {
       rolar('1d20', (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
-        const r = resolverTeste({
-          d20,
-          atributoId: 'vontade',
-          valorAtributo: bonus,
-          grauPericia: 0,
-          personagemFerido: false,
-          dt,
-        });
-        setResultadoRolagem({ sucesso: r.sucesso, d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
+        const total = d20 + bonus;
+        setResultadoRolagem({ sucesso: true, d20, modificador: bonus, total });
         setRolando(false);
 
         const origem = npc.nome || 'NPC';
-        const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
-        const rotulo = r.sucesso ? 'sucesso' : 'falha';
+        const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
         registrarLog(
           'teste',
-          `${origem} · ${rotulo} · teste → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          `${origem} · teste → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
           npc.id,
           visibilidade,
         );
@@ -118,7 +109,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           origem,
           personagemId: npc.id,
           formula,
-          total: r.total,
+          total,
           bruto: d20,
           visibilidade,
         });

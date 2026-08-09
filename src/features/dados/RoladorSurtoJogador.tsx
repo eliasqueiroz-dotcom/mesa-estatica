@@ -86,6 +86,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
     if (!resultado) return;
     setEscolhido(lado);
     resolverEscolhaSurtoPendente(ficha.id, lado);
+    registrarLog('surto', `${ficha.nome || 'Personagem'} · escolheu lado ${lado} do surto`, ficha.id, 'publica');
   };
 
   return (
