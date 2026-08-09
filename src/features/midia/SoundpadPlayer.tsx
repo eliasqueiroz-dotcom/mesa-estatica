@@ -17,12 +17,13 @@ import { useStore } from '../../state/store';
  * do jogador isso já acontece no botão "habilitar áudio" do `MidiaPlayerJogador`; antes disso o
  * efeito falha em silêncio, que é o comportamento correto (nada de erro no meio da cena).
  *
- * `sons` e `volume` vão pra refs (atualizados por efeito sem áudio) pra que o efeito principal
- * reaja **só** a `ultimoDisparo` e não execute disparos extras quando `sons` ou `volume` mudam.
+ * `sons` e `volume` vão pra refs (atualizados por subscriber) pra que o efeito principal
+ * reaja **só** a `ultimoDisparo`. O subscriber também ajusta o volume do áudio tocando ao vivo.
  */
 export default function SoundpadPlayer() {
   const ultimoDisparo = useStore((s) => s.soundpad.ultimoDisparo);
   const jaTocado = useRef<string | null>(null);
+  const audioAtual = useRef<HTMLAudioElement | null>(null);
 
   const sonsRef = useRef(useStore.getState().soundpad.sons);
   const volumeRef = useRef(useStore.getState().soundpad.volume);
@@ -31,6 +32,7 @@ export default function SoundpadPlayer() {
       useStore.subscribe((s) => {
         sonsRef.current = s.soundpad.sons;
         volumeRef.current = s.soundpad.volume;
+        if (audioAtual.current) audioAtual.current.volume = s.soundpad.volume;
       }),
     [],
   );
@@ -44,12 +46,8 @@ export default function SoundpadPlayer() {
 
     const audio = new Audio(som.url);
     audio.volume = volumeRef.current;
+    audioAtual.current = audio;
     audio.play().catch(() => {});
-
-    return () => {
-      audio.pause();
-      audio.remove();
-    };
   }, [ultimoDisparo]);
 
   return null;

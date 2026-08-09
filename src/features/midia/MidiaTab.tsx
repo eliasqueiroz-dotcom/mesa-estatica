@@ -50,6 +50,7 @@ export default function MidiaTab() {
     const arquivo = e.target.files?.[0];
     e.target.value = '';
     if (!arquivo || !supabase) return;
+    if (arquivo.size > 50 * 1024 * 1024) { setErro('arquivo excede 50MB — comprima ou divida em partes menores.'); return; }
     setErro(null);
     setEnviando(true);
     try {

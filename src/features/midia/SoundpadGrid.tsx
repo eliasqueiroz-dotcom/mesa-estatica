@@ -37,6 +37,7 @@ export default function SoundpadGrid() {
     const slot = slotAlvo.current;
     slotAlvo.current = null;
     if (!arquivo || slot === null || !supabase) return;
+    if (arquivo.size > 50 * 1024 * 1024) { setErro('arquivo excede 50MB — comprima ou divida em partes menores.'); return; }
     setErro(null);
     setEnviandoSlot(slot);
     try {
