@@ -225,7 +225,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     {e.nome}
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }} title="iniciativa: d20+agilidade">
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
                   {emSurto && (

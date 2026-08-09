@@ -92,7 +92,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                     {e.nome || 'sem nome'}
                     {souEu && <span className="badge" style={{ marginLeft: '0.4rem' }}>você</span>}
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }} title="iniciativa: d20+agilidade">
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
                 </div>
