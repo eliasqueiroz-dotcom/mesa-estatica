@@ -19,7 +19,7 @@ interface IniciativaPanelProps {
 export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true, ocultarBotaoProximo = false }: IniciativaPanelProps) {
   const {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
-    condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs,
+    condicoesCombate, condicaoDuracao, fichas, npcs,
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
     iniciarModoCombate, avancarTurno, encerrarModoCombate,
