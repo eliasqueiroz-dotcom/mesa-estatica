@@ -225,6 +225,9 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     {e.nome}
                   </span>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}>
+                    {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
+                  </span>
                   {emSurto && (
                     <span style={{ color: 'var(--ruido)', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -868,6 +868,8 @@ export const useStore = create<Store>()(
           tipo: p.tipo,
           nome: p.nome,
           valor: p.d20 + p.agilidade,
+          d20: p.d20,
+          agilidade: p.agilidade,
         }));
         set({ iniciativa: entradas });
         get().registrarLog(
@@ -893,6 +895,8 @@ export const useStore = create<Store>()(
           tipo: p.tipo,
           nome: p.nome,
           valor: p.d20 + p.agilidade,
+          d20: p.d20,
+          agilidade: p.agilidade,
         }));
         set((s) => comIniciativaInserida(s, entradas));
         get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
@@ -912,6 +916,8 @@ export const useStore = create<Store>()(
           tipo: 'npc' as const,
           nome: n.nome || 'sem nome',
           valor,
+          d20,
+          agilidade: maiorAgilidade,
         }));
         set((s) => comIniciativaInserida(s, entradas));
         get().registrarLog(
@@ -930,7 +936,7 @@ export const useStore = create<Store>()(
         const novoValor = d20 + agilidade;
         const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
         const reordenada = s.iniciativa
-          .map((e) => (e.participanteId === participanteId ? { ...e, valor: novoValor } : e))
+          .map((e) => (e.participanteId === participanteId ? { ...e, valor: novoValor, d20, agilidade } : e))
           .sort((a, b) => b.valor - a.valor);
         const novoIndice = participanteIdNaVez ? reordenada.findIndex((e) => e.participanteId === participanteIdNaVez) : -1;
         set({

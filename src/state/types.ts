@@ -136,6 +136,8 @@ export interface EntradaIniciativa {
   tipo: 'pc' | 'npc';
   nome: string;
   valor: number;
+  d20?: number;
+  agilidade?: number;
 }
 
 export interface TokenMapa {
