@@ -642,9 +642,22 @@ describe('soundpad', () => {
     useStore.getState().dispararSoundpad(3);
     const primeiro = useStore.getState().soundpad.ultimoDisparo;
     expect(primeiro?.slot).toBe(3);
-    await new Promise((r) => setTimeout(r, 2));
+    await new Promise((r) => setTimeout(r, 210));
     useStore.getState().dispararSoundpad(3);
     expect(useStore.getState().soundpad.ultimoDisparo?.em).not.toBe(primeiro?.em);
+  });
+
+  it('disparos rápidos (< 200ms) no mesmo slot são ignorados', () => {
+    useStore.getState().dispararSoundpad(3);
+    const primeiro = useStore.getState().soundpad.ultimoDisparo!;
+    useStore.getState().dispararSoundpad(3);
+    expect(useStore.getState().soundpad.ultimoDisparo?.em).toBe(primeiro.em);
+  });
+
+  it('disparos rápidos em slots diferentes são aceitos', () => {
+    useStore.getState().dispararSoundpad(3);
+    useStore.getState().dispararSoundpad(5);
+    expect(useStore.getState().soundpad.ultimoDisparo?.slot).toBe(5);
   });
 });
 

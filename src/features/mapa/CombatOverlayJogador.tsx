@@ -86,7 +86,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap }:
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
-        ...(aberto ? { width: 'min(420px, calc(100% - 16px))' } : {}),
+        ...(aberto ? { width: 'min(480px, calc(100vw - 16px))' } : {}),
       }}
     >
       {aberto && (

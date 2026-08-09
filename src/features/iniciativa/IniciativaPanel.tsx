@@ -332,20 +332,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                               {c.nome}
                               {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
                             </button>
-                            {ligada && (
-                              <input
-                                type="number"
-                                min={0}
-                                placeholder="∞"
-                                title="rodadas até acabar sozinha — vazio = manual/persistente"
-                                value={rodadasRestantes ?? ''}
-                                onChange={(ev) => {
-                                  const valor = ev.target.value === '' ? null : Number(ev.target.value);
-                                  definirDuracaoCondicao(e.participanteId, c.id, valor);
-                                }}
-                                style={{ width: 28, fontSize: 9, padding: '0.05em 0.15em' }}
-                              />
-                            )}
+
                           </span>
                         );
                       })}

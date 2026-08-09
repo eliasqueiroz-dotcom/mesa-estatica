@@ -16,24 +16,41 @@ import { useStore } from '../../state/store';
  * Autoplay: o navegador só libera `play()` depois de algum gesto do usuário na página. No lado
  * do jogador isso já acontece no botão "habilitar áudio" do `MidiaPlayerJogador`; antes disso o
  * efeito falha em silêncio, que é o comportamento correto (nada de erro no meio da cena).
+ *
+ * `sons` e `volume` vão pra refs (atualizados por efeito sem áudio) pra que o efeito principal
+ * reaja **só** a `ultimoDisparo` e não execute disparos extras quando `sons` ou `volume` mudam.
  */
 export default function SoundpadPlayer() {
-  const sons = useStore((s) => s.soundpad.sons);
-  const volume = useStore((s) => s.soundpad.volume);
   const ultimoDisparo = useStore((s) => s.soundpad.ultimoDisparo);
   const jaTocado = useRef<string | null>(null);
+
+  const sonsRef = useRef(useStore.getState().soundpad.sons);
+  const volumeRef = useRef(useStore.getState().soundpad.volume);
+  useEffect(
+    () =>
+      useStore.subscribe((s) => {
+        sonsRef.current = s.soundpad.sons;
+        volumeRef.current = s.soundpad.volume;
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (!ultimoDisparo || ultimoDisparo.em === jaTocado.current) return;
     jaTocado.current = ultimoDisparo.em;
 
-    const som = sons.find((s) => s.slot === ultimoDisparo.slot);
+    const som = sonsRef.current.find((s) => s.slot === ultimoDisparo.slot);
     if (!som?.url) return;
 
     const audio = new Audio(som.url);
-    audio.volume = volume;
+    audio.volume = volumeRef.current;
     audio.play().catch(() => {});
-  }, [ultimoDisparo, sons, volume]);
+
+    return () => {
+      audio.pause();
+      audio.remove();
+    };
+  }, [ultimoDisparo]);
 
   return null;
 }

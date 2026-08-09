@@ -1198,8 +1198,14 @@ export const useStore = create<Store>()(
         set((s) => ({ soundpad: { ...s.soundpad, sons: s.soundpad.sons.filter((x) => x.slot !== slot) } })),
       definirVolumeSoundpad: (volume) =>
         set((s) => ({ soundpad: { ...s.soundpad, volume: Math.max(0, Math.min(1, volume)) } })),
-      dispararSoundpad: (slot) =>
-        set((s) => ({ soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString() } } })),
+      dispararSoundpad: (slot) => {
+        const atual = get().soundpad.ultimoDisparo;
+        if (atual && atual.slot === slot) {
+          const diff = Date.now() - new Date(atual.em).getTime();
+          if (diff < 200) return;
+        }
+        set((s) => ({ soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString() } } }));
+      },
 
       registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
         const sessaoPublica = get().sessaoPublica;
