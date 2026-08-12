@@ -3,6 +3,8 @@ import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { personagemEstaEmSurto, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
+import BarraSegmentada from '../fichas/BarraSegmentada';
+import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeLamina, IconeMais } from '../combate/icones';
 
 interface IniciativaPanelProps {
   hook: ReturnType<typeof useIniciativa>;
@@ -43,10 +45,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     <>
       {header}
 
-      <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-        <button className="icone-botao" onClick={resetar} style={{ borderColor: 'var(--ruido-dim)', color: 'var(--ruido)' }}>
-          resetar
-        </button>
+      <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {selecionadosIniciativa.length > 0 && (
           <button className="icone-botao acento" onClick={rolarSelecionados} disabled={nenhumSelecionado && disponiveis.length > 0}>
             rolar inic.
@@ -59,7 +58,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 próximo
               </button>
             )}
-            <button className="icone-botao" onClick={encerrarModoCombate}>
+            <button className="icone-botao perigo" onClick={encerrarModoCombate}>
               encerrar
             </button>
           </>
@@ -68,8 +67,15 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             iniciar
           </button>
         )}
-        <button className="icone-botao" onClick={() => setMostrarGlossario((v) => !v)}>
-          glossário {mostrarGlossario ? '▲' : '▼'}
+        <button className="icone-botao perigo" onClick={resetar}>
+          resetar
+        </button>
+        <button
+          className="icone-botao"
+          onClick={() => setMostrarGlossario((v) => !v)}
+          style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)' }}
+        >
+          glossário <IconeChevron aberto={mostrarGlossario} />
         </button>
       </div>
 
@@ -141,9 +147,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const sendoArrastado = dragIndex === i;
             const alvoDrop = dropIndex === i;
             const npcAcoes = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId)?.acoes ?? [] : [];
+            const podeAdiar = iniciativa.length > 1 && i < iniciativa.length - 1;
+            const critico = !!pv && pv.atual > 0 && pvPct <= 0.25;
+            const foraDeCombate = !!pv && pv.atual <= 0;
             return (
               <div
                 key={e.id}
+                className="combate-linha"
                 data-ativo={naVez}
                 draggable={podeArrastar}
                 onDragStart={() => { setDragIndex(i); setDropIndex(null); }}
@@ -152,10 +162,9 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 onDrop={() => { if (dragIndex !== null && dragIndex !== i) { reordenarIniciativa(dragIndex, i); } setDragIndex(null); setDropIndex(null); }}
                 onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
                 style={{
-                  borderBottom: '2px solid var(--concrete-2)', padding: '0.25rem 0',
+                  marginBottom: '0.3rem',
                   opacity: sendoArrastado ? 0.3 : 1,
-                  borderTop: alvoDrop ? '2px solid var(--rede)' : undefined,
-                  transition: 'opacity 0.15s',
+                  borderTopColor: alvoDrop ? 'var(--rede)' : undefined,
                   cursor: 'grab',
                   ...estiloItem,
                 }}
@@ -164,7 +173,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   onClick={() => toggleExpandido(e.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 12,
-                    padding: '0.15rem 0',
+                    padding: '0.1rem 0',
                   }}
                 >
                   <input
@@ -191,30 +200,33 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     tabIndex={0}
                     onClick={(ev) => { ev.stopPropagation(); rerolarIniciativaDe(e.participanteId); }}
                     title="rerrolar iniciativa (d20+Agilidade)"
-                    style={{ padding: '0.1em 0.3em', fontSize: 10, lineHeight: 1, flexShrink: 0 }}
+                    style={{ padding: '0.1em 0.3em', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
                   >
-                    🎲
+                    <IconeDado />
                   </span>
-                  {iniciativa.length > 1 && i < iniciativa.length - 1 && (
-                    <span
-                      className="icone-botao"
-                      role="button"
-                      tabIndex={0}
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        reordenarIniciativa(i, iniciativa.length - 1);
-                        alternarCondicaoCombate(e.participanteId, 'aguardando');
-                      }}
-                      title="adiar — vai pro fim da ordem desta rodada"
-                      style={{ padding: '0.1em 0.3em', fontSize: 10, lineHeight: 1, flexShrink: 0 }}
-                    >
-                      ⏭
-                    </span>
-                  )}
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 14 }}>
+                  <span
+                    className="icone-botao"
+                    role={podeAdiar ? 'button' : undefined}
+                    tabIndex={podeAdiar ? 0 : undefined}
+                    onClick={podeAdiar ? (ev) => {
+                      ev.stopPropagation();
+                      reordenarIniciativa(i, iniciativa.length - 1);
+                      alternarCondicaoCombate(e.participanteId, 'aguardando');
+                    } : undefined}
+                    title={podeAdiar ? 'adiar — vai pro fim da ordem desta rodada' : undefined}
+                    style={{
+                      padding: '0.1em 0.3em', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+                      visibility: podeAdiar ? 'visible' : 'hidden', border: podeAdiar ? undefined : 'none',
+                    }}
+                  >
+                    <IconeAdiar />
+                  </span>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }}>
                     {i + 1}
                   </span>
-                  {naVez && <span className="mono" style={{ color: 'var(--rede)', fontSize: 11 }}>▶</span>}
+                  <span className="mono" style={{ color: 'var(--rede)', fontSize: 11, minWidth: 12, flexShrink: 0 }}>
+                    {naVez ? '▶' : ''}
+                  </span>
                   <span
                     className="mono"
                     style={{
@@ -225,42 +237,46 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     {e.nome}
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }} title="iniciativa: d20+agilidade">
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 34, textAlign: 'right' }} title="iniciativa: d20+agilidade">
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
-                  {emSurto && (
-                    <span style={{ color: 'var(--ruido)', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }} title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                      </svg>
-                    </span>
-                  )}
-                  {pv && pv.atual <= 0 && (
-                    <span
-                      className="badge"
-                      title={
-                        ativas.includes('estavel')
-                          ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
-                          : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).'
-                      }
-                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, flexShrink: 0, padding: '0.1em 0.35em' }}
-                    >
-                      {ativas.includes('estavel') ? 'estável' : 'fora de combate'}
-                    </span>
-                  )}
-                  {pv && pv.atual > 0 && pvPct <= 0.25 && (
-                    <span
-                      className="badge"
-                      title="PV em 25% ou menos do máximo"
-                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, flexShrink: 0, padding: '0.1em 0.35em' }}
-                    >
-                      crítico
-                    </span>
-                  )}
+                  <span style={{ width: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ruido)' }}>
+                    {emSurto && (
+                      <span title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'} style={{ display: 'inline-flex' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ minWidth: 68, flexShrink: 0, textAlign: 'right' }}>
+                    {foraDeCombate && (
+                      <span
+                        className="badge"
+                        title={
+                          ativas.includes('estavel')
+                            ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
+                            : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).'
+                        }
+                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em' }}
+                      >
+                        {ativas.includes('estavel') ? 'estável' : 'fora de combate'}
+                      </span>
+                    )}
+                    {critico && (
+                      <span
+                        className="badge"
+                        title="PV em 25% ou menos do máximo"
+                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em' }}
+                      >
+                        crítico
+                      </span>
+                    )}
+                  </span>
                   {pv && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
-                      <div style={{ width: 56, height: 8, background: 'var(--void)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.max(0, pvPct * 100)}%`, height: '100%', background: corPv(pv.atual, pv.maximo), borderRadius: 2, transition: 'width 0.2s' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0, width: 96 }}>
+                      <div style={{ width: 56 }}>
+                        <BarraSegmentada atual={pv.atual} maximo={pv.maximo} variante="pv" corPreenchimento={corPv(pv.atual, pv.maximo)} compacta />
                       </div>
                       <span className="mono" style={{ fontSize: 10, minWidth: 36, textAlign: 'right' }}>
                         {pv.atual}/{pv.maximo}
@@ -268,10 +284,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     </div>
                   )}
                   {defesa && (
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0 }}>
-                      🛡{defesa.valor}
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 30, justifyContent: 'flex-end' }}>
+                      <IconeEscudo size={12} />{defesa.valor}
                     </span>
                   )}
+                  <span style={{ color: 'var(--ink-faint)', flexShrink: 0, display: 'inline-flex' }}>
+                    <IconeChevron aberto={exp} />
+                  </span>
                 </div>
                 {exp && (
                   <div style={{ padding: '0.25rem 0 0.1rem 1.1rem' }}>
@@ -292,42 +311,50 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       const ficha = fichas.find((f) => f.id === e.participanteId);
                       if (!ficha || ficha.armas.length === 0) return null;
                       return (
-                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                          {ficha.armas.map((a) => (
-                            <span
-                              key={a.id}
-                              className="badge"
-                              style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                              title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
-                            >
-                              🗡 {a.nome || 'arma'}
-                            </span>
-                          ))}
+                        <div style={{ marginBottom: '0.4rem' }}>
+                          <span className="combate-rotulo">armas</span>
+                          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                            {ficha.armas.map((a) => (
+                              <span
+                                key={a.id}
+                                className="badge"
+                                style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
+                              >
+                                <IconeLamina size={10} /> {a.nome || 'arma'}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       );
                     })()}
                     {npcAcoes.length > 0 && (
-                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                        {npcAcoes.map((a) => (
-                          <button
-                            key={a.id}
-                            className="combate-chip combate-chip--ativa"
-                            onClick={() => usarAcaoNpc(e.participanteId, e.nome, a)}
-                            title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
-                            style={{ fontSize: 10, cursor: 'pointer' }}
-                          >
-                            🗡 {a.nome}
-                          </button>
-                        ))}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <span className="combate-rotulo">ações</span>
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                          {npcAcoes.map((a) => (
+                            <button
+                              key={a.id}
+                              className="combate-chip combate-chip--ativa"
+                              onClick={() => usarAcaoNpc(e.participanteId, e.nome, a)}
+                              title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
+                              style={{ fontSize: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            >
+                              <IconeLamina size={10} /> {a.nome}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    <div className="combate-condicoes" style={{ marginBottom: '0.25rem' }}>
-                      {CONDICOES_COMBATE.map((c) => {
-                        const ligada = ativas.includes(c.id);
-                        const rodadasRestantes = duracoes[c.id];
-                        return (
-                          <span key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                    <div style={{ marginBottom: '0.4rem' }}>
+                      <span className="combate-rotulo">condições</span>
+                      <div className="combate-condicoes">
+                        {CONDICOES_COMBATE.map((c) => {
+                          const ligada = ativas.includes(c.id);
+                          const rodadasRestantes = duracoes[c.id];
+                          return (
                             <button
+                              key={c.id}
                               className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
                               title={c.efeito}
                               onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
@@ -335,47 +362,51 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                               {c.nome}
                               {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
                             </button>
-
-                          </span>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       {pv && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'wrap' }}>
-                          <span className="vazio" style={{ fontSize: 10 }}>PV</span>
-                          <button className="icone-botao" onClick={() => pv.aplicar(-10)} title="−10 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−10</button>
-                          <button className="icone-botao" onClick={() => pv.aplicar(-5)} title="−5 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−5</button>
-                          <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="−1 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−1</button>
-                          <span className="mono" style={{ fontSize: 11, minWidth: 32, textAlign: 'center' }}>{pv.atual}</span>
-                          <button className="icone-botao" onClick={() => pv.aplicar(1)} title="+1 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+1</button>
-                          <button className="icone-botao" onClick={() => pv.aplicar(5)} title="+5 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+5</button>
-                          <input
-                            type="number"
-                            placeholder="dano"
-                            title="dano livre — Enter aplica"
-                            style={{ width: 44, fontSize: 10, padding: '0.1em 0.25em' }}
-                            onKeyDown={(ev) => {
-                              if (ev.key !== 'Enter') return;
-                              const alvo = ev.target as HTMLInputElement;
-                              const valor = Number(alvo.value);
-                              if (valor) pv.aplicar(-Math.abs(valor));
-                              alvo.value = '';
-                            }}
-                          />
+                        <div>
+                          <span className="combate-rotulo">pv</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'wrap' }}>
+                            <button className="icone-botao" onClick={() => pv.aplicar(-10)} title="−10 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−10</button>
+                            <button className="icone-botao" onClick={() => pv.aplicar(-5)} title="−5 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−5</button>
+                            <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="−1 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−1</button>
+                            <span className="mono" style={{ fontSize: 11, minWidth: 32, textAlign: 'center' }}>{pv.atual}</span>
+                            <button className="icone-botao" onClick={() => pv.aplicar(1)} title="+1 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+1</button>
+                            <button className="icone-botao" onClick={() => pv.aplicar(5)} title="+5 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+5</button>
+                            <input
+                              type="number"
+                              placeholder="dano"
+                              title="dano livre — Enter aplica"
+                              style={{ width: 44, fontSize: 10, padding: '0.1em 0.25em' }}
+                              onKeyDown={(ev) => {
+                                if (ev.key !== 'Enter') return;
+                                const alvo = ev.target as HTMLInputElement;
+                                const valor = Number(alvo.value);
+                                if (valor) pv.aplicar(-Math.abs(valor));
+                                alvo.value = '';
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                       {defesa && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <span className="vazio" style={{ fontSize: 10, color: 'var(--real)' }}>🛡</span>
-                          <button className="icone-botao" onClick={() => defesa.ajustar(-1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
-                          <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa.valor}</span>
-                          <button className="icone-botao" onClick={() => defesa.ajustar(1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                        <div>
+                          <span className="combate-rotulo">defesa</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span style={{ color: 'var(--real)', display: 'inline-flex' }}><IconeEscudo size={12} /></span>
+                            <button className="icone-botao" onClick={() => defesa.ajustar(-1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
+                            <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa.valor}</span>
+                            <button className="icone-botao" onClick={() => defesa.ajustar(1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                          </div>
                         </div>
                       )}
                     </div>
                     {pv && pv.atual <= 0 && !ativas.includes('estavel') && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.3rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
                         <span className="vazio" style={{ fontSize: 10 }}>socorro:</span>
                         <select
                           value={socorristaPorAlvo[e.participanteId] ?? ''}
@@ -482,9 +513,10 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
               <button
                 className="icone-botao"
                 onClick={() => setAdicionarAberto(!adicionarAberto)}
-                style={{ fontSize: 11, width: '100%' }}
+                style={{ fontSize: 11, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
               >
-                {adicionarAberto ? '− recolher' : '+ adicionar combatente'}
+                {adicionarAberto ? <IconeChevron aberto /> : <IconeMais size={12} />}
+                {adicionarAberto ? 'recolher' : 'adicionar combatente'}
               </button>
               {adicionarAberto && (
                 <div style={{ marginTop: '0.3rem' }}>

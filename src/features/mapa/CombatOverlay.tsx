@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIniciativa } from '../../hooks/useIniciativa';
 import { gerarResumoCombate } from '../../rules/combate';
 import { useStore } from '../../state/store';
+import { IconeCheck, IconePrancheta, IconeSeta } from '../combate/icones';
 import CombatLogView from '../iniciativa/CombatLogView';
 import IniciativaPanel from '../iniciativa/IniciativaPanel';
 
@@ -135,7 +136,7 @@ export default function CombatOverlay() {
         <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
           combate {modoCombate ? `· rodada ${iniciativa.rodada}` : ''}
         </h3>
-        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
           <button
             className="icone-botao"
             onClick={() => setVista((v) => (v === 'iniciativa' ? 'log' : 'iniciativa'))}
@@ -150,9 +151,9 @@ export default function CombatOverlay() {
             onClick={copiarResumo}
             title="copiar resumo do combate (markdown)"
             onPointerDown={(ev) => ev.stopPropagation()}
-            style={{ fontSize: 10 }}
+            style={{ display: 'inline-flex', alignItems: 'center', color: copiado ? 'var(--rede)' : undefined }}
           >
-            {copiado ? '✓ copiado' : '📋 resumo'}
+            {copiado ? <IconeCheck /> : <IconePrancheta />}
           </button>
           <button className="icone-botao" onClick={() => { setPanelPos({ x: 8, y: 8 }); setAberto(false); }} title="fechar" onPointerDown={(ev) => ev.stopPropagation()}>
             ×
@@ -171,9 +172,13 @@ export default function CombatOverlay() {
             className="icone-botao acento"
             onClick={avancarTurno}
             title="próximo turno (espaço ou n)"
-            style={{ fontSize: 12, padding: '0.3em 0.6em', flexShrink: 0 }}
+            style={{
+              fontSize: 12, padding: '0.3em 0.7em', flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+              boxShadow: '0 0 12px var(--rede-glow)',
+            }}
           >
-            ▶ próximo
+            próximo <IconeSeta size={13} />
           </button>
         </div>
       )}

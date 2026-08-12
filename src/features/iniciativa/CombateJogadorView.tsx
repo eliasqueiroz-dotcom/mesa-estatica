@@ -4,6 +4,7 @@ import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesComba
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
+import { IconeEscudo, IconeLamina, IconeSeta } from '../combate/icones';
 
 interface Props {
   iniciativa: EntradaIniciativa[];
@@ -51,10 +52,10 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
           style={{
             display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem',
             padding: '0.4rem 0.6rem', border: '1px solid var(--rede)', background: 'var(--rede-glow)',
-            color: 'var(--rede)', fontSize: 12, fontWeight: 600,
+            color: 'var(--rede)', fontSize: 12, fontWeight: 600, boxShadow: '0 0 12px var(--rede-glow)',
           }}
         >
-          ▶ sua vez
+          <IconeSeta size={13} /> sua vez
         </div>
       )}
 
@@ -70,15 +71,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
             const surtoAtivo = personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
             const surtoEscolha = surtoAtivo ? minhaFicha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
             return (
-              <div
-                key={e.id}
-                style={{
-                  padding: '0.4rem 0.6rem',
-                  border: '1px solid var(--concrete-2)',
-                  borderColor: ativo ? 'var(--rede)' : 'var(--concrete-2)',
-                  background: ativo ? 'var(--rede-glow)' : undefined,
-                }}
-              >
+              <div key={e.id} className="combate-linha" data-ativo={ativo} style={{ padding: '0.4rem 0.6rem' }}>
                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: souEu ? '0.4rem' : 0 }}>
                   <span style={{ width: '1.2em', textAlign: 'center', color: 'var(--rede)' }}>{ativo ? '▶' : ''}</span>
                   <span
@@ -99,17 +92,20 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                 {souEu && (
                   <div style={{ paddingLeft: '1.1rem' }}>
                     {minhaFicha.armas.length > 0 && (
-                      <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                        {minhaFicha.armas.map((a) => (
-                          <span
-                            key={a.id}
-                            className="badge"
-                            style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                            title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
-                          >
-                            🗡 {a.nome || 'arma'}
-                          </span>
-                        ))}
+                      <div style={{ marginBottom: '0.4rem' }}>
+                        <span className="combate-rotulo">armas</span>
+                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                          {minhaFicha.armas.map((a) => (
+                            <span
+                              key={a.id}
+                              className="badge"
+                              style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
+                            >
+                              <IconeLamina size={10} /> {a.nome || 'arma'}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                     <CombatenteResumo
@@ -124,26 +120,32 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                       hideDot
                       onAjustarPv={(d) => ajustarPvAtual(minhaFicha.id, minhaFicha.pvAtual + d)}
                     />
-                    <div className="combate-condicoes" style={{ marginTop: '0.5rem' }}>
-                      {CONDICOES_COMBATE.map((c) => {
-                        const ligada = condicoesCombate?.[minhaFicha.id]?.includes(c.id) ?? false;
-                        return (
-                          <button
-                            key={c.id}
-                            className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
-                            title={c.efeito}
-                            onClick={() => alternarCondicaoCombate(minhaFicha.id, c.id)}
-                          >
-                            {nomeCondicao(c.id)}
-                          </button>
-                        );
-                      })}
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <span className="combate-rotulo">condições</span>
+                      <div className="combate-condicoes">
+                        {CONDICOES_COMBATE.map((c) => {
+                          const ligada = condicoesCombate?.[minhaFicha.id]?.includes(c.id) ?? false;
+                          return (
+                            <button
+                              key={c.id}
+                              className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                              title={c.efeito}
+                              onClick={() => alternarCondicaoCombate(minhaFicha.id, c.id)}
+                            >
+                              {nomeCondicao(c.id)}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
-                      <span className="vazio" style={{ fontSize: 10, color: 'var(--real)' }}>🛡</span>
-                      <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
-                      <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa}</span>
-                      <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) + 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <span className="combate-rotulo">defesa</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <span style={{ color: 'var(--real)', display: 'inline-flex' }}><IconeEscudo size={12} /></span>
+                        <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
+                        <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa}</span>
+                        <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) + 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -180,14 +180,34 @@
   pointer-events: none;
 }
 
-/* Linha de um combatente no rastreador (CombatOverlay) + toggles de condição. */
+/* Linha de um combatente no rastreador (CombatOverlay/CombateJogadorView) + toggles de condição. */
 .combate-linha {
   border: 1px solid var(--concrete-2);
   border-radius: 3px;
-  padding: 0.25rem 0.4rem;
+  padding: 0.3rem 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+/* Combatente na vez atual — acento à esquerda + fundo levemente elevado, igual ao destaque
+   do card ativo no mockup de referência (sem alterar padding, pra não deslocar o conteúdo). */
+.combate-linha[data-ativo='true'] {
+  border-color: var(--rede-dim);
+  background: var(--concrete-0);
+  box-shadow: inset 3px 0 0 var(--rede);
+}
+
+/* Rótulo pequeno de seção dentro do card expandido (ex.: "condições", "armas", "pv"). */
+.combate-rotulo {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 9px;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 0.2rem;
 }
 
 .combate-condicoes {

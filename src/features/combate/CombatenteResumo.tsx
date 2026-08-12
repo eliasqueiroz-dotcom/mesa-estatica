@@ -1,6 +1,7 @@
 import { efeitoCondicao, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { descricaoSurto } from '../../rules/data/surto';
 import BarraSegmentada from '../fichas/BarraSegmentada';
+import { IconeEscudo } from './icones';
 
 interface Props {
   /** Vazio/omitido esconde a linha de nome inteira (dot + defesa continuam) — usado quando
@@ -79,8 +80,8 @@ export default function CombatenteResumo({
             {nome}
           </span>
         )}
-        <span className="vazio" style={{ fontSize: 12, marginLeft: nome ? undefined : 'auto' }}>
-          🛡 <span className="mono">{defesa}</span>
+        <span className="vazio" style={{ fontSize: 12, marginLeft: nome ? undefined : 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+          <IconeEscudo size={12} /> <span className="mono">{defesa}</span>
         </span>
       </div>
 
