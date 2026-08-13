@@ -155,24 +155,23 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 key={e.id}
                 className="combate-linha"
                 data-ativo={naVez}
-                draggable={podeArrastar}
-                onDragStart={() => { setDragIndex(i); setDropIndex(null); }}
-                onDragOver={(ev) => { ev.preventDefault(); setDropIndex(i); }}
-                onDragLeave={() => setDropIndex(null)}
-                onDrop={() => { if (dragIndex !== null && dragIndex !== i) { reordenarIniciativa(dragIndex, i); } setDragIndex(null); setDropIndex(null); }}
-                onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
                 style={{
                   marginBottom: '0.3rem',
                   opacity: sendoArrastado ? 0.3 : 1,
                   borderTopColor: alvoDrop ? 'var(--rede)' : undefined,
-                  cursor: 'grab',
                   ...estiloItem,
                 }}
               >
                 <div
+                  draggable={podeArrastar}
+                  onDragStart={() => { setDragIndex(i); setDropIndex(null); }}
+                  onDragOver={(ev) => { ev.preventDefault(); setDropIndex(i); }}
+                  onDragLeave={() => setDropIndex(null)}
+                  onDrop={() => { if (dragIndex !== null && dragIndex !== i) { reordenarIniciativa(dragIndex, i); } setDragIndex(null); setDropIndex(null); }}
+                  onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
                   onClick={() => toggleExpandido(e.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: podeArrastar ? 'grab' : 'pointer', fontSize: 12,
                     padding: '0.1rem 0',
                   }}
                 >
