@@ -230,61 +230,50 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   <span
                     className="mono"
                     style={{
-                      flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0,
+                      flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 44,
                       color: naVez ? 'var(--rede)' : undefined,
                     }}
                     title={e.nome}
                   >
                     {e.nome}
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 34, textAlign: 'right' }} title="iniciativa: d20+agilidade">
+                  {(foraDeCombate || critico) && (
+                    <span
+                      className="badge"
+                      title={
+                        foraDeCombate
+                          ? (ativas.includes('estavel')
+                            ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
+                            : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).')
+                          : 'PV em 25% ou menos do máximo'
+                      }
+                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em', flexShrink: 0 }}
+                    >
+                      {foraDeCombate ? (ativas.includes('estavel') ? 'estável' : 'fora de combate') : 'crítico'}
+                    </span>
+                  )}
+                  {emSurto && (
+                    <span title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', color: 'var(--ruido)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 26, textAlign: 'right' }} title="iniciativa: d20+agilidade">
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
-                  <span style={{ width: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ruido)' }}>
-                    {emSurto && (
-                      <span title={surtosVisiveis.filter((s) => s.escolha).map((s) => s.escolha).join(', ') || 'surto ativo'} style={{ display: 'inline-flex' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                        </svg>
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ minWidth: 68, flexShrink: 0, textAlign: 'right' }}>
-                    {foraDeCombate && (
-                      <span
-                        className="badge"
-                        title={
-                          ativas.includes('estavel')
-                            ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
-                            : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).'
-                        }
-                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em' }}
-                      >
-                        {ativas.includes('estavel') ? 'estável' : 'fora de combate'}
-                      </span>
-                    )}
-                    {critico && (
-                      <span
-                        className="badge"
-                        title="PV em 25% ou menos do máximo"
-                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em' }}
-                      >
-                        crítico
-                      </span>
-                    )}
-                  </span>
                   {pv && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0, width: 96 }}>
-                      <div style={{ width: 56 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexShrink: 0 }}>
+                      <div style={{ width: 36 }}>
                         <BarraSegmentada atual={pv.atual} maximo={pv.maximo} variante="pv" corPreenchimento={corPv(pv.atual, pv.maximo)} compacta />
                       </div>
-                      <span className="mono" style={{ fontSize: 10, minWidth: 36, textAlign: 'right' }}>
+                      <span className="mono" style={{ fontSize: 10, minWidth: 32, textAlign: 'right' }}>
                         {pv.atual}/{pv.maximo}
                       </span>
                     </div>
                   )}
                   {defesa && (
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 30, justifyContent: 'flex-end' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 24, justifyContent: 'flex-end' }}>
                       <IconeEscudo size={12} />{defesa.valor}
                     </span>
                   )}
