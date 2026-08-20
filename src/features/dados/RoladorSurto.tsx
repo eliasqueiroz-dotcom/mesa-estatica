@@ -50,7 +50,12 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
         atualizarFicha(ficha.id, {
           surtosAtivos: [
             ...(ficha.surtosAtivos ?? []),
-            { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: r.entradaA.nome },
+            {
+              id: crypto.randomUUID(),
+              expiraEm: calcularExpiraSurto(sessaoPublica),
+              escolha: r.entradaA.nome,
+              modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
+            },
           ],
         });
         registrarLog(
@@ -62,7 +67,12 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
         atualizarFicha(ficha.id, {
           surtosAtivos: [
             ...(ficha.surtosAtivos ?? []).filter((s) => s.escolha !== null),
-            { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: null },
+            {
+              id: crypto.randomUUID(),
+              expiraEm: calcularExpiraSurto(sessaoPublica),
+              escolha: null,
+              modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
+            },
           ],
         });
         useStore.setState((s) => ({

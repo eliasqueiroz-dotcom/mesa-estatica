@@ -34,15 +34,21 @@ export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto, personagemId:
   return sessao.contadorCena;
 }
 
-/** Verifica se a ficha está em Surto ativo, considerando o modo combate.
+/** Verifica se a ficha está em Surto ativo — cada entrada decide sozinha qual comparação usar
+ *  pelo `modo` gravado NA CRIAÇÃO (`calcularExpiraSurto`), não pelo `modoCombate` atual da
+ *  sessão: um Surto criado em combate continua comparando com `rodada` mesmo depois do combate
+ *  acabar, e um criado fora de combate continua comparando com `contadorCena` mesmo que um
+ *  combate comece depois. Usar o modo ATUAL da sessão (em vez do modo de criação) é o que
+ *  causava o Surto sumir ao encerrar combate e reaparecer ao iniciar um novo — `rodada` reseta
+ *  pra 1 a cada combate novo, e um `expiraEm` antigo quase sempre bate `>= 1`.
  *  Fora de combate: algum surto.expiraEm === contadorCena.
  *  Em combate: algum surto.expiraEm >= rodada. */
 export function personagemEstaEmSurto(
-  surtosAtivos: { expiraEm: number; id?: string; escolha?: string | null }[],
+  surtosAtivos: { expiraEm: number; modo: 'cena' | 'combate'; id?: string; escolha?: string | null }[],
   sessao: EstadoSessaoParaSurto,
 ): boolean {
   return (surtosAtivos ?? []).some((s) => {
-    if (sessao.modoCombate) {
+    if (s.modo === 'combate') {
       return s.expiraEm >= sessao.rodada;
     }
     return s.expiraEm === sessao.contadorCena;

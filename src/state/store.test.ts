@@ -18,35 +18,15 @@ describe('avancarCena', () => {
     expect(useStore.getState().sessaoPublica.contadorCena).toBe(6);
   });
 
-  it('remove surto com expiraEm === novaCena', () => {
+  it('zera surtosAtivos de toda ficha — fim de cena é fronteira absoluta pro Surto (regras.md)', () => {
     const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: '1', expiraEm: 2, escolha: 'Fuga cega' }, { id: '2', expiraEm: 3, escolha: 'Fúria' }];
+    ficha.surtosAtivos = [
+      { id: '1', expiraEm: 2, escolha: 'Fuga cega', modo: 'cena' },
+      { id: '2', expiraEm: 3, escolha: 'Fúria', modo: 'combate' },
+    ];
     useStore.setState({ fichas: [ficha], sessaoPublica: { ...useStore.getState().sessaoPublica, contadorCena: 1 } });
     useStore.getState().avancarCena(); // 1 -> 2
-    const fichas = useStore.getState().fichas;
-    expect(fichas[0].surtosAtivos).toHaveLength(1);
-    expect(fichas[0].surtosAtivos[0].id).toBe('2');
-  });
-
-  it('mantém surto com expiraEm > novaCena', () => {
-    const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: '1', expiraEm: 5, escolha: 'Fúria' }];
-    useStore.setState({ fichas: [ficha] });
-    useStore.getState().avancarCena(); // 1 -> 2
-    expect(useStore.getState().fichas[0].surtosAtivos).toHaveLength(1);
-  });
-
-  it('só remove surto com expiraEm === novaCena — expiraEm anterior não é limpo retroativamente', () => {
-    // Documenta o filtro real da store (`surto.expiraEm !== novaCena`): ele não trata "menor
-    // que" como expirado, só a correspondência exata. Na criação normal (ajustarSanidadeAtual,
-    // via calcularExpiraSurto) expiraEm fora de combate é sempre o contadorCena vigente no
-    // disparo, então isso nunca ocorre em uso normal — mas um estado corrompido/importado com
-    // expiraEm defasado sobrevive a avancarCena indefinidamente.
-    const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: '1', expiraEm: 1, escolha: 'Fuga cega' }];
-    useStore.setState({ fichas: [ficha], sessaoPublica: { ...useStore.getState().sessaoPublica, contadorCena: 1 } });
-    useStore.getState().avancarCena(); // 1 -> 2
-    expect(useStore.getState().fichas[0].surtosAtivos).toHaveLength(1);
+    expect(useStore.getState().fichas[0].surtosAtivos).toEqual([]);
   });
 
   it('não quebra se surtosAtivos for undefined', () => {
@@ -56,12 +36,52 @@ describe('avancarCena', () => {
     expect(() => useStore.getState().avancarCena()).not.toThrow();
   });
 
-  it('incrementa contadorCena', () => {
+  it('incrementa contadorCena em chamadas sucessivas', () => {
     expect(useStore.getState().sessaoPublica.contadorCena).toBe(1);
     useStore.getState().avancarCena();
     expect(useStore.getState().sessaoPublica.contadorCena).toBe(2);
     useStore.getState().avancarCena();
     expect(useStore.getState().sessaoPublica.contadorCena).toBe(3);
+  });
+});
+
+describe('encerrarModoCombate — surtos', () => {
+  it('remove só surtos com modo === "combate", preserva modo === "cena"', () => {
+    const ficha = criarFichaVazia();
+    ficha.surtosAtivos = [
+      { id: '1', expiraEm: 5, escolha: 'Fúria', modo: 'combate' },
+      { id: '2', expiraEm: 3, escolha: 'Congelamento', modo: 'cena' },
+    ];
+    useStore.setState({ fichas: [ficha], sessaoPublica: { ...useStore.getState().sessaoPublica, modoCombate: true } });
+    useStore.getState().encerrarModoCombate();
+    const surtos = useStore.getState().fichas[0].surtosAtivos;
+    expect(surtos).toHaveLength(1);
+    expect(surtos[0].id).toBe('2');
+  });
+
+  it('não quebra se surtosAtivos for undefined', () => {
+    const ficha = criarFichaVazia();
+    delete (ficha as any).surtosAtivos;
+    useStore.setState({ fichas: [ficha] });
+    expect(() => useStore.getState().encerrarModoCombate()).not.toThrow();
+  });
+
+  it('reproduz o bug relatado: Surto de combate não reaparece ao reiniciar o combate', () => {
+    const ficha = criarFichaVazia();
+    ficha.surtosAtivos = [{ id: '1', expiraEm: 5, escolha: 'Fúria', modo: 'combate' }];
+    useStore.setState({
+      fichas: [ficha],
+      iniciativa: [{ id: 'it1', participanteId: ficha.id, tipo: 'pc', nome: ficha.nome || 'pc', valor: 10 }],
+      sessaoPublica: { ...useStore.getState().sessaoPublica, modoCombate: true, rodada: 2 },
+    });
+    expect(personagemEstaEmSurto(useStore.getState().fichas[0].surtosAtivos, useStore.getState().sessaoPublica)).toBe(true);
+
+    useStore.getState().encerrarModoCombate();
+    expect(personagemEstaEmSurto(useStore.getState().fichas[0].surtosAtivos, useStore.getState().sessaoPublica)).toBe(false);
+
+    useStore.getState().iniciarModoCombate(); // rodada volta pra 1
+    expect(useStore.getState().sessaoPublica.rodada).toBe(1);
+    expect(personagemEstaEmSurto(useStore.getState().fichas[0].surtosAtivos, useStore.getState().sessaoPublica)).toBe(false);
   });
 });
 
@@ -435,53 +455,7 @@ describe('importarJSON', () => {
   });
 });
 
-// ===== avancarCena + surtos =====
-describe('avancarCena + surtos', () => {
-  beforeEach(() => {
-    useStore.setState(criarEstadoInicial());
-  });
-
-  it('remove surto com expiraEm === novaCena', () => {
-    const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: 's1', expiraEm: 2, escolha: 'Fuga cega' }, { id: 's2', expiraEm: 3, escolha: 'Fúria' }];
-    useStore.setState({ fichas: [ficha], sessaoPublica: { ...useStore.getState().sessaoPublica, contadorCena: 1 } });
-    useStore.getState().avancarCena(); // 1 -> 2
-    const fichas = useStore.getState().fichas;
-    expect(fichas[0].surtosAtivos).toHaveLength(1);
-    expect(fichas[0].surtosAtivos[0].id).toBe('s2');
-  });
-
-  it('mantém surtos com expiraEm > novaCena', () => {
-    const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: 's1', expiraEm: 5, escolha: 'Fúria' }];
-    useStore.setState({ fichas: [ficha] });
-    useStore.getState().avancarCena(); // 1 -> 2
-    expect(useStore.getState().fichas[0].surtosAtivos).toHaveLength(1);
-  });
-
-  it('só remove surto com expiraEm === novaCena — expiraEm anterior não é limpo retroativamente', () => {
-    const ficha = criarFichaVazia();
-    ficha.surtosAtivos = [{ id: 's1', expiraEm: 1, escolha: 'Fuga cega' }];
-    useStore.setState({ fichas: [ficha] });
-    useStore.getState().avancarCena(); // 1 -> 2
-    expect(useStore.getState().fichas[0].surtosAtivos).toHaveLength(1);
-  });
-
-  it('não quebra se surtosAtivos for undefined', () => {
-    const ficha = criarFichaVazia();
-    delete (ficha as any).surtosAtivos;
-    useStore.setState({ fichas: [ficha] });
-    expect(() => useStore.getState().avancarCena()).not.toThrow();
-  });
-
-  it('incrementa contadorCena', () => {
-    expect(useStore.getState().sessaoPublica.contadorCena).toBe(1);
-    useStore.getState().avancarCena();
-    expect(useStore.getState().sessaoPublica.contadorCena).toBe(2);
-    useStore.getState().avancarCena();
-    expect(useStore.getState().sessaoPublica.contadorCena).toBe(3);
-  });
-});
+// ===== avancarCena + surtos: coberto acima em describe('avancarCena') =====
 
 // ===== converterDinheiro =====
 describe('converterDinheiro', () => {
@@ -1167,15 +1141,16 @@ describe('migrate', () => {
     expect(estado.mapa.grade).toEqual(gradeCustom);
   });
 
-  it('v10 → v11: converte surtoAtivo/surtoEscolha soltos em surtosAtivos', () => {
+  it('v10 → v11: converte surtoAtivo/surtoEscolha soltos em surtosAtivos (depois zerado pela v30 — ver teste abaixo)', () => {
     const estado = migrate(
       { fichas: [{ id: 'f1', nome: 'Helena', surtoAtivo: 5, surtoEscolha: 'Fuga cega' }] },
       10,
     );
-    expect(estado.fichas[0].surtosAtivos).toHaveLength(1);
-    expect(estado.fichas[0].surtosAtivos[0]).toMatchObject({ expiraEm: 5, escolha: 'Fuga cega' });
     expect(estado.fichas[0]).not.toHaveProperty('surtoAtivo');
     expect(estado.fichas[0]).not.toHaveProperty('surtoEscolha');
+    // v29 → v30 roda na mesma cascata (versaoAnterior=10 < 30) e zera surtosAtivos de novo —
+    // dado de Surto tão antigo não tem `modo`, mesmo convertido pela v11 não dá pra confiar.
+    expect(estado.fichas[0].surtosAtivos).toEqual([]);
   });
 
   it('v10 → v11: ficha sem surto ativo (surtoAtivo null) vira array vazio', () => {
@@ -1273,6 +1248,19 @@ describe('migrate', () => {
     const minha = [{ id: 't1', nome: 'minha', lados: 12, entradas: [] }];
     const estado = migrate({ tabelas: minha }, 28);
     expect(estado.tabelas).toEqual(minha);
+  });
+
+  it('v29 → v30: zera surtosAtivos sem `modo` (dado antigo, ambíguo — não dá pra saber o relógio certo)', () => {
+    const estado = migrate(
+      { fichas: [{ id: 'f1', nome: 'Helena', surtosAtivos: [{ id: 's1', expiraEm: 5, escolha: 'Fúria' }] }] },
+      29,
+    );
+    expect(estado.fichas[0].surtosAtivos).toEqual([]);
+  });
+
+  it('v29 → v30: ficha sem surtosAtivos não quebra', () => {
+    const estado = migrate({ fichas: [{ id: 'f1', nome: 'Helena' }] }, 29);
+    expect(estado.fichas[0].surtosAtivos).toEqual([]);
   });
 });
 

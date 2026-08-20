@@ -41,22 +41,42 @@ describe('personagemEstaEmSurto', () => {
     expect(personagemEstaEmSurto([], sessaoCombate)).toBe(false);
   });
 
-  it('fora de combate: ativo quando algum expiraEm === contadorCena', () => {
-    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null }], sessaoFora)).toBe(true);
-    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 2, escolha: null }], sessaoFora)).toBe(false);
+  it('modo cena: ativo quando algum expiraEm === contadorCena', () => {
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null, modo: 'cena' }], sessaoFora)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 2, escolha: null, modo: 'cena' }], sessaoFora)).toBe(false);
   });
 
-  it('em combate: ativo enquanto algum expiraEm >= rodada', () => {
-    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 5, escolha: null }], sessaoCombate)).toBe(true);
-    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 4, escolha: null }], sessaoCombate)).toBe(true);
-    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null }], sessaoCombate)).toBe(false);
+  it('modo combate: ativo enquanto algum expiraEm >= rodada', () => {
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 5, escolha: null, modo: 'combate' }], sessaoCombate)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 4, escolha: null, modo: 'combate' }], sessaoCombate)).toBe(true);
+    expect(personagemEstaEmSurto([{ id: '1', expiraEm: 3, escolha: null, modo: 'combate' }], sessaoCombate)).toBe(false);
   });
 
   it('múltiplos surtos: true se pelo menos um ativo', () => {
     const surtos = [
-      { id: '1', expiraEm: 1, escolha: null },  // expirou
-      { id: '2', expiraEm: 3, escolha: 'Fuga cega' }, // ativo
+      { id: '1', expiraEm: 1, escolha: null, modo: 'cena' as const },  // expirou
+      { id: '2', expiraEm: 3, escolha: 'Fuga cega', modo: 'cena' as const }, // ativo
     ];
     expect(personagemEstaEmSurto(surtos, sessaoFora)).toBe(true);
+  });
+
+  it('decide pelo `modo` gravado no Surto, não pelo modoCombate atual da sessão — reproduz o bug relatado', () => {
+    // Surto disparado em combate (rodada 4, expiraEm = 4+1 = 5): ativo em combate.
+    const surtoDeCombate = { id: '1', expiraEm: 5, escolha: null, modo: 'combate' as const };
+    expect(personagemEstaEmSurto([surtoDeCombate], sessaoCombate)).toBe(true);
+
+    // Combate encerra (sessão vira "fora de combate", mas o Surto continua com modo:'combate')
+    // — antes do fix, a checagem trocava pra comparar com contadorCena e o Surto "sumia" sem
+    // ter sido de fato limpo. Com o fix, `modo` do Surto manda: continua comparando com rodada,
+    // mesmo a sessão estando fora de combate agora.
+    const sessaoAposEncerrar: EstadoSessaoParaSurto = { modoCombate: false, contadorCena: 3, rodada: 4 };
+    expect(personagemEstaEmSurto([surtoDeCombate], sessaoAposEncerrar)).toBe(true);
+
+    // Um novo combate começa e `rodada` reseta pra 1 — antes do fix, o Surto "morto" reaparecia
+    // porque expiraEm(5) >= rodada(1). Com o fix isso também bate (mesmo `modo`), então quem
+    // evita o reaparecimento é `encerrarModoCombate` podar `modo === 'combate'` de verdade —
+    // este teste só documenta que a fórmula em si é consistente com o `modo` gravado.
+    const sessaoNovoCombate: EstadoSessaoParaSurto = { modoCombate: true, contadorCena: 3, rodada: 1 };
+    expect(personagemEstaEmSurto([surtoDeCombate], sessaoNovoCombate)).toBe(true);
   });
 });

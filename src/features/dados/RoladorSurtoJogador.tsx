@@ -56,7 +56,12 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
           atualizarFicha(ficha.id, {
             surtosAtivos: [
               ...(ficha.surtosAtivos ?? []),
-              { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: r.entradaA.nome },
+              {
+                id: crypto.randomUUID(),
+                expiraEm: calcularExpiraSurto(sessaoPublica),
+                escolha: r.entradaA.nome,
+                modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
+              },
             ],
           });
           registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} → ${r.entradaA.nome} (destino insiste)`, ficha.id, 'publica');
@@ -64,7 +69,12 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
           atualizarFicha(ficha.id, {
             surtosAtivos: [
               ...(ficha.surtosAtivos ?? []).filter((s) => s.escolha !== null),
-              { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(sessaoPublica), escolha: null },
+              {
+                id: crypto.randomUUID(),
+                expiraEm: calcularExpiraSurto(sessaoPublica),
+                escolha: null,
+                modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
+              },
             ],
           });
           useStore.setState((s) => ({

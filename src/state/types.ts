@@ -27,6 +27,11 @@ export interface SurtoAtivo {
   id: string;
   expiraEm: number;
   escolha: string | null;
+  /** Em que "relógio" `expiraEm` foi medido no momento da criação — 'combate' compara com
+   *  `rodada`, 'cena' compara com `contadorCena` (rules/surto.ts). Sem isso, uma checagem feita
+   *  depois que o modo mudou reinterpretava o número errado (Surto sumia ao encerrar combate e
+   *  reaparecia ao iniciar um novo). */
+  modo: 'cena' | 'combate';
 }
 
 export interface KitInvestigacaoItem {

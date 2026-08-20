@@ -402,10 +402,13 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
       const { surtoAtivo, surtoEscolha, ...resto } = f;
       const surtosAtivos: SurtoAtivo[] = [];
       if (surtoAtivo != null) {
+        // `modo` não existia nessa versão — valor arbitrário, sem efeito real: a migração
+        // v29→v30 zera `surtosAtivos` de novo pra qualquer estado que passe por aqui.
         surtosAtivos.push({
           id: crypto.randomUUID(),
           expiraEm: surtoAtivo,
           escolha: surtoEscolha ?? null,
+          modo: 'cena',
         });
       }
       return { ...resto, surtosAtivos };
@@ -510,6 +513,13 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   // existentes (não reescreve quem já migrou antes).
   if (versaoAnterior < 29 && !estado.tabelas) {
     estado.tabelas = criarTabelasSeed();
+  }
+  // v29 → v30: SurtoAtivo ganha `modo` ('cena'|'combate') — expiraEm era ambíguo sem isso
+  // (bug: Surto sumia ao encerrar combate e reaparecia ao iniciar um novo). Dado salvo antes
+  // do fix não tem como saber o relógio certo, zera em vez de adivinhar errado.
+  if (versaoAnterior < 30 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, surtosAtivos: [] }));
   }
   return estado as Store;
 }
@@ -623,7 +633,12 @@ export const useStore = create<Store>()(
                       sanidadeAtual: valor,
                       surtosAtivos: [
                         ...(f.surtosAtivos ?? []),
-                        { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(s.sessaoPublica), escolha: resultado.entradaA.nome },
+                        {
+                          id: crypto.randomUUID(),
+                          expiraEm: calcularExpiraSurto(s.sessaoPublica),
+                          escolha: resultado.entradaA.nome,
+                          modo: s.sessaoPublica.modoCombate ? 'combate' : 'cena',
+                        },
                       ],
                     }
                   : f,
@@ -638,7 +653,12 @@ export const useStore = create<Store>()(
                       sanidadeAtual: valor,
                       surtosAtivos: [
                         ...(f.surtosAtivos ?? []),
-                        { id: crypto.randomUUID(), expiraEm: calcularExpiraSurto(s.sessaoPublica), escolha: null },
+                        {
+                          id: crypto.randomUUID(),
+                          expiraEm: calcularExpiraSurto(s.sessaoPublica),
+                          escolha: null,
+                          modo: s.sessaoPublica.modoCombate ? 'combate' : 'cena',
+                        },
                       ],
                     }
                   : f,
@@ -1035,7 +1055,16 @@ export const useStore = create<Store>()(
           return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada, condicoesCombate, condicaoDuracao } };
         }),
       encerrarModoCombate: () =>
-        set((s) => ({ sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {}, condicaoDuracao: {} } })),
+        set((s) => ({
+          sessaoPublica: { ...s.sessaoPublica, modoCombate: false, condicoesCombate: {}, condicaoDuracao: {} },
+          // Surto criado em combate (modo: 'combate') mede a duração em rodadas — fora de
+          // combate esse relógio deixa de existir, então poda essas entradas aqui. Um Surto
+          // criado fora de combate (modo: 'cena') não depende de rodada, sobrevive normal.
+          fichas: s.fichas.map((f) => ({
+            ...f,
+            surtosAtivos: (f.surtosAtivos ?? []).filter((surto) => surto.modo !== 'combate'),
+          })),
+        })),
       alternarCondicaoCombate: (participanteId, condicaoId) =>
         set((s) => {
           const condicoesMap = { ...(s.sessaoPublica.condicoesCombate ?? {}) };
@@ -1293,16 +1322,12 @@ export const useStore = create<Store>()(
               : s.sessaoPublica,
         })),
       avancarCena: () =>
-        set((s) => {
-          const novaCena = s.sessaoPublica.contadorCena + 1;
-          return {
-            sessaoPublica: { ...s.sessaoPublica, contadorCena: novaCena },
-            fichas: s.fichas.map((f) => ({
-              ...f,
-              surtosAtivos: (f.surtosAtivos ?? []).filter((surto) => surto.expiraEm !== novaCena),
-            })),
-          };
-        }),
+        set((s) => ({
+          sessaoPublica: { ...s.sessaoPublica, contadorCena: s.sessaoPublica.contadorCena + 1 },
+          // fim de cena é fronteira absoluta pro Surto (regras.md: "duração até o fim da
+          // cena") — zera pra toda ficha, não só filtra por número (rules/surto.ts).
+          fichas: s.fichas.map((f) => ({ ...f, surtosAtivos: [] })),
+        })),
 
       adicionarEvento: (texto) =>
         set((s) => ({

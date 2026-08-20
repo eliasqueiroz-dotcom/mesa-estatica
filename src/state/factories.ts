@@ -152,7 +152,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
