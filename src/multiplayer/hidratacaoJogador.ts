@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EntradaIniciativa, GradeMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
+import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
 import type { FichaPublica } from './fichaSplit';
@@ -50,10 +51,11 @@ export function useHidratarSessaoPublica(): void {
           useStore.setState({ sessaoPublica: paraSessaoPublica(payload.new as LinhaSessaoPublica) });
         }
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-sessao-publica'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-sessao-publica');
       cliente.removeChannel(canal);
     };
   }, []);
@@ -94,10 +96,11 @@ export function useHidratarMapaPublico(): void {
         const linha = payload.new as { imagem_data_url: string | null; grade: GradeMapa };
         useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-mapa-publico'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-mapa-publico');
       cliente.removeChannel(canal);
     };
   }, []);
@@ -154,7 +157,7 @@ export function useHidratarMidia(): void {
           useStore.setState({ midia: { ...s.midia, faixas } });
         }
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-midia-faixas'));
 
     const canalEstado = cliente
       .channel('jogador-midia-estado')
@@ -163,10 +166,12 @@ export function useHidratarMidia(): void {
         const patch = paraEstadoMidia(payload.new as LinhaMidiaEstado);
         useStore.setState((s) => ({ midia: { ...s.midia, ...patch } }));
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-midia-estado'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-midia-faixas');
+      desconectarCanal('jogador-midia-estado');
       cliente.removeChannel(canalFaixas);
       cliente.removeChannel(canalEstado);
     };
@@ -202,10 +207,11 @@ export function useFichasPublicas(): FichaPublica[] {
           setFichas((atual) => (atual.some((f) => f.id === ficha.id) ? atual.map((f) => (f.id === ficha.id ? ficha : f)) : [...atual, ficha]));
         }
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-fichas-publico'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-fichas-publico');
       cliente.removeChannel(canal);
     };
   }, []);
@@ -244,10 +250,11 @@ export function useNpcsPublicos(): NpcPublico[] {
           setNpcs((atual) => (atual.some((n) => n.id === npc.id) ? atual.map((n) => (n.id === npc.id ? npc : n)) : [...atual, npc]));
         }
       })
-      .subscribe();
+      .subscribe(assinarStatusCanal('jogador-npcs-publico'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-npcs-publico');
       cliente.removeChannel(canal);
     };
   }, []);
@@ -263,31 +270,52 @@ export function useIniciativaPublica(): EntradaIniciativa[] {
     if (!cliente) return;
 
     let cancelado = false;
+    // Ordem importa (quem joga antes de quem) — `EntradaIniciativa` não guarda `posicao`
+    // (a ordem do array É a posição), então mantém a última `posicao` conhecida por id pra
+    // reordenar sem precisar reconsultar a tabela inteira a cada evento (mesmo padrão de
+    // `iniciativaSync.ts`, lado GM, só que sem o lado de escrita).
+    const posicoesConhecidas = new Map<string, number>();
+    const ordenarPorPosicao = (entradas: EntradaIniciativa[]): EntradaIniciativa[] =>
+      [...entradas].sort((a, b) => (posicoesConhecidas.get(a.id) ?? 0) - (posicoesConhecidas.get(b.id) ?? 0));
 
-    // Ordem importa (quem joga antes de quem) — refaz o fetch completo, ordenado por
-    // `posicao`, em qualquer mudança, em vez de tentar remendar o array localmente. Mesmo
-    // padrão de `iniciativaSync.ts` (GM), só que sem o lado de escrita.
-    const buscar = () => {
-      cliente
-        .from('iniciativa')
-        .select('*')
-        .order('posicao', { ascending: true })
-        .then(({ data, error }) => {
-          if (cancelado) return;
-          if (error) console.error('[hidratacaoJogador] busca de iniciativa falhou', error);
-          else if (data) setIniciativa((data as LinhaIniciativa[]).map(paraEntrada));
-        });
-    };
-
-    buscar();
+    cliente
+      .from('iniciativa')
+      .select('*')
+      .order('posicao', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelado) return;
+        if (error) return console.error('[hidratacaoJogador] busca inicial de iniciativa falhou', error);
+        if (!data) return;
+        const linhas = data as LinhaIniciativa[];
+        for (const linha of linhas) posicoesConhecidas.set(linha.id, linha.posicao);
+        setIniciativa(linhas.map(paraEntrada));
+      });
 
     const canal = cliente
       .channel('jogador-iniciativa')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'iniciativa' }, buscar)
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'iniciativa' }, (payload) => {
+        if (cancelado) return;
+        if (payload.eventType === 'DELETE') {
+          const id = (payload.old as { id?: string }).id;
+          if (!id) return;
+          posicoesConhecidas.delete(id);
+          setIniciativa((atual) => atual.filter((e) => e.id !== id));
+        } else {
+          const linha = payload.new as LinhaIniciativa;
+          posicoesConhecidas.set(linha.id, linha.posicao);
+          const entrada = paraEntrada(linha);
+          setIniciativa((atual) => {
+            const existe = atual.some((e) => e.id === entrada.id);
+            const atualizada = existe ? atual.map((e) => (e.id === entrada.id ? entrada : e)) : [...atual, entrada];
+            return ordenarPorPosicao(atualizada);
+          });
+        }
+      })
+      .subscribe(assinarStatusCanal('jogador-iniciativa'));
 
     return () => {
       cancelado = true;
+      desconectarCanal('jogador-iniciativa');
       cliente.removeChannel(canal);
     };
   }, []);

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { ehDataUrl } from './imagemPendente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 type Cliente = NonNullable<typeof supabase>;
@@ -111,15 +112,23 @@ async function empurrarNpc(cliente: Cliente, npc: Npc) {
   const linhaPublico = paraLinhaPublico(npc);
   const { data: existente } = await cliente.from('npcs_publico').select('id').eq('id', npc.id).maybeSingle();
 
+  // `foto` ainda em base64 (upload pro Storage em voo) nunca vai pro Postgres/Realtime — ver
+  // imagemPendente.ts. Insert usa null (troca pela URL real no próximo push); update OMITE a
+  // coluna pra não apagar a URL que já estava lá.
+  const fotoPendente = ehDataUrl(linhaPublico.foto);
+
   if (!existente) {
-    const { error: erroPublico } = await cliente.from('npcs_publico').insert(linhaPublico);
+    const { error: erroPublico } = await cliente
+      .from('npcs_publico')
+      .insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico);
     if (erroPublico) throw erroPublico;
     const { error: erroPrivado } = await cliente
       .from('npcs_privado')
       .insert({ id: npc.id, notas_mestre: npc.notasMestre });
     if (erroPrivado) throw erroPrivado;
   } else {
-    const { error: erroPublico } = await cliente.from('npcs_publico').update(linhaPublico).eq('id', npc.id);
+    const patchPublico = fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico;
+    const { error: erroPublico } = await cliente.from('npcs_publico').update(patchPublico).eq('id', npc.id);
     if (erroPublico) throw erroPublico;
     const { error: erroPrivado } = await cliente
       .from('npcs_privado')

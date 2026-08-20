@@ -6,6 +6,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
+import { ehDataUrl } from './imagemPendente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 const ATRASO_PUSH_MS = 500;
@@ -112,13 +113,21 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha) {
   const basePV = useStore.getState().config.basePV;
   const { data: existente } = await cliente.from('characters_privado').select('id').eq('id', ficha.id).maybeSingle();
 
+  const linhaPublico = paraLinhaPublico(ficha, basePV);
+  // `foto` ainda em base64 (upload pro Storage em voo) nunca vai pro Postgres/Realtime — ver
+  // imagemPendente.ts. Insert usa null (troca pela URL real no próximo push); update OMITE a
+  // coluna pra não apagar a URL que já estava lá.
+  const fotoPendente = ehDataUrl(linhaPublico.foto);
+
   if (!existente) {
     const ownerToken = crypto.randomUUID();
     const { error: erroPrivado } = await cliente
       .from('characters_privado')
       .insert({ id: ficha.id, owner_token: ownerToken, dados: privado });
     if (erroPrivado) throw erroPrivado;
-    const { error: erroPublico } = await cliente.from('characters_publico').insert(paraLinhaPublico(ficha, basePV));
+    const { error: erroPublico } = await cliente
+      .from('characters_publico')
+      .insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico);
     if (erroPublico) throw erroPublico;
   } else {
     const { error: erroPrivado } = await cliente
@@ -126,10 +135,8 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha) {
       .update({ dados: privado })
       .eq('id', ficha.id);
     if (erroPrivado) throw erroPrivado;
-    const { error: erroPublico } = await cliente
-      .from('characters_publico')
-      .update(paraLinhaPublico(ficha, basePV))
-      .eq('id', ficha.id);
+    const patchPublico = fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico;
+    const { error: erroPublico } = await cliente.from('characters_publico').update(patchPublico).eq('id', ficha.id);
     if (erroPublico) throw erroPublico;
   }
 }

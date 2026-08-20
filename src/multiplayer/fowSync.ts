@@ -54,10 +54,7 @@ export function iniciarSyncFoW(): () => void {
 
   let aplicandoRemotoContagem = 0;
 
-  const aplicarRemoto = async () => {
-    const { data, error } = await cliente.from('fow_estado').select('*').eq('id', ID_FOW).maybeSingle();
-    if (error || !data) return;
-    const linha = data as LinhaFow;
+  const aplicarLinha = (linha: LinhaFow) => {
     aplicandoRemotoContagem++;
     try {
       useStore.setState((s) => ({ mapa: { ...s.mapa, fow: paraEstadoFoW(linha) } }));
@@ -67,12 +64,25 @@ export function iniciarSyncFoW(): () => void {
   };
 
   // busca inicial — sem linha ainda é no-op (mesa sem FoW configurado).
-  void aplicarRemoto();
+  cliente
+    .from('fow_estado')
+    .select('*')
+    .eq('id', ID_FOW)
+    .maybeSingle()
+    .then(({ data, error }) => {
+      if (error || !data) return;
+      aplicarLinha(data as LinhaFow);
+    });
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('fow-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'fow_estado' }, () => {
-      void aplicarRemoto();
+    // usa o payload que o próprio evento já traz — evita reconsultar `vistas`/`visiveis_agora`
+    // (arrays que crescem a cada revelação de fog-of-war) a cada mudança, mesmo padrão de
+    // `mapaPublicoSync.ts`.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'fow_estado' }, (payload) => {
+      const linha = payload.new as LinhaFow | null;
+      if (!linha) return;
+      aplicarLinha(linha);
     })
     .subscribe(assinarStatusCanal('fow-sync'));
 

@@ -85,25 +85,34 @@ export function iniciarSyncMidiaEstado(): () => void {
     agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume });
   });
 
-  const aplicarRemoto = async () => {
-    const { data, error } = await cliente.from('midia_estado').select('*').eq('id', ID_MIDIA).maybeSingle();
-    if (error || !data) return;
-    const patch = paraEstadoMidia(data as Linha);
+  const aplicarLinha = (linha: Linha) => {
     aplicandoRemotoContagem++;
     try {
-      useStore.setState((s) => ({ midia: { ...s.midia, ...patch } }));
+      useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(linha) } }));
     } finally {
       aplicandoRemotoContagem--;
     }
   };
 
   // busca inicial — recupera o estado ao vivo se o GM recarregar a página no meio de uma faixa.
-  void aplicarRemoto();
+  cliente
+    .from('midia_estado')
+    .select('*')
+    .eq('id', ID_MIDIA)
+    .maybeSingle()
+    .then(({ data, error }) => {
+      if (error || !data) return;
+      aplicarLinha(data as Linha);
+    });
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('midia-estado-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'midia_estado' }, () => {
-      void aplicarRemoto();
+    // usa o payload que o próprio evento já traz — evita reconsultar a cada mudança, mesmo
+    // padrão de `mapaPublicoSync.ts`.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'midia_estado' }, (payload) => {
+      const linha = payload.new as Linha | null;
+      if (!linha) return;
+      aplicarLinha(linha);
     })
     .subscribe(assinarStatusCanal('midia-estado-sync'));
 

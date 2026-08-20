@@ -88,9 +88,13 @@ export function iniciarSyncLogRolls(): () => void {
 
   // busca inicial — mais novo primeiro, pra já bater com a ordem local (registrarLog/
   // registrarRoll fazem prepend). `aplicandoRemoto` evita ecoar de volta pro servidor.
+  // `limit` evita rebaixar a campanha inteira a cada nova conexão (reload do GM, jogador
+  // entrando no meio da sessão) — histórico sem teto era puro egress sem ganho, a UI só
+  // mostra o log recente mesmo.
+  const LIMITE_HISTORICO_INICIAL = 200;
   Promise.all([
-    cliente.from('log_publico').select('*').order('criado_em', { ascending: false }),
-    cliente.from('rolls_publicas').select('*').order('criado_em', { ascending: false }),
+    cliente.from('log_publico').select('*').order('criado_em', { ascending: false }).limit(LIMITE_HISTORICO_INICIAL),
+    cliente.from('rolls_publicas').select('*').order('criado_em', { ascending: false }).limit(LIMITE_HISTORICO_INICIAL),
   ]).then(([logRes, rollsRes]) => {
     if (!logRes.data && !rollsRes.data) return;
     aplicandoRemoto = true;

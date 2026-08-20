@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { ehDataUrl } from './imagemPendente';
 import type { GradeMapa } from '../state/types';
 
 type Cliente = NonNullable<typeof supabase>;
@@ -49,9 +50,13 @@ export function iniciarSyncMapaPublico(): () => void {
   };
 
   const agendarPush = criarDebouncePorChave<{ imagemDataUrl: string | null; grade: GradeMapa }>(ATRASO_PUSH_MS, (_chave, valor) => {
+    // `imagemDataUrl` ainda em base64 (upload pro Storage em voo) nunca vai pro
+    // Postgres/Realtime — ver imagemPendente.ts. Omite a coluna (upsert preserva o valor
+    // remoto anterior); a próxima mudança, quando o upload virar URL, sincroniza de verdade.
+    const pendente = ehDataUrl(valor.imagemDataUrl);
     cliente
       .from('mapa_publico')
-      .upsert({ id: ID_MAPA, imagem_data_url: valor.imagemDataUrl, grade: valor.grade })
+      .upsert({ id: ID_MAPA, ...(pendente ? {} : { imagem_data_url: valor.imagemDataUrl }), grade: valor.grade })
       .then(({ error }) => {
         if (error) console.error('[mapaPublicoSync] push falhou', error);
       });
