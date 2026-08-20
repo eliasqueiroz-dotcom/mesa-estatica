@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { calcularPosicaoEsperada } from '../../multiplayer/posicaoMidia';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
+import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
 import { useStore } from '../../state/store';
 import type { FaixaMidia } from '../../state/types';
 import SoundpadGrid from './SoundpadGrid';
@@ -54,11 +55,10 @@ export default function MidiaTab() {
     setErro(null);
     setEnviando(true);
     try {
-      const path = `${crypto.randomUUID()}-${arquivo.name}`;
-      const { error: erroUpload } = await supabase.storage.from('midia').upload(path, arquivo);
-      if (erroUpload) throw erroUpload;
-      const { data } = supabase.storage.from('midia').getPublicUrl(path);
-      adicionarFaixaMidia(arquivo.name, path, data.publicUrl);
+      const path = `sfx/${crypto.randomUUID()}-${arquivo.name}`;
+      const url = await uploadR2(path, arquivo, arquivo.type || 'application/octet-stream');
+      if (!url) throw new Error('upload R2 falhou');
+      adicionarFaixaMidia(arquivo.name, path, url);
     } catch {
       setErro('upload falhou — confira o formato/tamanho e tente de novo.');
     } finally {
@@ -70,9 +70,16 @@ export default function MidiaTab() {
     if (!window.confirm(`excluir "${faixa.nome}"?`)) return;
     marcarRemocaoExplicita(faixa.id);
     removerFaixaMidia(faixa.id);
-    if (supabase) {
-      const { error } = await supabase.storage.from('midia').remove([faixa.path]);
-      if (error) console.error('[MidiaTab] remoção do Storage falhou (linha já removida)', error);
+    // faixas de antes da migração pro R2 ainda estão no Supabase Storage — decide o backend
+    // pela URL guardada em vez de assumir que toda faixa já está no R2.
+    if (isUrlSupabaseStorage(faixa.url)) {
+      if (supabase) {
+        const { error } = await supabase.storage.from('midia').remove([faixa.path]);
+        if (error) console.error('[MidiaTab] remoção do Storage falhou (linha já removida)', error);
+      }
+    } else {
+      const ok = await deletarR2(faixa.path);
+      if (!ok) console.error('[MidiaTab] remoção do R2 falhou (linha já removida)');
     }
   };
 

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
+import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
 import { useStore } from '../../state/store';
 import type { SomSoundpad } from '../../state/types';
 
@@ -41,12 +42,10 @@ export default function SoundpadGrid() {
     setErro(null);
     setEnviandoSlot(slot);
     try {
-      // prefixo sfx/ no bucket `midia` já existente — sem bucket novo (ver migração 0020).
       const path = `sfx/${crypto.randomUUID()}-${arquivo.name}`;
-      const { error: erroUpload } = await supabase.storage.from('midia').upload(path, arquivo);
-      if (erroUpload) throw erroUpload;
-      const { data } = supabase.storage.from('midia').getPublicUrl(path);
-      definirSomSoundpad(slot, arquivo.name, path, data.publicUrl);
+      const url = await uploadR2(path, arquivo, arquivo.type || 'application/octet-stream');
+      if (!url) throw new Error('upload R2 falhou');
+      definirSomSoundpad(slot, arquivo.name, path, url);
     } catch {
       setErro('upload falhou — confira o formato/tamanho e tente de novo.');
     } finally {
@@ -58,9 +57,16 @@ export default function SoundpadGrid() {
     if (!window.confirm(`remover "${som.nome}" do botão ${som.slot + 1}?`)) return;
     marcarRemocaoExplicita(som.id);
     removerSomSoundpad(som.slot);
-    if (supabase) {
-      const { error } = await supabase.storage.from('midia').remove([som.path]);
-      if (error) console.error('[SoundpadGrid] remoção do Storage falhou (linha já removida)', error);
+    // sons de antes da migração pro R2 ainda estão no Supabase Storage — decide o backend
+    // pela URL guardada em vez de assumir que todo som já está no R2.
+    if (isUrlSupabaseStorage(som.url)) {
+      if (supabase) {
+        const { error } = await supabase.storage.from('midia').remove([som.path]);
+        if (error) console.error('[SoundpadGrid] remoção do Storage falhou (linha já removida)', error);
+      }
+    } else {
+      const ok = await deletarR2(som.path);
+      if (!ok) console.error('[SoundpadGrid] remoção do R2 falhou (linha já removida)');
     }
   };
 

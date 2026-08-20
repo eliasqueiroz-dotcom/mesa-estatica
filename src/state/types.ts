@@ -349,7 +349,8 @@ export type ModoLoopMidia = 'nenhum' | 'faixa' | 'lista';
 export interface FaixaMidia {
   id: string;
   nome: string;
-  /** caminho do objeto dentro do bucket 'midia' do Supabase Storage. */
+  /** caminho do objeto — Supabase Storage (bucket 'midia') pra faixas antigas, R2 pras novas
+   * (ver `isUrlSupabaseStorage` em `uploadR2.ts` pra saber qual backend pela `url`). */
   path: string;
   /** URL pública já resolvida no upload (bucket público — sem expiração). */
   url: string;

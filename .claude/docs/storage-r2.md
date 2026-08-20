@@ -34,10 +34,10 @@ Passo 3 quando migrar (a function já isola isso numa função auxiliar única).
 
 ## Padrão comum a toda Edge Function deste guia
 
-As duas functions novas abaixo (`presign-r2-upload`, `buscar-freesound`) seguem **exatamente** o
-mesmo preâmbulo das que já existem no projeto (`supabase/functions/vincular-mestre`,
-`supabase/functions/gerenciar-fila-forcada`) — mostrado aqui uma vez só, pra não repetir nos dois
-blocos de código abaixo (cada um mostra só a lógica que muda de verdade). Ao criar o arquivo real,
+As functions novas abaixo (`presign-r2-upload`, `remover-r2-objeto`, `buscar-freesound`) seguem
+**exatamente** o mesmo preâmbulo das que já existem no projeto (`supabase/functions/vincular-mestre`,
+`supabase/functions/gerenciar-fila-forcada`) — mostrado aqui uma vez só, pra não repetir em cada
+bloco de código abaixo (cada um mostra só a lógica que muda de verdade). Ao criar o arquivo real,
 esse trecho entra no topo, antes da lógica específica:
 
 ```ts
@@ -112,14 +112,13 @@ NPC/ficha ficam de fora — se um dia quiser migrar também, o Passo 4 explica o
    - **Recomendado se você já tem um domínio na Cloudflare**: bucket → *Settings* → *Custom
      Domains* → conectar um subdomínio (ex.: `midia.seudominio.com`) — sem rate limit, passa
      pelo CDN da Cloudflare.
-4. **CORS** — bucket → *Settings* → *CORS Policy* → colar (ajuste a origem pro seu domínio real
-   do GitHub Pages, hoje `https://queiroz-labs.github.io`; o app roda sob o base path
-   `/mesa-estatica/`, mas CORS é por origem, não por path):
+4. **CORS** — bucket → *Settings* → *CORS Policy* → colar (origem do site real — depois da Parte
+   3 deste guia é o Cloudflare Pages, `https://estatica-stc.pages.dev`, não mais GitHub Pages):
 
    ```json
    [
      {
-       "AllowedOrigins": ["https://queiroz-labs.github.io", "http://localhost:5173"],
+       "AllowedOrigins": ["https://estatica-stc.pages.dev", "http://localhost:5173"],
        "AllowedMethods": ["PUT", "GET"],
        "AllowedHeaders": ["content-type"],
        "MaxAgeSeconds": 3600
@@ -217,49 +216,53 @@ só cuida do build/deploy do site estático):
 supabase functions deploy presign-r2-upload
 ```
 
-## Passo 5 — trocar o upload no cliente pra usar o R2
+**Código já implementado**: [`supabase/functions/presign-r2-upload/index.ts`](../../supabase/functions/presign-r2-upload/index.ts).
 
-Novo helper, mesmo formato de `src/multiplayer/uploadImagemStorage.ts`:
+## Passo 4b — Edge Function `remover-r2-objeto` (extensão além do plano original)
 
-```ts
-// src/multiplayer/uploadR2.ts
-import { supabase } from '../lib/supabaseClient';
+O plano original deste doc só cobria upload — sem uma contraparte de exclusão, apagar uma
+faixa/som no app não removia nada do R2 (o `supabase.storage.remove` antigo só funciona pro
+bucket Supabase). Diferente do upload, a exclusão não precisa de URL assinada devolvida pro
+cliente: a function já tem as credenciais admin e executa o `DELETE` ela mesma via `aws4fetch`
+(`AwsClient.fetch`, que assina e manda a requisição numa chamada só — o `.sign` usado no upload
+só assina e devolve a URL, sem executar).
 
-export async function uploadR2(path: string, arquivo: Blob, tipo: string): Promise<string | null> {
-  const cliente = supabase;
-  if (!cliente) return null;
+Mesmo preâmbulo padrão (mensagem do check de GM: `'só o mestre remove mídia'`), mesmos
+`PREFIXOS_PERMITIDOS` do upload (mantenha as duas listas em sincronia se adicionar prefixo
+novo). Corpo `{ path }`. Trata `404` do R2 como sucesso (idempotente — excluir de novo, ou um
+objeto que nunca existiu, não é erro).
 
-  const { data, error } = await cliente.functions.invoke<{ uploadUrl: string; publicUrl: string }>(
-    'presign-r2-upload',
-    { body: { path, tipo } },
-  );
-  if (error || !data) {
-    console.error('[uploadR2] presign falhou', error);
-    return null;
-  }
+**Código já implementado**: [`supabase/functions/remover-r2-objeto/index.ts`](../../supabase/functions/remover-r2-objeto/index.ts).
 
-  const resposta = await fetch(data.uploadUrl, { method: 'PUT', body: arquivo, headers: { 'Content-Type': tipo } });
-  if (!resposta.ok) {
-    console.error('[uploadR2] PUT falhou', resposta.status);
-    return null;
-  }
-  return data.publicUrl;
-}
+```bash
+supabase functions deploy remover-r2-objeto
 ```
 
-Troca os call sites que hoje fazem `supabase.storage.from('midia').upload(...)`:
+## Passo 5 — trocar upload e exclusão no cliente pra usar o R2
 
-- **`src/features/midia/MidiaTab.tsx`** (`importarArquivo`) — obrigatório.
-- **`src/features/midia/SoundpadGrid.tsx`** (`enviar`) — obrigatório.
-- **`src/features/mapa/MapaTab.tsx`** (via `uploadImagemStorage.ts`) — só se decidir migrar
-  mapas também (Passo 1: adicionar `'img/mapa/'` em `PREFIXOS_PERMITIDOS`).
+**Já implementado** em [`src/multiplayer/uploadR2.ts`](../../src/multiplayer/uploadR2.ts) — três
+exports: `uploadR2(path, blob, tipo)` (mesmo formato de `uploadImagemStorage.ts`), `deletarR2(path)`
+(chama `remover-r2-objeto`), e `isUrlSupabaseStorage(url)` — helper de transição: URLs públicas
+do Supabase Storage sempre contêm `/storage/v1/object/public/`, URLs do R2 nunca contêm, então dá
+pra decidir qual backend um item usa **pela própria URL guardada**, sem precisar de coluna nova
+no state/DB. Necessário porque faixas/sons de antes da migração continuam apontando pro Supabase
+até o backfill (Passo 6, ainda não feito) — excluir uma faixa antiga não pode tentar chamar o R2.
 
-Cada troca é: `uploadImagemStorage/storage.from('midia').upload` vira `uploadR2(path, blob,
-tipo)`, path com o mesmo prefixo de antes (`sfx/{uuid}.mp3`, etc.) — o shape salvo no store/DB
-(campo `url`) não muda, só o domínio da URL.
+Call sites trocados:
 
-*(Este passo é só documentado aqui — a implementação nos arquivos acima fica pra depois que o
-Passo 1-3 estiver feito manualmente na Cloudflare, é uma tarefa separada.)*
+- **`src/features/midia/MidiaTab.tsx`** — `importarArquivo` usa `uploadR2` (path ganhou o
+  prefixo `sfx/` que não tinha antes, pra ficar consistente com o Soundpad); `excluir` checa
+  `isUrlSupabaseStorage` e chama `deletarR2` ou o `supabase.storage.remove` antigo conforme o
+  caso.
+- **`src/features/midia/SoundpadGrid.tsx`** — mesma troca em `enviar`/`limpar` (já usava `sfx/`,
+  só mudou o destino do upload/delete).
+- **`src/features/mapa/MapaTab.tsx`** (via `uploadImagemStorage.ts`) — **não migrado nesta
+  rodada**, só se decidir migrar mapas também (Passo 1: adicionar `'img/mapa/'` em
+  `PREFIXOS_PERMITIDOS` das duas Edge Functions).
+
+**Pendente**: os secrets do Passo 3 e o deploy das duas Edge Functions (Passo 4/4b) — sem isso o
+upload/exclusão falha em runtime (a function não existe ainda no Supabase), mas o código já está
+pronto e testado (`npm run build`/`npm test` passam) pra funcionar assim que o backend existir.
 
 ## Passo 6 — migrar arquivos já existentes (backfill)
 
@@ -279,11 +282,13 @@ bundle:
 
 ## Passo 7 — testar
 
-- Upload de um arquivo novo pelo fluxo migrado → confirma que toca/aparece no app.
+- Upload de um arquivo novo pelo fluxo migrado (Soundpad e Jukebox) → confirma que toca/aparece
+  no app, e que o objeto aparece no dashboard R2 sob `sfx/`.
+- Excluir esse mesmo item → confirma que some do app **e** do dashboard R2.
 - Leitura pública funciona **sem autenticação** (abrir a URL do R2 direto, aba anônima).
-- Upload como não-GM continua bloqueado (401/403 da Edge Function).
-- CORS funciona a partir do domínio **real** do GitHub Pages publicado, não só localhost — teste
-  no site publicado, não só no `npm run dev`.
+- Upload/exclusão como não-GM continuam bloqueados (401/403 da Edge Function).
+- CORS funciona a partir do domínio **real** do site publicado (`estatica-stc.pages.dev`), não só
+  localhost — teste no site publicado, não só no `npm run dev`.
 
 ## Passo 8 — limpeza
 
