@@ -8,7 +8,7 @@ import react from '@vitejs/plugin-react';
 // Caminhos relativos (sem path.resolve/__dirname) — Vite resolve contra `root` sozinho e isso
 // evita depender de @types/node, que não é uma dependência instalada neste projeto.
 export default defineConfig({
-  base: '/mesa-estatica/',
+  base: '/',
   plugins: [react()],
   test: {
     // `tests/` (raiz, fora de src/) guarda um spec Playwright avulso (player-app.spec.ts) que
