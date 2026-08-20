@@ -4,6 +4,7 @@ import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../
 import { PROTECOES } from '../../rules/data/armas';
 import { PERICIAS } from '../../rules/data/pericias';
 import { descricaoSurto } from '../../rules/data/surto';
+import { surtosAtivosNaSessao } from '../../rules/surto';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
@@ -110,10 +111,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   if (tipo === 'npc' && !npc) return null;
 
   const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
-  const surtosVisiveis = (ficha?.surtosAtivos ?? []).filter((s) => {
-    if (modoCombate) return s.expiraEm >= rodada;
-    return s.expiraEm === contadorCena;
-  });
+  const surtosVisiveis = surtosAtivosNaSessao(ficha?.surtosAtivos ?? [], { modoCombate, contadorCena, rodada });
   const emSurto = surtosVisiveis.length > 0;
   const turnoAtivo = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === id;
 

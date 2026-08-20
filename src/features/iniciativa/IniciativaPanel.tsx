@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
-import { personagemEstaEmSurto, type EstadoSessaoParaSurto } from '../../rules/surto';
+import { surtosAtivosNaSessao, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeLamina, IconeMais } from '../combate/icones';
@@ -25,7 +25,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
     iniciarModoCombate, avancarTurno, encerrarModoCombate,
-    alternarCondicaoCombate,
+    alternarCondicaoCombate, definirDuracaoCondicao,
     disponiveis, todosSelecionados, nenhumSelecionado, adicionarDisponiveis,
     expandidos, adicionarAberto, dragIndex, dropIndex,
     setDragIndex, setDropIndex, setAdicionarAberto,
@@ -139,11 +139,8 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const pvPct = pv ? pv.atual / pv.maximo : 0;
             const sessaoSurto: EstadoSessaoParaSurto = { modoCombate, contadorCena, rodada };
             const fichaSurtos = e.tipo === 'pc' ? fichas.find((f) => f.id === e.participanteId)?.surtosAtivos ?? [] : [];
-            const emSurto = personagemEstaEmSurto(fichaSurtos, sessaoSurto);
-            const surtosVisiveis = fichaSurtos.filter((s) => {
-              if (modoCombate) return s.expiraEm >= rodada;
-              return s.expiraEm === contadorCena;
-            });
+            const surtosVisiveis = surtosAtivosNaSessao(fichaSurtos, sessaoSurto);
+            const emSurto = surtosVisiveis.length > 0;
             const sendoArrastado = dragIndex === i;
             const alvoDrop = dropIndex === i;
             const npcAcoes = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId)?.acoes ?? [] : [];
@@ -210,7 +207,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     onClick={podeAdiar ? (ev) => {
                       ev.stopPropagation();
                       reordenarIniciativa(i, iniciativa.length - 1);
+                      const jaAdiado = ativas.includes('aguardando');
                       alternarCondicaoCombate(e.participanteId, 'aguardando');
+                      // "foi pro fim da ordem DESTA rodada" (condicoesCombate.ts) — sem duração,
+                      // o chip ficava aceso pra sempre até o mestre lembrar de desligar na mão.
+                      // 1 rodada reaproveita o decremento automático que avancarTurno já faz.
+                      // Só ao LIGAR: se já estava adiado e o clique desligou, alternarCondicaoCombate
+                      // já limpou a duração órfã — setar de novo aqui a ressuscitaria sem sentido.
+                      if (!jaAdiado) definirDuracaoCondicao(e.participanteId, 'aguardando', 1);
                     } : undefined}
                     title={podeAdiar ? 'adiar — vai pro fim da ordem desta rodada' : undefined}
                     style={{
@@ -220,7 +224,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     <IconeAdiar />
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }}>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }} title="posição na ordem de turno">
                     {i + 1}
                   </span>
                   <span className="mono" style={{ color: 'var(--rede)', fontSize: 11, minWidth: 12, flexShrink: 0 }}>
@@ -258,7 +262,15 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       </svg>
                     </span>
                   )}
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 26, textAlign: 'right' }} title="iniciativa: d20+agilidade">
+                  <span
+                    className="mono"
+                    style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 26, textAlign: 'right' }}
+                    title={
+                      e.d20 !== undefined && e.agilidade !== undefined
+                        ? `rolagem iniciativa: d20 ${e.d20} + agilidade ${e.agilidade} = ${e.valor}`
+                        : 'rolagem iniciativa'
+                    }
+                  >
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
                   {pv && (
@@ -272,7 +284,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     </div>
                   )}
                   {defesa && (
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 24, justifyContent: 'flex-end' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 24, justifyContent: 'flex-end' }} title="defesa">
                       <IconeEscudo size={12} />{defesa.valor}
                     </span>
                   )}
@@ -344,7 +356,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                             <button
                               key={c.id}
                               className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
-                              title={c.efeito}
+                              title={rodadasRestantes !== undefined ? `${c.efeito} (${rodadasRestantes} rodada${rodadasRestantes === 1 ? '' : 's'} restante${rodadasRestantes === 1 ? '' : 's'})` : c.efeito}
                               onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
                             >
                               {c.nome}

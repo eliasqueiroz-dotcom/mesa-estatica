@@ -8,7 +8,7 @@ import {
   estaFerido,
   metade,
 } from '../../../rules/derivados';
-import { personagemEstaEmSurto } from '../../../rules/surto';
+import { personagemEstaEmSurto, surtosAtivosNaSessao } from '../../../rules/surto';
 import { descricaoSurto } from '../../../rules/data/surto';
 import { ATRIBUTOS } from '../../../rules/data/pericias';
 import { NOME_TIER_RUIDO } from '../../ruido/RuidoOverlay';
@@ -163,10 +163,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
 
       {(traumasAtivos >= 3 || (surtoAtivoAgora && !escolhaSurtoPendente)) && (
         <div className="badges-linha">
-          {surtoAtivoAgora && !escolhaSurtoPendente && ficha.surtosAtivos.filter((s) => {
-            if (modoCombate) return s.expiraEm >= rodada;
-            return s.expiraEm === contadorCena;
-          }).map((s) => (
+          {surtoAtivoAgora && !escolhaSurtoPendente && surtosAtivosNaSessao(ficha.surtosAtivos, { modoCombate, contadorCena, rodada }).map((s) => (
             <span
               key={s.id}
               className="badge"

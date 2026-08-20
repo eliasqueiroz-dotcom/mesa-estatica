@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import Avatar from '../../components/Avatar';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
-import { personagemEstaEmSurto } from '../../rules/surto';
+import { surtosAtivosNaSessao } from '../../rules/surto';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
@@ -37,6 +37,8 @@ export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhu
     return () => window.removeEventListener('keydown', handler);
   }, [onFechar]);
 
+  const surtosVisiveis = surtosAtivosNaSessao(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
+
   return (
     <div
       style={{
@@ -70,8 +72,8 @@ export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhu
               pvMaximo={calcularPvMaximo(basePV, minhaFicha.atributos.vigor)}
               defesa={calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa)}
               condicoes={condicoesAtivas}
-              surtoAtivo={personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada })}
-              surtoEscolha={minhaFicha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null}
+              surtoAtivo={surtosVisiveis.length > 0}
+              surtoEscolha={surtosVisiveis.find((s) => s.escolha !== null)?.escolha ?? null}
               editavel
               sanidadeAtual={minhaFicha.sanidadeAtual}
               sanidadeMaxima={calcularSanidadeMaxima(minhaFicha.atributos.vontade)}

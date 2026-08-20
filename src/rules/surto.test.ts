@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { calcularExpiraSurto, personagemEstaEmSurto, resolverSurto } from './surto';
+import { calcularExpiraSurto, personagemEstaEmSurto, resolverSurto, surtosAtivosNaSessao } from './surto';
 import type { EstadoSessaoParaSurto } from './surto';
 
 describe('resolverSurto', () => {
@@ -78,5 +78,33 @@ describe('personagemEstaEmSurto', () => {
     // este teste só documenta que a fórmula em si é consistente com o `modo` gravado.
     const sessaoNovoCombate: EstadoSessaoParaSurto = { modoCombate: true, contadorCena: 3, rodada: 1 };
     expect(personagemEstaEmSurto([surtoDeCombate], sessaoNovoCombate)).toBe(true);
+  });
+});
+
+describe('surtosAtivosNaSessao', () => {
+  const sessaoFora: EstadoSessaoParaSurto = { modoCombate: false, contadorCena: 3, rodada: 1 };
+  const sessaoCombate: EstadoSessaoParaSurto = { modoCombate: true, contadorCena: 3, rodada: 4 };
+
+  it('array vazio -> array vazio', () => {
+    expect(surtosAtivosNaSessao([], sessaoFora)).toEqual([]);
+  });
+
+  it('filtra só os ativos, preservando os outros campos de cada entrada', () => {
+    const surtos = [
+      { id: '1', expiraEm: 1, escolha: null, modo: 'cena' as const }, // expirou
+      { id: '2', expiraEm: 3, escolha: 'Fuga cega', modo: 'cena' as const }, // ativo
+    ];
+    expect(surtosAtivosNaSessao(surtos, sessaoFora)).toEqual([surtos[1]]);
+  });
+
+  it('personagemEstaEmSurto é consistente com surtosAtivosNaSessao (booleano = length > 0)', () => {
+    const surtos = [
+      { id: '1', expiraEm: 5, escolha: null, modo: 'combate' as const },
+      { id: '2', expiraEm: 2, escolha: 'Fúria', modo: 'combate' as const }, // já passou da rodada
+    ];
+    const ativos = surtosAtivosNaSessao(surtos, sessaoCombate);
+    expect(ativos).toHaveLength(1);
+    expect(ativos[0].id).toBe('1');
+    expect(personagemEstaEmSurto(surtos, sessaoCombate)).toBe(ativos.length > 0);
   });
 });

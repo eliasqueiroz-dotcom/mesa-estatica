@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
-import { personagemEstaEmSurto } from '../../rules/surto';
+import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
@@ -268,9 +268,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const sanidadeCritica = p.ficha
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
       : false;
-    const surtosAtivos = p.ficha?.surtosAtivos ?? [];
-    const surtoAtivo = personagemEstaEmSurto(surtosAtivos, { modoCombate, contadorCena, rodada });
-    const surtoEscolha = surtoAtivo ? surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
+    const surtosVisiveis = surtosAtivosNaSessao(p.ficha?.surtosAtivos ?? [], { modoCombate, contadorCena, rodada });
+    const surtoAtivo = surtosVisiveis.length > 0;
+    const surtoEscolha = surtosVisiveis.find((s) => s.escolha !== null)?.escolha ?? null;
     const turnoAtivo = participanteNaVez === t.participanteId;
     const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome, foto: p.foto, silhueta: p.silhueta };

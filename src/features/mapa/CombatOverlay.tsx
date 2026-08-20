@@ -220,7 +220,7 @@ export default function CombatOverlay() {
       )}
       <button
         onClick={toggleAberto}
-        title="combate"
+        title="abrir painel de combate"
         style={
           iniciativa.modoCombate
             ? { borderRadius: '50%', width: 48, height: 48, padding: 0, borderColor: 'var(--rede-dim)', color: 'var(--rede)' }

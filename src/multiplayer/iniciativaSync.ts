@@ -16,6 +16,11 @@ export interface LinhaIniciativa {
   nome: string;
   valor: number;
   posicao: number;
+  /** Migração 0033 — d20 bruto e modificador de Agilidade usados na rolagem, pro tooltip
+   *  "rolagem iniciativa" mostrar o valor real mesmo depois de um round-trip pelo Supabase.
+   *  Nullable: linhas de antes da migração não têm esses valores. */
+  d20: number | null;
+  agilidade: number | null;
 }
 
 export const paraLinha = (e: EntradaIniciativa, posicao: number): LinhaIniciativa => ({
@@ -25,6 +30,8 @@ export const paraLinha = (e: EntradaIniciativa, posicao: number): LinhaIniciativ
   nome: e.nome,
   valor: e.valor,
   posicao,
+  d20: e.d20 ?? null,
+  agilidade: e.agilidade ?? null,
 });
 
 export const paraEntrada = (r: LinhaIniciativa): EntradaIniciativa => ({
@@ -33,6 +40,8 @@ export const paraEntrada = (r: LinhaIniciativa): EntradaIniciativa => ({
   tipo: r.tipo,
   nome: r.nome,
   valor: r.valor,
+  ...(r.d20 != null ? { d20: r.d20 } : {}),
+  ...(r.agilidade != null ? { agilidade: r.agilidade } : {}),
 });
 
 /**

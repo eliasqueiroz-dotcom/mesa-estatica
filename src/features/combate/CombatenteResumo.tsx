@@ -1,5 +1,6 @@
 import { efeitoCondicao, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { descricaoSurto } from '../../rules/data/surto';
+import { corPv } from '../../hooks/useIniciativa';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 import { IconeEscudo } from './icones';
 
@@ -80,7 +81,7 @@ export default function CombatenteResumo({
             {nome}
           </span>
         )}
-        <span className="vazio" style={{ fontSize: 12, marginLeft: nome ? undefined : 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+        <span className="vazio" style={{ fontSize: 12, marginLeft: nome ? undefined : 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} title="defesa">
           <IconeEscudo size={12} /> <span className="mono">{defesa}</span>
         </span>
       </div>
@@ -88,7 +89,7 @@ export default function CombatenteResumo({
       {editavel && onAjustarPv ? (
         <Stepper label="PV" atual={pvAtual} maximo={pvMaximo} onAjustar={onAjustarPv} />
       ) : (
-        <BarraSegmentada atual={pvAtual} maximo={pvMaximo} variante="pv" />
+        <BarraSegmentada atual={pvAtual} maximo={pvMaximo} variante="pv" corPreenchimento={corPv(pvAtual, pvMaximo)} />
       )}
 
       {editavel && onAjustarSanidade && sanidadeAtual !== undefined && sanidadeMaxima !== undefined && (
@@ -109,7 +110,12 @@ export default function CombatenteResumo({
             </span>
           )}
           {condicoes.map((c) => (
-            <span key={c} className="combate-chip" title={efeitoCondicao(c)}>
+            // `condicoes` só recebe condições JÁ ativas (ver doc da prop acima) — sempre
+            // `--ativa`, senão fica com a mesma aparência "desligada" do chip inativo do
+            // rastreador do mestre, mesmo estando de fato ligada. `cursor: default`: este
+            // `<span>` não tem `onClick` (é sempre read-only aqui), diferente do chip
+            // clicável em IniciativaPanel.tsx/CombateJogadorView.tsx que reusa a mesma classe.
+            <span key={c} className="combate-chip combate-chip--ativa" title={efeitoCondicao(c)} style={{ cursor: 'default' }}>
               {nomeCondicao(c)}
             </span>
           ))}

@@ -3,7 +3,7 @@ import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
 import { nomeCondicao } from '../../rules/data/condicoesCombate';
-import { personagemEstaEmSurto } from '../../rules/surto';
+import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
@@ -106,8 +106,9 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     .map((t) => {
       const p = participantePorId(t.participanteId);
       if (!p) return null;
-      const surtoAtivo = personagemEstaEmSurto(p.surtosAtivos, { modoCombate, contadorCena, rodada });
-      const surtoEscolha = surtoAtivo ? p.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
+      const surtosVisiveis = surtosAtivosNaSessao(p.surtosAtivos, { modoCombate, contadorCena, rodada });
+      const surtoAtivo = surtosVisiveis.length > 0;
+      const surtoEscolha = surtosVisiveis.find((s) => s.escolha !== null)?.escolha ?? null;
       const turnoAtivo = participanteNaVez === t.participanteId;
       const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
       const podeMover = t.participanteId === minhaFicha.id;

@@ -1,5 +1,5 @@
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
-import { personagemEstaEmSurto } from '../../rules/surto';
+import { surtosAtivosNaSessao } from '../../rules/surto';
 import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
@@ -68,8 +68,9 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
             const souEu = ehMeuTurno(e.participanteId);
             const pvMaximo = calcularPvMaximo(basePV, minhaFicha.atributos.vigor);
             const defesa = calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa);
-            const surtoAtivo = personagemEstaEmSurto(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
-            const surtoEscolha = surtoAtivo ? minhaFicha.surtosAtivos.find((s) => s.escolha !== null)?.escolha ?? null : null;
+            const surtosVisiveis = surtosAtivosNaSessao(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
+            const surtoAtivo = surtosVisiveis.length > 0;
+            const surtoEscolha = surtosVisiveis.find((s) => s.escolha !== null)?.escolha ?? null;
             return (
               <div key={e.id} className="combate-linha" data-ativo={ativo} style={{ padding: '0.4rem 0.6rem' }}>
                 <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: souEu ? '0.4rem' : 0 }}>
@@ -85,7 +86,15 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                     {e.nome || 'sem nome'}
                     {souEu && <span className="badge" style={{ marginLeft: '0.4rem' }}>você</span>}
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }} title="iniciativa: d20+agilidade">
+                  <span
+                    className="mono"
+                    style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}
+                    title={
+                      e.d20 !== undefined && e.agilidade !== undefined
+                        ? `rolagem iniciativa: d20 ${e.d20} + agilidade ${e.agilidade} = ${e.valor}`
+                        : 'rolagem iniciativa'
+                    }
+                  >
                     {e.d20 !== undefined && e.agilidade !== undefined ? `${e.d20}+${e.agilidade}` : e.valor}
                   </span>
                 </div>

@@ -184,7 +184,7 @@ export default function AoEOverlay({ imgRenderRect, tamanho, grade, containerRef
       {template && (
         <div className="mapa-aoe-painel">
           <p className="mono" style={{ margin: 0, fontSize: 11 }}>
-            raio {formatarDistancia(tamanhoTemplateEmCelulas(template, grade) * grade.escala, grade.unidade)} · {alvosDentro.length} dentro
+            {template.forma === 'circulo' ? 'raio' : 'metade do lado'} {formatarDistancia(tamanhoTemplateEmCelulas(template, grade) * grade.escala, grade.unidade)} · {alvosDentro.length} dentro
           </p>
           {alvosDentro.length > 0 && (
             <p className="vazio" style={{ margin: '0.2rem 0', fontSize: 10 }}>

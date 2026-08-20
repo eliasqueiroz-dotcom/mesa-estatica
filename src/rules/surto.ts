@@ -1,4 +1,5 @@
 import { rolarDadoComForcados } from '../dice/registroForcados';
+import type { SurtoAtivo } from '../state/types';
 import { TABELA_SURTO, type EntradaSurto } from './data/surto';
 
 export interface ResultadoSurto {
@@ -34,7 +35,7 @@ export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto, personagemId:
   return sessao.contadorCena;
 }
 
-/** Verifica se a ficha está em Surto ativo — cada entrada decide sozinha qual comparação usar
+/** Filtra só os Surtos que ESTÃO ativos agora — cada entrada decide sozinha qual comparação usar
  *  pelo `modo` gravado NA CRIAÇÃO (`calcularExpiraSurto`), não pelo `modoCombate` atual da
  *  sessão: um Surto criado em combate continua comparando com `rodada` mesmo depois do combate
  *  acabar, e um criado fora de combate continua comparando com `contadorCena` mesmo que um
@@ -42,15 +43,21 @@ export function calcularExpiraSurto(sessao: EstadoSessaoParaSurto, personagemId:
  *  causava o Surto sumir ao encerrar combate e reaparecer ao iniciar um novo — `rodada` reseta
  *  pra 1 a cada combate novo, e um `expiraEm` antigo quase sempre bate `>= 1`.
  *  Fora de combate: algum surto.expiraEm === contadorCena.
- *  Em combate: algum surto.expiraEm >= rodada. */
-export function personagemEstaEmSurto(
-  surtosAtivos: { expiraEm: number; modo: 'cena' | 'combate'; id?: string; escolha?: string | null }[],
-  sessao: EstadoSessaoParaSurto,
-): boolean {
-  return (surtosAtivos ?? []).some((s) => {
+ *  Em combate: algum surto.expiraEm >= rodada.
+ *
+ *  Função central pro "está em Surto?" — todo consumidor que precisa saber QUAL Surto mostrar
+ *  (não só se há algum ativo) deve usar esta função, nunca reimplementar o filtro inline (era
+ *  o que causava o mesmo bug reaparecer em badges que não passavam pelo `personagemEstaEmSurto`
+ *  abaixo). */
+export function surtosAtivosNaSessao(surtosAtivos: SurtoAtivo[], sessao: EstadoSessaoParaSurto): SurtoAtivo[] {
+  return (surtosAtivos ?? []).filter((s) => {
     if (s.modo === 'combate') {
       return s.expiraEm >= sessao.rodada;
     }
     return s.expiraEm === sessao.contadorCena;
   });
+}
+
+export function personagemEstaEmSurto(surtosAtivos: SurtoAtivo[], sessao: EstadoSessaoParaSurto): boolean {
+  return surtosAtivosNaSessao(surtosAtivos, sessao).length > 0;
 }
