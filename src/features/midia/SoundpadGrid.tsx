@@ -2,14 +2,21 @@ import { useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
+import { useSoundpadUiStore } from '../../state/soundpadUiStore';
 import { useStore } from '../../state/store';
 import type { SomSoundpad } from '../../state/types';
 
 const SLOTS = [0, 1, 2, 3, 4, 5];
 
 /**
- * Soundpad do mestre — 6 botões de efeito. Clicar dispara pra todo mundo; o áudio em si toca
- * no `SoundpadPlayer` (montado no header), por cima da música, sem tocar no player da jukebox.
+ * Soundpad do mestre — 6 botões de efeito. Clicar num slot parado dispara pra todo mundo;
+ * clicar de novo enquanto ele está tocando (neste cliente) para só esse efeito — não mexe nos
+ * outros slots nem na jukebox, que tem seus próprios controles de transporte. O áudio em si
+ * toca no `SoundpadPlayer` (montado no header), por cima da música, sem tocar no player dela.
+ *
+ * "Tocando" vem do `soundpadUiStore` (fato local deste cliente, não sincronizado — cada
+ * cliente tem seu próprio `<audio>`), não do `ultimoDisparo` do store principal (que só diz
+ * qual foi o ÚLTIMO comando, não se o áudio ainda está de fato tocando ou já terminou).
  *
  * Volume é separado do da música e também vale pra todos — o mestre equilibra efeito e trilha
  * de forma independente.
@@ -21,6 +28,8 @@ export default function SoundpadGrid() {
   const removerSomSoundpad = useStore((s) => s.removerSomSoundpad);
   const definirVolumeSoundpad = useStore((s) => s.definirVolumeSoundpad);
   const dispararSoundpad = useStore((s) => s.dispararSoundpad);
+  const pararSoundpad = useStore((s) => s.pararSoundpad);
+  const slotsTocando = useSoundpadUiStore((s) => s.slotsTocando);
 
   const [enviandoSlot, setEnviandoSlot] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -105,6 +114,7 @@ export default function SoundpadGrid() {
             {SLOTS.map((slot) => {
               const som = sons.find((x) => x.slot === slot) ?? null;
               const enviando = enviandoSlot === slot;
+              const tocando = slotsTocando.has(slot);
               return (
                 <div
                   key={slot}
@@ -123,11 +133,17 @@ export default function SoundpadGrid() {
                     <>
                       <button
                         className="acento"
-                        onClick={() => dispararSoundpad(slot)}
-                        title={`disparar "${som.nome}" pra todos`}
-                        style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        onClick={() => (tocando ? pararSoundpad(slot) : dispararSoundpad(slot))}
+                        title={tocando ? `parar "${som.nome}"` : `disparar "${som.nome}" pra todos`}
+                        style={{
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          outline: tocando ? '2px solid var(--rede)' : undefined,
+                        }}
                       >
-                        {som.nome}
+                        {tocando ? `■ ${som.nome}` : som.nome}
                       </button>
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
                         <button

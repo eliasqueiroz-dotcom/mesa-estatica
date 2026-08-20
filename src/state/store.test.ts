@@ -600,6 +600,23 @@ describe('midia', () => {
       expect(midia.atualizadoEm).not.toBe(antes);
     });
   });
+
+  describe('definirVolumeMidia', () => {
+    it('muda o volume sem recarimbar atualizadoEm — mudar volume não pode saltar a posição', () => {
+      const antes = useStore.getState().midia.atualizadoEm;
+      useStore.getState().definirVolumeMidia(0.3);
+      const midia = useStore.getState().midia;
+      expect(midia.volume).toBe(0.3);
+      expect(midia.atualizadoEm).toBe(antes);
+    });
+
+    it('é clampado em 0..1', () => {
+      useStore.getState().definirVolumeMidia(5);
+      expect(useStore.getState().midia.volume).toBe(1);
+      useStore.getState().definirVolumeMidia(-1);
+      expect(useStore.getState().midia.volume).toBe(0);
+    });
+  });
 });
 
 describe('soundpad', () => {
@@ -658,6 +675,18 @@ describe('soundpad', () => {
     useStore.getState().dispararSoundpad(3);
     useStore.getState().dispararSoundpad(5);
     expect(useStore.getState().soundpad.ultimoDisparo?.slot).toBe(5);
+  });
+
+  it('dispararSoundpad carimba tipo "tocar"', () => {
+    useStore.getState().dispararSoundpad(3);
+    expect(useStore.getState().soundpad.ultimoDisparo?.tipo).toBe('tocar');
+  });
+
+  it('pararSoundpad carimba tipo "parar" pro slot pedido', () => {
+    useStore.getState().pararSoundpad(4);
+    const disparo = useStore.getState().soundpad.ultimoDisparo;
+    expect(disparo?.slot).toBe(4);
+    expect(disparo?.tipo).toBe('parar');
   });
 });
 

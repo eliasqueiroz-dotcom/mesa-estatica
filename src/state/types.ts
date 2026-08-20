@@ -385,9 +385,11 @@ export interface EstadoSoundpad {
   sons: SomSoundpad[];
   /** Separado do volume da música — o GM controla os dois de forma independente. */
   volume: number;
-  /** Evento, não estado: quem recebe compara `em` com o último disparo já tocado e só toca
-   *  se for mais novo, senão um refetch do Realtime repetiria o efeito. */
-  ultimoDisparo: { slot: number; em: string } | null;
+  /** Evento, não estado: quem recebe compara `em` com o último disparo já tocado e só age
+   *  se for mais novo, senão um refetch do Realtime repetiria a ação. `tipo` distingue tocar
+   *  de parar — 'parar' pede pra CADA cliente interromper sua própria instância local daquele
+   *  slot, se estiver tocando (ver `soundpadUiStore.ts`). */
+  ultimoDisparo: { slot: number; em: string; tipo: 'tocar' | 'parar' } | null;
 }
 
 /** Uma entrada de tabela aleatória cobre uma faixa de rolagem `min`–`max` (inclusive).

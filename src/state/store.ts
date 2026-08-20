@@ -176,11 +176,16 @@ interface Acoes {
   removerFaixaMidia: (id: string) => void;
   /** Troca `ordem` com o vizinho imediato na lista ordenada; no-op nas bordas. */
   moverFaixaMidia: (id: string, direcao: 'cima' | 'baixo') => void;
-  /** Patch genérico de playback — sempre recarimba `atualizadoEm`. Todo transporte
-   *  (play/pause/seek/próxima/anterior/loop/fim-de-faixa) passa por aqui. */
+  /** Patch genérico de playback — sempre recarimba `atualizadoEm`, que `MidiaPlayerGM`
+   *  usa como gatilho pra resincronizar o `<audio>` (`audio.currentTime = posicaoSegundos`).
+   *  Por isso NÃO inclui `volume` aqui: mexer só no volume recarimbaria `atualizadoEm` e
+   *  faria a faixa saltar de volta pra `posicaoSegundos` (que fica parado desde o último
+   *  seek/troca de faixa) — som "reiniciando" a cada ajuste de volume. `volume` tem ação
+   *  própria (`definirVolumeMidia`) que não recarimba nada. */
   atualizarEstadoMidia: (
-    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop' | 'volume'>>,
+    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop'>>,
   ) => void;
+  definirVolumeMidia: (volume: number) => void;
 
   /** Grava o som no slot (0–5), sobrescrevendo o que estiver lá — é o "substituir" da UI. */
   definirSomSoundpad: (slot: number, nome: string, path: string, url: string) => string;
@@ -188,6 +193,9 @@ interface Acoes {
   definirVolumeSoundpad: (volume: number) => void;
   /** Carimba o disparo; GM e jogadores tocam o efeito e nunca repetem o mesmo carimbo. */
   dispararSoundpad: (slot: number) => void;
+  /** Contraparte de `dispararSoundpad` — pede pra cada cliente interromper a própria instância
+   *  do efeito daquele slot (se estiver tocando aí). Mesmo mecanismo de evento carimbado. */
+  pararSoundpad: (slot: number) => void;
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
   limparLog: () => void;
@@ -1187,6 +1195,8 @@ export const useStore = create<Store>()(
         }),
       atualizarEstadoMidia: (patch) =>
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
+      definirVolumeMidia: (volume) =>
+        set((s) => ({ midia: { ...s.midia, volume: Math.max(0, Math.min(1, volume)) } })),
 
       // Um slot por vez: definir sobrescreve o som que estiver naquela posição (é o
       // "substituir" da UI — não existe caminho separado pra trocar).
@@ -1210,8 +1220,14 @@ export const useStore = create<Store>()(
           const diff = Date.now() - new Date(atual.em).getTime();
           if (diff < 200) return;
         }
-        set((s) => ({ soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString() } } }));
+        set((s) => ({
+          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString(), tipo: 'tocar' } },
+        }));
       },
+      pararSoundpad: (slot) =>
+        set((s) => ({
+          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString(), tipo: 'parar' } },
+        })),
 
       registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
         const sessaoPublica = get().sessaoPublica;

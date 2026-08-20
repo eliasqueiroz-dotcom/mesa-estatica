@@ -36,6 +36,7 @@ export interface LinhaEstadoSoundpad {
   volume: number;
   disparo_slot: number | null;
   disparo_em: string | null;
+  disparo_tipo: 'tocar' | 'parar';
 }
 
 /**
@@ -155,6 +156,7 @@ export function iniciarSyncSoundpad(): () => void {
           volume: state.soundpad.volume,
           disparo_slot: state.soundpad.ultimoDisparo?.slot ?? null,
           disparo_em: state.soundpad.ultimoDisparo?.em ?? null,
+          disparo_tipo: state.soundpad.ultimoDisparo?.tipo ?? 'tocar',
         })
         .then(({ error }) => {
           if (error) console.error('[soundpadSync] upsert de estado falhou', error);
@@ -191,11 +193,11 @@ export function iniciarSyncSoundpad(): () => void {
           soundpad: {
             ...s.soundpad,
             volume: linha.volume,
-            // quem toca é o SoundpadPlayer, que dedupe pelo carimbo `em` — reaplicar o mesmo
-            // valor aqui não repete o efeito.
+            // quem toca/para é o SoundpadPlayer, que dedupe pelo carimbo `em` — reaplicar o
+            // mesmo valor aqui não repete a ação.
             ultimoDisparo:
               linha.disparo_slot !== null && linha.disparo_em
-                ? { slot: linha.disparo_slot, em: linha.disparo_em }
+                ? { slot: linha.disparo_slot, em: linha.disparo_em, tipo: linha.disparo_tipo ?? 'tocar' }
                 : s.soundpad.ultimoDisparo,
           },
         }));

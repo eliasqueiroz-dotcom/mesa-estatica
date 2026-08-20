@@ -26,6 +26,7 @@ export default function MidiaTab() {
   const removerFaixaMidia = useStore((s) => s.removerFaixaMidia);
   const moverFaixaMidia = useStore((s) => s.moverFaixaMidia);
   const atualizarEstadoMidia = useStore((s) => s.atualizarEstadoMidia);
+  const definirVolumeMidia = useStore((s) => s.definirVolumeMidia);
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -167,7 +168,7 @@ export default function MidiaTab() {
             max={1}
             step={0.05}
             value={midia.volume}
-            onChange={(e) => atualizarEstadoMidia({ volume: Number(e.target.value) })}
+            onChange={(e) => definirVolumeMidia(Number(e.target.value))}
             style={{ width: '120px' }}
           />
         </div>
