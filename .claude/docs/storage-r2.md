@@ -81,7 +81,7 @@ O bucket único `midia` do Supabase (`supabase/migrations/0008_midia.sql`) hospe
 (`sfx/`), imagens de mapa (`img/mapa/`) e fotos de NPC/ficha (`img/npcs/`, `img/fichas/`). O
 free tier do Supabase limita **Storage a 1GB total** e cobra egress acima da cota do plano
 (confira o valor atual na página de pricing deles — muda com o tempo). O áudio já aceita até
-50MB por arquivo **sem nenhuma compressão** (`MidiaTab.tsx`, `SoundpadGrid.tsx`) — é o que mais
+100MB por arquivo **sem nenhuma compressão** (`MidiaTab.tsx`, `SoundpadGrid.tsx`) — é o que mais
 pesa, de longe.
 
 O Cloudflare R2 é compatível com a API S3, tem um free tier bem maior (~10GB de storage) e a
@@ -92,7 +92,7 @@ do R2 não é cobrado por banda.
 
 | Asset | Prefixo | Por quê migrar (ou não) |
 |---|---|---|
-| **Áudio** (soundpad + jukebox) | `sfx/` | **Fazer primeiro.** Sem compressão, até 50MB/arquivo — é o que estoura a cota e gera mais egress (tocado repetidas vezes numa sessão) |
+| **Áudio** (soundpad + jukebox) | `sfx/` | **Fazer primeiro.** Sem compressão, até 100MB/arquivo — é o que estoura a cota e gera mais egress (tocado repetidas vezes numa sessão) |
 | Imagem de mapa | `img/mapa/` | **Opcional.** JPEG comprimido a ~1600px, um mapa ativo por vez — porte médio, baixo volume |
 | Foto de NPC/ficha | `img/npcs/`, `img/fichas/` | **Não vale a pena.** Avatar 256×256 comprimido, poucos KB cada — mover não reduz egress de forma perceptível e adiciona complexidade (a policy de dono-de-ficha da migração `0031` teria que ser replicada na Edge Function) |
 
@@ -218,6 +218,26 @@ supabase functions deploy presign-r2-upload
 
 **Código já implementado**: [`supabase/functions/presign-r2-upload/index.ts`](../../supabase/functions/presign-r2-upload/index.ts).
 
+### Trava de cota (8GB — extensão além do plano original)
+
+O free tier do R2 é 10GB de storage; acima disso a Cloudflare cobra. Antes de assinar a URL de
+upload, a function soma o tamanho de **todos os objetos do bucket** (via `ListObjectsV2` da API
+S3-compatible, assinada com o mesmo `AwsClient`, paginado por `continuation-token` — a resposta é
+XML, sem `DOMParser` no runtime edge do Deno, então extraída com regex simples nas tags
+`<Size>`/`<IsTruncated>`/`<NextContinuationToken>`, schema fixo da AWS/R2). Se `usoAtual +
+tamanho` passar de `LIMITE_BYTES` (`8 * 1024 ** 3`, constante hardcoded igual
+`PREFIXOS_PERMITIDOS`), devolve 413 com o quanto já está usado. Por isso o corpo da requisição
+`{ path, tipo }` ganhou um terceiro campo obrigatório: `tamanho` (bytes do arquivo).
+
+**Limitação conhecida**: a soma considera só **este bucket** (`estatica-midia`). Se a conta
+Cloudflare tiver outros buckets R2 fora deste projeto, o uso total de storage da conta pode
+passar de 8GB sem esta trava perceber — o free tier de 10GB é por conta, não por bucket.
+
+**Reforço fora do código**: configure também uma notificação de uso em Cloudflare dashboard →
+**Notifications** → tipo **R2 Storage** → gatilho em 8GB, e-mail de destino. Isso cobre uploads
+feitos fora do app (ex.: direto pelo dashboard) — a trava do código só vê o que passa pela Edge
+Function.
+
 ## Passo 4b — Edge Function `remover-r2-objeto` (extensão além do plano original)
 
 O plano original deste doc só cobria upload — sem uma contraparte de exclusão, apagar uma
@@ -241,12 +261,15 @@ supabase functions deploy remover-r2-objeto
 ## Passo 5 — trocar upload e exclusão no cliente pra usar o R2
 
 **Já implementado** em [`src/multiplayer/uploadR2.ts`](../../src/multiplayer/uploadR2.ts) — três
-exports: `uploadR2(path, blob, tipo)` (mesmo formato de `uploadImagemStorage.ts`), `deletarR2(path)`
-(chama `remover-r2-objeto`), e `isUrlSupabaseStorage(url)` — helper de transição: URLs públicas
-do Supabase Storage sempre contêm `/storage/v1/object/public/`, URLs do R2 nunca contêm, então dá
-pra decidir qual backend um item usa **pela própria URL guardada**, sem precisar de coluna nova
-no state/DB. Necessário porque faixas/sons de antes da migração continuam apontando pro Supabase
-até o backfill (Passo 6, ainda não feito) — excluir uma faixa antiga não pode tentar chamar o R2.
+exports: `uploadR2(path, blob, tipo)` (mesmo formato de `uploadImagemStorage.ts`, mas devolve
+`{ url, erro? }` em vez de só a URL — `erro` vem preenchido quando a Edge Function recusa com um
+motivo específico, ex.: a trava de cota do Passo 4; sem isso o mestre só veria "upload falhou"
+genérico e não saberia que precisa liberar espaço), `deletarR2(path)` (chama `remover-r2-objeto`),
+e `isUrlSupabaseStorage(url)` — helper de transição: URLs públicas do Supabase Storage sempre
+contêm `/storage/v1/object/public/`, URLs do R2 nunca contêm, então dá pra decidir qual backend
+um item usa **pela própria URL guardada**, sem precisar de coluna nova no state/DB. Necessário
+porque faixas/sons de antes da migração continuam apontando pro Supabase até o backfill (Passo
+6, ainda não feito) — excluir uma faixa antiga não pode tentar chamar o R2.
 
 Call sites trocados:
 
@@ -306,7 +329,7 @@ bundle:
 ## Por quê
 
 O soundpad (`src/features/midia/SoundpadGrid.tsx`, grade de 6 slots) só aceita upload manual de
-arquivo local hoje (até 50MB, sem compressão, mesmo bucket `midia` da Parte 1, prefixo `sfx/`).
+arquivo local hoje (até 100MB, sem compressão, mesmo bucket `midia` da Parte 1, prefixo `sfx/`).
 O [Freesound.org](https://freesound.org) tem uma biblioteca enorme de efeitos sonoros e
 gravações de campo sob licença Creative Commons, de graça — dá pra buscar "estática", "passos
 concreto", "rádio distorcido" direto no app em vez de caçar e baixar arquivo em outro lugar.

@@ -1,30 +1,51 @@
 import { supabase } from '../lib/supabaseClient';
 
+export interface ResultadoUploadR2 {
+  url: string | null;
+  /** mensagem específica do erro (ex.: cota do R2 cheia) quando dá pra extrair da resposta da
+   * Edge Function — ausente quando a falha não veio com uma mensagem própria. */
+  erro?: string;
+}
+
+/** Tenta extrair `{ erro }` do corpo da resposta HTTP de um `FunctionsHttpError` (supabase-js
+ * expõe a Response original em `error.context`) — cai em `undefined` se não der. */
+async function extrairMensagemErro(error: unknown): Promise<string | undefined> {
+  const contexto = (error as { context?: Response } | null)?.context;
+  if (!(contexto instanceof Response)) return undefined;
+  try {
+    const corpo = await contexto.clone().json();
+    return typeof corpo?.erro === 'string' ? corpo.erro : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Sobe um blob pro Cloudflare R2 via URL assinada (Edge Function `presign-r2-upload`) — o
- * upload em si vai direto do navegador pro R2, só a assinatura passa pelo Supabase. Devolve a
- * URL pública ou `null` em qualquer falha (sem Supabase configurado, presign negado, PUT
- * falhou) — quem chama decide o fallback.
+ * upload em si vai direto do navegador pro R2, só a assinatura passa pelo Supabase. Devolve
+ * `{ url }` (ou `url: null` em qualquer falha — sem Supabase configurado, presign negado, PUT
+ * falhou), com `erro` preenchido quando a Edge Function mandou um motivo específico (ex.: cota
+ * do R2 quase cheia) — quem chama decide o fallback/mensagem.
  */
-export async function uploadR2(path: string, arquivo: Blob, tipo: string): Promise<string | null> {
+export async function uploadR2(path: string, arquivo: Blob, tipo: string): Promise<ResultadoUploadR2> {
   const cliente = supabase;
-  if (!cliente) return null;
+  if (!cliente) return { url: null };
 
   const { data, error } = await cliente.functions.invoke<{ uploadUrl: string; publicUrl: string }>(
     'presign-r2-upload',
-    { body: { path, tipo } },
+    { body: { path, tipo, tamanho: arquivo.size } },
   );
   if (error || !data) {
     console.error('[uploadR2] presign falhou', error);
-    return null;
+    return { url: null, erro: await extrairMensagemErro(error) };
   }
 
   const resposta = await fetch(data.uploadUrl, { method: 'PUT', body: arquivo, headers: { 'Content-Type': tipo } });
   if (!resposta.ok) {
     console.error('[uploadR2] PUT falhou', resposta.status);
-    return null;
+    return { url: null };
   }
-  return data.publicUrl;
+  return { url: data.publicUrl };
 }
 
 /**

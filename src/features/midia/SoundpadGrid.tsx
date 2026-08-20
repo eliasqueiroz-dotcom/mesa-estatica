@@ -38,13 +38,16 @@ export default function SoundpadGrid() {
     const slot = slotAlvo.current;
     slotAlvo.current = null;
     if (!arquivo || slot === null || !supabase) return;
-    if (arquivo.size > 50 * 1024 * 1024) { setErro('arquivo excede 50MB — comprima ou divida em partes menores.'); return; }
+    if (arquivo.size > 100 * 1024 * 1024) { setErro('arquivo excede 100MB — comprima ou divida em partes menores.'); return; }
     setErro(null);
     setEnviandoSlot(slot);
     try {
       const path = `sfx/${crypto.randomUUID()}-${arquivo.name}`;
-      const url = await uploadR2(path, arquivo, arquivo.type || 'application/octet-stream');
-      if (!url) throw new Error('upload R2 falhou');
+      const { url, erro: mensagemErro } = await uploadR2(path, arquivo, arquivo.type || 'application/octet-stream');
+      if (!url) {
+        setErro(mensagemErro ?? 'upload falhou — confira o formato/tamanho e tente de novo.');
+        return;
+      }
       definirSomSoundpad(slot, arquivo.name, path, url);
     } catch {
       setErro('upload falhou — confira o formato/tamanho e tente de novo.');

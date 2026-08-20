@@ -19,6 +19,33 @@ const jsonResponse = (body: unknown, status: number) =>
 // mantenha em sincronia com PREFIXOS_PERMITIDOS de `remover-r2-objeto`.
 const PREFIXOS_PERMITIDOS = ['sfx/'];
 
+// 8GB — margem de segurança abaixo do free tier de 10GB do R2 (acima disso a Cloudflare cobra).
+// checa só ESTE bucket: se a conta Cloudflare tiver outros buckets R2, o uso total da conta
+// pode passar de 8GB sem essa trava perceber (o free tier é por conta, não por bucket).
+const LIMITE_BYTES = 8 * 1024 ** 3;
+
+/** Soma o Content-Length de todos os objetos do bucket via ListObjectsV2 (S3-compatible),
+ * paginando por continuation-token. A resposta é XML — sem DOMParser no runtime edge do Deno,
+ * então extrai as tags <Size>/<IsTruncated>/<NextContinuationToken> com regex simples (o schema
+ * do ListBucketResult é fixo e controlado pela própria AWS/R2, não input de usuário). */
+async function usoAtualBucket(r2: AwsClient, accountId: string, bucket: string): Promise<number> {
+  let total = 0;
+  let continuationToken: string | undefined;
+  do {
+    const url = new URL(`https://${accountId}.r2.cloudflarestorage.com/${bucket}`);
+    url.searchParams.set('list-type', '2');
+    if (continuationToken) url.searchParams.set('continuation-token', continuationToken);
+    const resposta = await r2.fetch(url.toString());
+    if (!resposta.ok) throw new Error(`list falhou: ${resposta.status}`);
+    const xml = await resposta.text();
+    for (const m of xml.matchAll(/<Size>(\d+)<\/Size>/g)) total += Number(m[1]);
+    const truncado = /<IsTruncated>true<\/IsTruncated>/.test(xml);
+    const tokenMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
+    continuationToken = truncado && tokenMatch ? tokenMatch[1] : undefined;
+  } while (continuationToken);
+  return total;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return jsonResponse({ erro: 'método não permitido' }, 405);
@@ -26,14 +53,14 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) return jsonResponse({ erro: 'sem autenticação' }, 401);
 
-  let body: { path?: string; tipo?: string };
+  let body: { path?: string; tipo?: string; tamanho?: number };
   try {
     body = await req.json();
   } catch {
     return jsonResponse({ erro: 'corpo inválido' }, 400);
   }
-  const { path, tipo } = body;
-  if (!path || !tipo) return jsonResponse({ erro: 'path/tipo ausente' }, 400);
+  const { path, tipo, tamanho } = body;
+  if (!path || !tipo || typeof tamanho !== 'number') return jsonResponse({ erro: 'path/tipo/tamanho ausente' }, 400);
   if (!PREFIXOS_PERMITIDOS.some((p) => path.startsWith(p))) {
     return jsonResponse({ erro: 'prefixo não permitido' }, 400);
   }
@@ -57,6 +84,17 @@ Deno.serve(async (req) => {
     service: 's3',
     region: 'auto',
   });
+
+  try {
+    const usoAtual = await usoAtualBucket(r2, accountId, bucket);
+    if (usoAtual + tamanho > LIMITE_BYTES) {
+      const usadoGB = (usoAtual / 1024 ** 3).toFixed(2);
+      const limiteGB = (LIMITE_BYTES / 1024 ** 3).toFixed(0);
+      return jsonResponse({ erro: `cota do R2 quase cheia (${usadoGB}GB de ${limiteGB}GB) — apague sons/faixas antigos antes de subir mais` }, 413);
+    }
+  } catch {
+    return jsonResponse({ erro: 'falha ao checar cota do R2' }, 502);
+  }
 
   const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${path}`;
   const assinada = await r2.sign(
