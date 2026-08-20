@@ -362,9 +362,12 @@ A API do Freesound (confirmado na doc oficial, `freesound.org/docs/api/`):
 
 Mesmo padrão da Parte 1 (e do `GM_TOKEN`) — nunca no repo:
 
-```bash
-supabase secrets set FREESOUND_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```powershell
+npx.cmd supabase secrets set FREESOUND_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+(Os secrets do R2 — `R2_ACCOUNT_ID`, `R2_BUCKET_NAME` etc., já configurados na Parte 1 — são
+reaproveitados pela function abaixo; nenhum secret novo além deste.)
 
 ## Passo 3 — Edge Function `buscar-freesound`
 
@@ -436,33 +439,41 @@ if (acao === 'usar') {
 return jsonResponse({ erro: 'acao inválida' }, 400);
 ```
 
-> Se a Parte 1 (R2) já tiver saído do papel, troque o bloco de upload da ação `usar` pela mesma
-> lógica de assinatura/PUT da `presign-r2-upload` em vez de `admin.storage.from('midia').upload`
-> — o resto da function (busca, checagem de GM) não muda.
+**Código já implementado** em [`supabase/functions/buscar-freesound/index.ts`](../../supabase/functions/buscar-freesound/index.ts)
+— como a Parte 1 (R2) já estava pronta quando esta parte foi feita, a ação `usar` sobe **direto
+pro R2** (não mais pro bucket Supabase, que era o destino descrito acima antes da Parte 1
+existir): mesma assinatura `aws4fetch`, mas PUT direto em vez de presigned URL — quem faz o
+upload aqui é a própria function, que já tem as credenciais, diferente de `presign-r2-upload`
+(que só assina pra o *navegador* subir depois). Também **reaplica a trava de 8GB**
+(`usoAtualBucket`/`LIMITE_BYTES`, duplicada aqui — sem pasta `_shared/`, mesmo padrão de
+cópia-e-cola de sempre) — sem isso, `buscar-freesound` seria um jeito de driblar a cota que
+`presign-r2-upload` já aplica no upload manual.
 
 Deploy manual, mesmo mecanismo:
 
-```bash
-supabase functions deploy buscar-freesound
+```powershell
+npx.cmd supabase functions deploy buscar-freesound
 ```
 
-## Passo 4 — onde entra no cliente (só descrito aqui, não implementado)
+## Passo 4 — onde entra no cliente
 
-`SoundpadGrid.tsx` ganha uma segunda opção em cada slot além de "+ som" (upload manual): abrir
-um painel de busca. Reaproveita:
+**Já implementado** em [`SoundpadGrid.tsx`](../../src/features/midia/SoundpadGrid.tsx) — cada
+slot ganha um botão "buscar" (ao lado de "+ som"/"trocar") que abre um modal. Reaproveitou:
 
 - O **padrão de modal inline** já usado em `src/features/sessao/ResetSessao.tsx` (backdrop fixed
   + card `.secao`, fecha com Escape ou clique fora) — não existe componente de modal
-  compartilhado no projeto, então replica o mesmo padrão copy-paste em vez de inventar
+  compartilhado no projeto, então replicou o mesmo padrão copy-paste em vez de inventar
   abstração nova.
-- O estado `enviandoSlot`/`erro` que o componente já tem, pro spinner e mensagem de erro do
-  "usar".
+- Estado próprio pro modal (`slotBusca`/`query`/`resultados`/`usandoId`/`erroBusca`), separado
+  do `enviandoSlot`/`erro` do upload manual — os dois fluxos são independentes.
 - A action **já existente** `definirSomSoundpad(slot, nome, path, url)` (`src/state/store.ts`)
   — mesma que o upload manual chama depois de subir o arquivo. Nenhuma action nova no store,
   nenhuma migração de banco.
+- `extrairMensagemErro` (exportada de `uploadR2.ts`, já usada lá pra mostrar o motivo real de um
+  bloqueio de cota) — reusada aqui pro erro da ação `usar`.
 
 Fluxo: campo de busca → `functions.invoke('buscar-freesound', { body: { acao: 'buscar', query } })`
-→ lista de resultados com botão de tocar prévia (`<audio src={previewUrl}>`) → botão "usar" →
+→ lista de resultados com prévia (`<audio controls src={previewUrl}>`) → botão "usar" →
 `functions.invoke('buscar-freesound', { body: { acao: 'usar', slot, previewUrl, nome } })` →
 resposta `{ path, url }` → `definirSomSoundpad(slot, nome, path, url)` → fecha o painel.
 

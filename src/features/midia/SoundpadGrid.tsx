@@ -1,12 +1,25 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
-import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
+import { deletarR2, extrairMensagemErro, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
 import { useSoundpadUiStore } from '../../state/soundpadUiStore';
 import { useStore } from '../../state/store';
 import type { SomSoundpad } from '../../state/types';
 
 const SLOTS = [0, 1, 2, 3, 4, 5];
+
+interface ResultadoBusca {
+  id: number;
+  nome: string;
+  duracao: number;
+  previewUrl: string;
+}
+
+const formatarDuracao = (segundos: number): string => {
+  const m = Math.floor(segundos / 60);
+  const s = Math.floor(segundos % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 /**
  * Soundpad do mestre — 6 botões de efeito. Clicar num slot parado dispara pra todo mundo;
@@ -36,9 +49,70 @@ export default function SoundpadGrid() {
   const slotAlvo = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [slotBusca, setSlotBusca] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState<ResultadoBusca[]>([]);
+  const [usandoId, setUsandoId] = useState<number | null>(null);
+  const [erroBusca, setErroBusca] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (slotBusca === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && usandoId === null) setSlotBusca(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [slotBusca, usandoId]);
+
   const escolherArquivo = (slot: number) => {
     slotAlvo.current = slot;
     inputRef.current?.click();
+  };
+
+  const abrirBusca = (slot: number) => {
+    setSlotBusca(slot);
+    setQuery('');
+    setResultados([]);
+    setErroBusca(null);
+  };
+
+  const buscar = async () => {
+    if (!supabase || !query.trim()) return;
+    setBuscando(true);
+    setErroBusca(null);
+    try {
+      const { data, error } = await supabase.functions.invoke<{ resultados: ResultadoBusca[] }>('buscar-freesound', {
+        body: { acao: 'buscar', query },
+      });
+      if (error || !data) throw new Error();
+      setResultados(data.resultados);
+    } catch {
+      setErroBusca('busca falhou — confira sua conexão e tente de novo.');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const usar = async (resultado: ResultadoBusca) => {
+    if (!supabase || slotBusca === null) return;
+    setUsandoId(resultado.id);
+    setErroBusca(null);
+    try {
+      const { data, error } = await supabase.functions.invoke<{ path: string; url: string }>('buscar-freesound', {
+        body: { acao: 'usar', slot: slotBusca, previewUrl: resultado.previewUrl, nome: resultado.nome },
+      });
+      if (error || !data) {
+        setErroBusca((await extrairMensagemErro(error)) ?? 'não deu pra usar esse som — tenta outro ou de novo em instantes.');
+        return;
+      }
+      definirSomSoundpad(slotBusca, resultado.nome, data.path, data.url);
+      setSlotBusca(null);
+    } catch {
+      setErroBusca('não deu pra usar esse som — tenta outro ou de novo em instantes.');
+    } finally {
+      setUsandoId(null);
+    }
   };
 
   const enviar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,20 +229,40 @@ export default function SoundpadGrid() {
                         >
                           {enviando ? 'enviando…' : 'trocar'}
                         </button>
+                        <button
+                          className="icone-botao"
+                          onClick={() => abrirBusca(slot)}
+                          disabled={enviando}
+                          title="buscar efeito no Freesound"
+                          style={{ fontSize: 10, flex: 1 }}
+                        >
+                          buscar
+                        </button>
                         <button className="icone-botao perigo" onClick={() => limpar(som)} title="remover" style={{ fontSize: 10 }}>
                           ×
                         </button>
                       </div>
                     </>
                   ) : (
-                    <button
-                      onClick={() => escolherArquivo(slot)}
-                      disabled={enviando}
-                      title={`escolher um efeito pro botão ${slot + 1}`}
-                      style={{ flex: 1, color: 'var(--ink-dim)' }}
-                    >
-                      {enviando ? 'enviando…' : '+ som'}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1 }}>
+                      <button
+                        onClick={() => escolherArquivo(slot)}
+                        disabled={enviando}
+                        title={`escolher um efeito pro botão ${slot + 1}`}
+                        style={{ flex: 1, color: 'var(--ink-dim)' }}
+                      >
+                        {enviando ? 'enviando…' : '+ som'}
+                      </button>
+                      <button
+                        className="icone-botao"
+                        onClick={() => abrirBusca(slot)}
+                        disabled={enviando}
+                        title="buscar efeito no Freesound"
+                        style={{ fontSize: 10 }}
+                      >
+                        buscar
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -186,6 +280,90 @@ export default function SoundpadGrid() {
         hidden
         onChange={enviar}
       />
+
+      {slotBusca !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(11, 13, 17, 0.6)',
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => usandoId === null && setSlotBusca(null)}
+        >
+          <div
+            className="secao"
+            style={{
+              width: 480,
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0 }}>buscar som no Freesound (botão {slotBusca + 1})</h3>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !buscando && buscar()}
+                placeholder='ex.: "estática", "passos concreto", "rádio distorcido"'
+                style={{ flex: 1 }}
+                autoFocus
+              />
+              <button className="acento" onClick={buscar} disabled={buscando || !query.trim()}>
+                {buscando ? 'buscando…' : 'buscar'}
+              </button>
+            </div>
+            {erroBusca && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erroBusca}</span>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', overflowY: 'auto' }}>
+              {resultados.length === 0 && !buscando && (
+                <p className="vazio">nenhum resultado ainda — busca um termo acima (só efeitos CC0).</p>
+              )}
+              {resultados.map((r) => (
+                <div
+                  key={r.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.4rem 0.5rem',
+                    border: '1px solid var(--concrete-2)',
+                    borderRadius: '2px',
+                  }}
+                >
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.nome}
+                  </span>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-dim)' }}>
+                    {formatarDuracao(r.duracao)}
+                  </span>
+                  <audio controls src={r.previewUrl} style={{ height: 28, maxWidth: 140 }} />
+                  <button
+                    className="acento"
+                    onClick={() => usar(r)}
+                    disabled={usandoId !== null}
+                    style={{ fontSize: 12 }}
+                  >
+                    {usandoId === r.id ? 'usando…' : 'usar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setSlotBusca(null)} disabled={usandoId !== null}>
+              fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

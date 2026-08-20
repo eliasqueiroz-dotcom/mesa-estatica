@@ -8,8 +8,10 @@ export interface ResultadoUploadR2 {
 }
 
 /** Tenta extrair `{ erro }` do corpo da resposta HTTP de um `FunctionsHttpError` (supabase-js
- * expõe a Response original em `error.context`) — cai em `undefined` se não der. */
-async function extrairMensagemErro(error: unknown): Promise<string | undefined> {
+ * expõe a Response original em `error.context`) — cai em `undefined` se não der. Exportada
+ * porque `SoundpadGrid.tsx` reusa pra mostrar o mesmo tipo de erro específico (ex.: cota do R2)
+ * quando chama `buscar-freesound` direto, sem passar por `uploadR2`. */
+export async function extrairMensagemErro(error: unknown): Promise<string | undefined> {
   const contexto = (error as { context?: Response } | null)?.context;
   if (!(contexto instanceof Response)) return undefined;
   try {
