@@ -464,12 +464,13 @@ do R2 — não é urgente.
 ## Passo 1 — criar o projeto no Cloudflare Pages (sem trocar o CI)
 
 Dashboard da Cloudflare → **Workers & Pages** → **Create** → **Pages** → **Direct Upload**. O
-nome digitado vira o subdomínio (`<nome>.pages.dev`) **e** o identificador que o
-`wrangler pages deploy --project-name=...` usa — se o nome já estiver em uso por outra conta
-(o `*.pages.dev` é compartilhado globalmente), a Cloudflare acrescenta um sufixo automático. Foi
-o que aconteceu aqui: o nome digitado foi `estatica`, mas o projeto final ficou `estatica-stc`
-(`estatica-stc.pages.dev`) — confira o nome real em **Settings → General** do projeto antes de
-preencher o `--project-name` do Passo 1 abaixo, não assuma que é o que você digitou.
+nome do projeto (`--project-name` do wrangler, campo **Settings → General → Project name**) e o
+subdomínio público (`<nome>.pages.dev`) são **campos separados** na Cloudflare — se o subdomínio
+já estiver em uso por outra conta (o `*.pages.dev` é compartilhado globalmente), só o subdomínio
+ganha um sufixo automático, o nome do projeto continua o que você digitou. Foi o que aconteceu
+aqui: nome do projeto `estatica`, mas o subdomínio ficou `estatica-stc.pages.dev`. **Use o nome
+do projeto** (`estatica`, confira em Settings → General se tiver dúvida) no `--project-name` do
+Passo 1 abaixo — não o subdomínio.
 
 **Não conecte o repositório GitHub direto no Cloudflare Pages** (a opção "Connect to Git" da
 tela de criação) — a integração Git nativa do Pages builda no push e **não roda `npm run
@@ -516,7 +517,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=estatica-stc
+          command: pages deploy dist --project-name=estatica
 ```
 
 `npm ci` → `npm run lint` → `npm run build` → `npm test` continuam exatamente como estão hoje —
