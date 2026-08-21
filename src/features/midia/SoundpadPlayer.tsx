@@ -11,9 +11,11 @@ import { useStore } from '../../state/store';
  * conseguir interromper só a instância certa. Um novo 'tocar' no mesmo slot para a instância
  * anterior antes de criar a nova (não faz sentido dois efeitos do mesmo botão ao mesmo tempo).
  *
- * Dedupe pelo carimbo `em`: o mesmo disparo chega aqui mais de uma vez (a ação local do GM e
- * depois o eco do Realtime, e um refetch de reconexão pode repetir o último). Guardar o
- * carimbo já tocado garante uma ação por clique.
+ * Dedupe pelo carimbo `em`, comparado como instante (epoch ms via `Date`, não string crua): o
+ * mesmo disparo chega aqui mais de uma vez (a ação local do GM e depois o eco do Realtime, que
+ * devolve `disparo_em` reformatado pelo Postgres — mesmo instante, string diferente — e um
+ * refetch de reconexão pode repetir o último). Guardar o instante já tocado garante uma ação
+ * por clique.
  *
  * Autoplay: o navegador só libera `play()` depois de algum gesto do usuário na página. No lado
  * do jogador isso já acontece no botão "habilitar áudio" do `MidiaPlayerJogador`; antes disso o
@@ -28,7 +30,7 @@ import { useStore } from '../../state/store';
  */
 export default function SoundpadPlayer() {
   const ultimoDisparo = useStore((s) => s.soundpad.ultimoDisparo);
-  const jaTocado = useRef<string | null>(null);
+  const jaTocado = useRef<number | null>(null);
   const audiosPorSlot = useRef<Map<number, HTMLAudioElement>>(new Map());
 
   const sonsRef = useRef(useStore.getState().soundpad.sons);
@@ -44,8 +46,14 @@ export default function SoundpadPlayer() {
   );
 
   useEffect(() => {
-    if (!ultimoDisparo || ultimoDisparo.em === jaTocado.current) return;
-    jaTocado.current = ultimoDisparo.em;
+    if (!ultimoDisparo) return;
+    // Compara pelo instante (epoch ms), não pela string crua: o eco do Realtime devolve
+    // `disparo_em` reformatado pelo Postgres (timestamptz troca o "Z" por "+00:00", por
+    // exemplo) — mesmo carimbo, string diferente. Comparar string batia igual só na ação
+    // local e falhava no eco, tocando o efeito duas vezes (reinicia quando o eco chega).
+    const carimbo = new Date(ultimoDisparo.em).getTime();
+    if (carimbo === jaTocado.current) return;
+    jaTocado.current = carimbo;
     const { slot, tipo } = ultimoDisparo;
 
     if (tipo === 'parar') {

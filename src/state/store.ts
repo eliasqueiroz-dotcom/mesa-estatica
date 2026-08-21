@@ -1245,7 +1245,7 @@ export const useStore = create<Store>()(
         set((s) => ({ soundpad: { ...s.soundpad, volume: Math.max(0, Math.min(1, volume)) } })),
       dispararSoundpad: (slot) => {
         const atual = get().soundpad.ultimoDisparo;
-        if (atual && atual.slot === slot) {
+        if (atual && atual.slot === slot && atual.tipo === 'tocar') {
           const diff = Date.now() - new Date(atual.em).getTime();
           if (diff < 200) return;
         }

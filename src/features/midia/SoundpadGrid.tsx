@@ -140,7 +140,6 @@ export default function SoundpadGrid() {
   };
 
   const limpar = async (som: SomSoundpad) => {
-    if (!window.confirm(`remover "${som.nome}" do botão ${som.slot + 1}?`)) return;
     marcarRemocaoExplicita(som.id);
     removerSomSoundpad(som.slot);
     // sons de antes da migração pro R2 ainda estão no Supabase Storage — decide o backend
