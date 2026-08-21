@@ -222,11 +222,19 @@ export interface ResultadoImportacaoLote {
   erroGeral?: string;
 }
 
+/** Tira cerca de código markdown (```json ... ``` ou ``` ... ```) que a IA às vezes devolve junto
+ *  mesmo quando instruída a não fazer isso — sem cerca, texto passa direto. */
+function tirarCercaMarkdown(texto: string): string {
+  const alvo = texto.trim();
+  const match = alvo.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+  return match ? match[1].trim() : alvo;
+}
+
 /** Aceita um objeto único (1 personagem) ou uma lista (vários .docx convertidos de uma vez). */
 export function importarFichasDeJSON(texto: string, basePV: BasePV): ResultadoImportacaoLote {
   let dados: unknown;
   try {
-    dados = JSON.parse(texto);
+    dados = JSON.parse(tirarCercaMarkdown(texto));
   } catch {
     return {
       resultados: [],

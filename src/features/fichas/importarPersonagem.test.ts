@@ -112,6 +112,18 @@ describe('importarFichasDeJSON', () => {
     const { erroGeral } = importarFichasDeJSON(JSON.stringify(['string solta']), 20);
     expect(erroGeral).toBeTruthy();
   });
+
+  it('tira cerca de código markdown (```json ... ```) antes de parsear', () => {
+    const { resultados, erroGeral } = importarFichasDeJSON('```json\n' + JSON.stringify({ nome: 'Cercado' }) + '\n```', 20);
+    expect(erroGeral).toBeUndefined();
+    expect(resultados[0].patch.nome).toBe('Cercado');
+  });
+
+  it('tira cerca de código markdown sem a tag "json"', () => {
+    const { resultados, erroGeral } = importarFichasDeJSON('```\n' + JSON.stringify({ nome: 'Cercado2' }) + '\n```', 20);
+    expect(erroGeral).toBeUndefined();
+    expect(resultados[0].patch.nome).toBe('Cercado2');
+  });
 });
 
 describe('encontrarFichaPorNome', () => {

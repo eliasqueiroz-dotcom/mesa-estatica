@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+import { extrairMensagemErro } from '../../multiplayer/uploadR2';
 import { ANTECEDENTES } from '../../rules/data/antecedentes';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { useStore } from '../../state/store';
+import { extrairTextoDocx } from './extrairTextoDocx';
 import { encontrarFichaPorNome, importarFichasDeJSON, type ResultadoImportacao } from './importarPersonagem';
+
+const PLACEHOLDER_DOCX = '[cole ou anexe o conteúdo do .docx aqui]';
 
 const EXEMPLO = {
   nome: "Marta 'Sombra' Andrade",
@@ -45,7 +50,7 @@ Regras de preenchimento:
 - Responda só com o JSON, sem markdown, sem comentário antes ou depois.
 
 Aqui está a ficha:
-[cole ou anexe o conteúdo do .docx aqui]`;
+${PLACEHOLDER_DOCX}`;
 }
 
 type Status = 'fechado' | 'aberto' | 'copiado';
@@ -58,6 +63,7 @@ export default function ImportarPersonagemBotao() {
   const [status, setStatus] = useState<Status>('fechado');
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [convertendo, setConvertendo] = useState(false);
 
   const copiarPrompt = async () => {
     await navigator.clipboard.writeText(montarPrompt());
@@ -109,6 +115,33 @@ export default function ImportarPersonagemBotao() {
     aplicarResultados(resultados);
   };
 
+  const importarDeDocx = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo || !supabase) return;
+    setErro(null);
+    setConvertendo(true);
+    try {
+      const textoDocx = await extrairTextoDocx(arquivo);
+      const prompt = montarPrompt().replace(PLACEHOLDER_DOCX, textoDocx);
+      const { data, error } = await supabase.functions.invoke<{ texto: string }>('converter-ficha-docx', { body: { prompt } });
+      if (error || !data) {
+        setErro((await extrairMensagemErro(error)) ?? 'importação por IA falhou — tenta de novo ou usa o fluxo manual.');
+        return;
+      }
+      const { resultados, erroGeral } = importarFichasDeJSON(data.texto, basePV);
+      if (erroGeral) {
+        setErro(erroGeral);
+        return;
+      }
+      aplicarResultados(resultados);
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'não deu pra ler esse .docx.');
+    } finally {
+      setConvertendo(false);
+    }
+  };
+
   const fechar = () => {
     setStatus('fechado');
     setTexto('');
@@ -156,9 +189,24 @@ export default function ImportarPersonagemBotao() {
             ×
           </button>
         </div>
+        {supabase && (
+          <>
+            <p className="vazio" style={{ margin: 0 }}>
+              carregue o .docx do jogador e a IA converte sozinha, sem precisar copiar/colar nada.
+            </p>
+            <label className="mapa-upload-botao acento" style={{ fontSize: '13px', padding: '0.5em 0.8em', opacity: convertendo ? 0.6 : 1 }}>
+              {convertendo ? 'convertendo…' : 'carregar .docx (IA converte automático)'}
+              <input type="file" accept=".docx" hidden disabled={convertendo} onChange={importarDeDocx} />
+            </label>
+            <p className="vazio" style={{ margin: 0, fontSize: '12px' }}>
+              ou, se preferir controlar a IA você mesmo:
+            </p>
+          </>
+        )}
         <p className="vazio" style={{ margin: 0 }}>
           1. copie o prompt abaixo e mande pra sua IA junto com o .docx do jogador. 2. cole aqui embaixo o JSON que ela devolver (ou
           carregue como arquivo .json).
+          {!supabase && ' (importação automática por IA precisa de Supabase configurado.)'}
         </p>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button onClick={copiarPrompt}>{status === 'copiado' ? 'copiado' : 'copiar prompt pra IA'}</button>

@@ -615,3 +615,71 @@ obsoletas desse doc (ver Passo 8 da Parte 1).
 - Manter o GitHub Pages antigo no ar até confirmar que o domínio novo funciona ponta a ponta —
   só então atualizar links compartilhados com jogadores e, se quiser, desligar o `deploy-pages`
   antigo de vez.
+
+# Parte 4 — Import de ficha por IA (docx automático)
+
+## Por quê
+
+O import de ficha via IA já existia de forma manual (`ImportarPersonagemBotao.tsx`: copiar prompt
+→ colar num chat de IA junto com o `.docx` → colar o JSON de volta). Esta parte automatiza o meio
+do fluxo: o mestre sobe o `.docx` no app e a IA converte sozinha.
+
+**O arquivo `.docx` nunca sai do navegador** — a extração de texto roda 100% client-side (lib
+`mammoth`, sem rede). Só o *texto extraído* (pequeno, é o texto de uma ficha) passa pela Edge
+Function até o provedor de IA. Isso é cota de invocação de Edge Function, não Storage/egress —
+diferente do problema de egress que motivou a Parte 1 (imagem/áudio em base64/Storage). Continua
+sem tocar em Supabase Storage em nenhum momento deste fluxo.
+
+Provedor escolhido: [OpenRouter](https://openrouter.ai) — free tier com vários modelos `:free`,
+API compatível com o formato OpenAI (`chat/completions`).
+
+## Passo 1 — criar conta e chave no OpenRouter
+
+1. Crie uma conta em [openrouter.ai](https://openrouter.ai) (grátis).
+2. Gere uma API key em `openrouter.ai/keys`.
+3. Confira o catálogo de modelos gratuitos em `openrouter.ai/models?max_price=0` — o line-up muda
+   com o tempo, por isso o modelo é configurável por secret (Passo 2) em vez de fixo no código.
+
+## Passo 2 — guardar como secrets do Supabase
+
+```powershell
+npx.cmd supabase secrets set OPENROUTER_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+`OPENROUTER_MODEL` é opcional (default `openai/gpt-oss-20b:free` no código — catálogo free muda
+com o tempo, confira o atual em `openrouter.ai/api/v1/models`) — só sete se quiser trocar o modelo
+sem reeditar/redeployar a function:
+
+```powershell
+npx.cmd supabase secrets set OPENROUTER_MODEL=algum-outro-modelo:free
+```
+
+## Passo 3 — Edge Function `converter-ficha-docx`
+
+Mesmo padrão Deno/`esm.sh`/CORS/checagem de GM das outras functions deste guia (mensagem do check
+de GM: `'só o mestre importa ficha por IA'`). Corpo `{ prompt: string }` — o cliente já manda o
+prompt inteiro (schema + instruções + texto do `.docx`, montado por `montarPrompt()` em
+`ImportarPersonagemBotao.tsx`); a function é um relay burro que só segura a chave e repassa pro
+OpenRouter, devolvendo `{ texto: <resposta da IA> }`. Quem valida/casa os campos contra as tabelas
+do jogo continua sendo `importarFichasDeJSON` no cliente — mesma lógica testada do fluxo manual.
+
+**Código já implementado**: [`supabase/functions/converter-ficha-docx/index.ts`](../../supabase/functions/converter-ficha-docx/index.ts).
+
+## Passo 4 — onde entra no cliente
+
+- `src/features/fichas/extrairTextoDocx.ts` — extrai texto puro do `.docx` via `mammoth`
+  (`mammoth.extractRawText`), 100% no navegador.
+- `ImportarPersonagemBotao.tsx` — novo botão "carregar .docx (IA converte automático)", só
+  visível quando `supabase` (`src/lib/supabaseClient.ts`) não é `null`. Sem Supabase configurado,
+  só o fluxo manual (copiar prompt / colar JSON / carregar `.json`) aparece — continua funcionando
+  sem nenhuma dependência nova.
+
+## Passo 5 — testar
+
+- Deploy da function: `npx.cmd supabase functions deploy converter-ficha-docx`.
+- Sem Supabase configurado (`npm run dev` num clone limpo sem `.env`): confirmar que só o fluxo
+  manual aparece no modal e que ele funciona como antes.
+- Com Supabase configurado: logado como mestre, subir um `.docx` de exemplo (pode gerar um pelo
+  próprio botão "exportar .docx" da ficha) e confirmar que a ficha é criada/atualizada certo.
+- Testar rate-limit/erro (ex.: secret ausente ou sessão de não-mestre) e confirmar que a mensagem
+  de erro aparece na UI sugerindo o fluxo manual, sem travar.
