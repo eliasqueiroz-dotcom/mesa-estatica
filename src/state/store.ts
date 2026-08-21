@@ -178,14 +178,14 @@ interface Acoes {
   moverFaixaMidia: (id: string, direcao: 'cima' | 'baixo') => void;
   /** Patch genérico de playback — sempre recarimba `atualizadoEm`, que `MidiaPlayerGM`
    *  usa como gatilho pra resincronizar o `<audio>` (`audio.currentTime = posicaoSegundos`).
-   *  Por isso NÃO inclui `volume` aqui: mexer só no volume recarimbaria `atualizadoEm` e
-   *  faria a faixa saltar de volta pra `posicaoSegundos` (que fica parado desde o último
-   *  seek/troca de faixa) — som "reiniciando" a cada ajuste de volume. `volume` tem ação
-   *  própria (`definirVolumeMidia`) que não recarimba nada. */
-  atualizarEstadoMidia: (
-    patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos' | 'modoLoop'>>,
-  ) => void;
+   *  Por isso NÃO inclui `volume` nem `modoLoop` aqui: mexer só nesses recarimbaria
+   *  `atualizadoEm` e faria a faixa saltar de volta pra `posicaoSegundos` (que fica parado
+   *  desde o último seek/troca de faixa) — som "reiniciando" ao trocar o modo de loop ou
+   *  ajustar o volume. Os dois têm ação própria (`definirVolumeMidia`/`definirModoLoopMidia`)
+   *  que não recarimba nada. */
+  atualizarEstadoMidia: (patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos'>>) => void;
   definirVolumeMidia: (volume: number) => void;
+  definirModoLoopMidia: (modoLoop: EstadoMidia['modoLoop']) => void;
 
   /** Grava o som no slot (0–5), sobrescrevendo o que estiver lá — é o "substituir" da UI. */
   definirSomSoundpad: (slot: number, nome: string, path: string, url: string) => string;
@@ -1226,6 +1226,7 @@ export const useStore = create<Store>()(
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
       definirVolumeMidia: (volume) =>
         set((s) => ({ midia: { ...s.midia, volume: Math.max(0, Math.min(1, volume)) } })),
+      definirModoLoopMidia: (modoLoop) => set((s) => ({ midia: { ...s.midia, modoLoop } })),
 
       // Um slot por vez: definir sobrescreve o som que estiver naquela posição (é o
       // "substituir" da UI — não existe caminho separado pra trocar).

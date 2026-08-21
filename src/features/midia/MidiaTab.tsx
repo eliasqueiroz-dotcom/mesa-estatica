@@ -27,6 +27,7 @@ export default function MidiaTab() {
   const moverFaixaMidia = useStore((s) => s.moverFaixaMidia);
   const atualizarEstadoMidia = useStore((s) => s.atualizarEstadoMidia);
   const definirVolumeMidia = useStore((s) => s.definirVolumeMidia);
+  const definirModoLoopMidia = useStore((s) => s.definirModoLoopMidia);
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -154,7 +155,7 @@ export default function MidiaTab() {
             +10s
           </button>
           <div style={{ flex: 1 }} />
-          <button onClick={() => atualizarEstadoMidia({ modoLoop: proximoModoLoop() })} title="alternar modo de repetição">
+          <button onClick={() => definirModoLoopMidia(proximoModoLoop())} title="alternar modo de repetição">
             loop: {rotuloLoop}
           </button>
         </div>
