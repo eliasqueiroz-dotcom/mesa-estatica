@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { estaAplicandoRemotoMidia } from '../../multiplayer/midiaEstadoSync';
 import { calcularPosicaoEsperada, precisaResincronizar } from '../../multiplayer/posicaoMidia';
+import { useMidiaUiStore } from '../../state/midiaUiStore';
 import { useStore } from '../../state/store';
 
 /**
@@ -16,6 +17,7 @@ import { useStore } from '../../state/store';
  */
 export default function MidiaPlayerGM() {
   const midia = useStore((s) => s.midia);
+  const definirDuracao = useMidiaUiStore((s) => s.definirDuracao);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const [erroAudio, setErroAudio] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export default function MidiaPlayerGM() {
     if (!audio) return;
 
     if (audio.src !== faixaAtual?.url) {
+      definirDuracao(0);
       audio.src = faixaAtual?.url ?? '';
       setErroAudio(null);
     }
@@ -89,6 +92,7 @@ export default function MidiaPlayerGM() {
       <audio
         ref={audioRef}
         onEnded={aoTerminar}
+        onLoadedMetadata={(e) => definirDuracao(e.currentTarget.duration)}
         onError={() => faixaAtual && setErroAudio(`não consegui tocar "${faixaAtual.nome}" — formato não suportado neste navegador.`)}
       />
       {(bloqueado || erroAudio) && (

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { calcularPosicaoEsperada } from '../../multiplayer/posicaoMidia';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
+import { useMidiaUiStore } from '../../state/midiaUiStore';
 import { useStore } from '../../state/store';
 import type { FaixaMidia } from '../../state/types';
 import SoundpadGrid from './SoundpadGrid';
@@ -15,13 +16,15 @@ const formatarTempo = (segundos: number): string => {
 
 /**
  * Aba Mídia do mestre — upload, playlist (reordenar por ↑/↓, excluir) e transporte
- * (tocar/pausar/próxima/anterior/±10s/loop). Só despacha ações no store — não tem `<audio>`
- * próprio (isso é `MidiaPlayerGM.tsx`, montado na raiz do App, pra não ter duas fontes de
- * verdade tocando ao mesmo tempo). Seek relativo (±10s) em vez de barra arrastável — evitar
- * compartilhar a duração real da faixa entre dois componentes que não têm o mesmo `<audio>`.
+ * (tocar/pausar/próxima/anterior/±10s/loop/barra de progresso). Só despacha ações no store —
+ * não tem `<audio>` próprio (isso é `MidiaPlayerGM.tsx`, montado na raiz do App, pra não ter
+ * duas fontes de verdade tocando ao mesmo tempo). A duração da faixa vem de `midiaUiStore`
+ * (fato local do cliente, lido do `<audio>` de verdade em `MidiaPlayerGM.tsx`) — este
+ * componente não tem como saber a duração sozinho.
  */
 export default function MidiaTab() {
   const midia = useStore((s) => s.midia);
+  const duracao = useMidiaUiStore((s) => s.duracaoSegundos);
   const adicionarFaixaMidia = useStore((s) => s.adicionarFaixaMidia);
   const removerFaixaMidia = useStore((s) => s.removerFaixaMidia);
   const moverFaixaMidia = useStore((s) => s.moverFaixaMidia);
@@ -135,9 +138,24 @@ export default function MidiaTab() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="mono">{faixaAtual ? faixaAtual.nome : 'nenhuma faixa selecionada'}</span>
           <span className="mono" style={{ fontSize: '12px', color: 'var(--ink-dim)' }}>
-            {formatarTempo(posicaoExibida)}
+            {formatarTempo(posicaoExibida)} / {formatarTempo(duracao)}
           </span>
         </div>
+        <input
+          type="range"
+          min={0}
+          max={duracao || 0}
+          step={0.1}
+          value={Math.min(posicaoExibida, duracao || 0)}
+          onChange={(e) => {
+            const novaPosicao = Number(e.target.value);
+            setPosicaoExibida(novaPosicao);
+            atualizarEstadoMidia({ posicaoSegundos: novaPosicao });
+          }}
+          disabled={!faixaAtual || duracao === 0}
+          title="arrastar pra outro ponto da faixa"
+          style={{ width: '100%' }}
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button onClick={() => ir('anterior')} disabled={ordenadas.length === 0}>
             ‹‹ anterior

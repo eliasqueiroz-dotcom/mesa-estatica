@@ -299,7 +299,7 @@ export default function SoundpadGrid() {
           <div
             className="secao"
             style={{
-              width: 480,
+              width: 720,
               maxWidth: '90vw',
               maxHeight: '80vh',
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
@@ -348,7 +348,7 @@ export default function SoundpadGrid() {
                   <span className="mono" style={{ fontSize: 11, color: 'var(--ink-dim)' }}>
                     {formatarDuracao(r.duracao)}
                   </span>
-                  <audio controls src={r.previewUrl} style={{ height: 28, maxWidth: 140 }} />
+                  <audio controls src={r.previewUrl} style={{ height: 28, maxWidth: 220 }} />
                   <button
                     className="acento"
                     onClick={() => usar(r)}
