@@ -1,6 +1,6 @@
 # Mesa de Estática — painel de mestre
 
-Painel de mestre do RPG "Estática" (investigação/horror, São Paulo distópica, d20 + atributo + perícia). Tela do mestre compartilhada por screen share no Discord + app reduzido do jogador (`jogador.html`). Estado local em localStorage (Zustand persist) com export JSON, mais sync opcional via Supabase. Publicado no GitHub Pages.
+Painel de mestre do RPG "Estática" (investigação/horror, São Paulo distópica, d20 + atributo + perícia). Tela do mestre compartilhada por screen share no Discord + app reduzido do jogador (`jogador.html`). Estado local em localStorage (Zustand persist) com export JSON, mais sync opcional via Supabase. Publicado no Cloudflare Pages (migrado do GitHub Pages, ver `.claude/docs/storage-r2.md` Parte 3).
 
 ## Documentos de referência (Grep pela seção — nunca ler o arquivo inteiro)
 
@@ -9,20 +9,22 @@ Painel de mestre do RPG "Estática" (investigação/horror, São Paulo distópic
 - [.claude/docs/arte.md](.claude/docs/arte.md) — design tokens, tipografia, sistema de ruído, microcopy, os 3 clichês proibidos.
 - [.claude/docs/arquitetura.md](.claude/docs/arquitetura.md) — stack e decisões fechadas.
 - [mesa-estatica-multiplayer-completo.md](mesa-estatica-multiplayer-completo.md) — spec do multiplayer (Supabase, RLS, Edge Functions); comentários no código citam suas seções (§11, Parte IV…).
+- [.claude/docs/storage-r2.md](.claude/docs/storage-r2.md) — guia operacional de mídia: Cloudflare R2 (egress), Freesound (soundpad), migração do site pro Cloudflare Pages.
+- [.claude/docs/mcp-servers.md](.claude/docs/mcp-servers.md) — setup dos MCP servers conectados (Supabase, Cloudflare, Context7) — ferramenta do Claude Code, não arquitetura do app.
 - [ROADMAP.md](ROADMAP.md) — o que já foi feito e o que vem a seguir.
 
 ## Stack
 
-Vite 8 + React 18 + TS + Zustand(persist) · `@3d-dice/dice-box-threejs` nos dados 3D (escolhido por suportar rolagem forçada nativa `1d20@X`) · Three.js nos tokens · @fontsource self-host · `docx` no export de ficha · Supabase (Realtime + Edge Functions) opcional.
+Vite 8 + React 18 + TS + Zustand(persist) · `@3d-dice/dice-box-threejs` nos dados 3D · Three.js nos tokens · @fontsource self-host · `docx` no export de ficha · Supabase (Realtime + Edge Functions) opcional. Porquê de cada escolha: `arquitetura.md`.
 
-`npm run dev` · `build` · `preview` · `test` (vitest) · `test:watch`. CI: push em `main` → build + test → deploy no GitHub Pages.
+`npm run dev` · `build` · `preview` · `test` (vitest) · `test:watch`. CI: push em `main` → build + test → deploy no Cloudflare Pages (`.github/workflows/deploy.yml`).
 
 ## Convenções
 
 - `src/rules/` é TS puro (sem React/Three) e espelha `regras.md`; **toda regra nova ganha teste**. `src/rules/data/` guarda as tabelas tipadas do jogo.
-- `src/state/store.ts` = Zustand + persist + migrations. **Toda mudança de shape bumpa `SCHEMA_VERSION` (`factories.ts`) e ganha bloco em `migrate`.**
-- **Rolagem é honesta por padrão** (valor bruto vem da física, modificadores somados depois). Exceção deliberada: o mestre força pela janela secreta `#controle` (`src/dice/forcarRolagem.ts`) — nunca expor esse controle na janela compartilhada. Fallback 2D se WebGL falhar.
-- `src/features/` = uma pasta por aba. Abas usam `visibility`/`pointer-events`, não render condicional, pra preservar estado local (`App.tsx`).
+- `src/state/store.ts` = Zustand + persist + migrations (regra de `SCHEMA_VERSION`: `arquitetura.md`).
+- **Rolagem é honesta por padrão** — exceção deliberada só pela janela secreta `#controle` (`src/dice/forcarRolagem.ts`), **nunca exposta na janela compartilhada**. Mecanismo completo: `arquitetura.md`.
+- `src/features/` = uma pasta por aba. Abas usam `visibility`/`pointer-events`, não render condicional (por quê: `arquitetura.md`).
 - Bundle do jogador (`jogador.html` → `PlayerApp.tsx`) nunca importa código exclusivo de mestre — o sigilo depende disso.
 - `src/hooks/useIniciativa.ts` + `features/iniciativa/IniciativaPanel.tsx` centralizam iniciativa/combate (usados por `CombatOverlay` e `NpcsTab`).
 - Ruído visual global: tiers 0–3 via `data-ruido` no `<html>` (`features/ruido/RuidoOverlay.tsx`), CSS puro, dirigido pela Sanidade da ficha ativa.

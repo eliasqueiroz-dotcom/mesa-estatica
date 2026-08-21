@@ -46,7 +46,7 @@ Postgres RLS decide se uma **linha inteira** é visível/editável — não esco
 | `forced_queue` | **ninguém no cliente** — RLS `USING (false)` pra `anon`; só a Edge Function com `service_role` | idem | character_id, valor_forçado, consumido, criado_por |
 | `sessao_publica` | todos | só GM | nome da mesa, nº sessão, clima, hora, caso atual, local atual, objetivo, progresso, "o que os jogadores veem", mini log, painel "destaque superior", **e também** o estado de turno/combate: `modo_combate`, `ordem`, `indice_atual`, `rodada`, e o contador `contadorCena` (usado pelo Surto — ver Parte II; não confundir com o campo de texto `cenaAtual` já existente) |
 | `sessao_privada` | só GM | só GM | "o que realmente está acontecendo", próximo evento, lembretes do mestre, gauges de Tensão/Ruído narrativo/Ameaça, estatísticas da sessão (rolagens/surtos/mortes/tempo) |
-| `media` | pasta `geral`: todos · pasta `gm`: só GM | `geral`: todos inserem · `gm`: só GM insere · mover de `gm`→`geral`: só GM · delete: GM sempre, jogador só o que ele mesmo subiu em `geral` *(assunção — confirmar antes de implementar)* | arquivo (via Supabase Storage, tabela guarda só a URL/metadados), pasta, autor, rótulo |
+| `media` | pasta `geral`: todos · pasta `gm`: só GM | `geral`: todos inserem · `gm`: só GM insere · mover de `gm`→`geral`: só GM · delete: GM sempre, jogador só o que ele mesmo subiu em `geral` *(assunção — confirmar antes de implementar)* | arquivo (via Supabase Storage, tabela guarda só a URL/metadados), pasta, autor, rótulo. **⚠ desatualizado**: nunca implementado assim — é um bucket único `midia`, ver §9 e `.claude/docs/storage-r2.md` |
 
 O ponto que importa em todas as tabelas sensíveis: mesmo que um jogador abra o DevTools e inspecione o tráfego de rede, `forced_queue`, `sessao_privada` e o `characters_privado` **dos outros jogadores** **nunca aparecem** — porque o cliente dele nunca teve permissão de consultar essas linhas, em nenhum momento.
 
@@ -111,6 +111,11 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 
 ## 9. Mídia — duas pastas
 
+**⚠ desatualizado**: este plano de duas pastas/tabela `media` nunca foi implementado. O código
+real usa um bucket único `midia` no Supabase Storage com prefixos de path (`sfx/`, `img/mapa/`,
+`img/npcs/`, `img/fichas/`) — ver `supabase/migrations/0008_midia.sql` e
+`.claude/docs/storage-r2.md`. Seção mantida por referência histórica, não como spec atual.
+
 - `media.pasta`: `'gm' | 'geral'`.
 - Leitura: `geral` visível a todos; `gm` só ao GM.
 - Upload: jogador só em `geral`; GM em qualquer uma.
@@ -134,16 +139,22 @@ Campos em `sessao_publica` (ver seção 4): `modo_combate`, `ordem` (array `{tip
 
 ## 11. Migração incremental
 
+> **⚠ Seção historicamente desatualizada** — descreve o plano de fases como era pensado
+> originalmente. O código de hoje já foi muito além de E-H (FoW, AoE, régua, ping, soundpad,
+> rolagem ao vivo transmitida, RLS fina em NPCs/fichas/tokens, mídia com pastas geral/gm) sem
+> seguir exatamente esta ordem. Tratar como registro de raciocínio de design, não como checklist
+> do que falta — pra "o que já está pronto de verdade" ver `ROADMAP.md` "Estado atual".
+
 - **Fase A ✅ (em produção) — só tokens.** Sincronizar posição x/y via Realtime. Menor risco, maior valor imediato.
 - **Fase B ✅ (em produção) — fichas.** Cada jogador edita a própria linha (`characters_privado`); GM assina todas via `is_gm()`.
 - **Fase C ✅ (construída, não ligada) — rolagens.** `resolver-rolagem` honesta (crypto) + forçada via `forced_queue`, testada isolada contra o Supabase real. `useDiceBox.ts` ainda não chama essa função.
 - **Fase D ✅ (construída, atrás de flag desligada) — corte da janela `#controle`** pro novo transporte. `VITE_FASE_D_ROLAGEM_REMOTA` liga; `BroadcastChannel` continua o padrão (e o fallback GM-sozinho-sem-internet, mesmo depois de ativada).
-- **Fase E — Sessão pública/privada.** Criar as duas tabelas, migrar os campos do dashboard (Parte III), GM lendo ambas.
-- **Fase F — Permissões finas de Mapas/NPCs/Personagens.** RLS de 1 personagem por dono (`owner_token` vincula exatamente 1 linha em `characters`, sem insert adicional pelo jogador), insert/update/delete de `npcs` restrito ao GM, insert/delete de `tokens` restrito ao próprio `character_id`, `controlado_por` exposto na UI como "quem pode mover".
-- **Fase G — Mídia.** Tabela `media` + Storage, upload em `geral` liberado, `gm` restrito, ação "mover pra Geral".
-- **Fase H — Limpar logs.** Botão condicional (só GM) + policy de delete em `rolls_log`.
+- **Fase E ✅ (em produção) — Sessão pública/privada.** `sessao_publica`/`sessao_privada` existem, dashboard (Parte III) já lê as duas.
+- **Fase F ✅ (em produção, na prática) — Permissões finas.** RLS por dono já cobre `characters`/`npcs`/`tokens` (ver migrações 0021+); `controlado_por`/UI de "quem pode mover" não foi implementado nesse formato específico, mas o RLS subjacente está de pé.
+- **Fase G ✅ (em produção) — Mídia.** Bucket `midia` (imagens) + R2 (áudio) — pastas `geral`/`gm` como planejado aqui não existem tal qual descrito na Parte II §6; o que existe é RLS por tabela (`soundpad_*`, `midia_*`), não por pasta.
+- **Fase H — Limpar logs.** Ainda não tem botão/policy dedicados — `resetMesa.ts` (ROADMAP.md, "sessão limpa") cobre um caso adjacente (reset completo), não uma limpeza seletiva de `rolls_log`.
 
-Ordem sugerida: E antes de F (dashboard do GM fica utilizável cedo) — F e G podem ser paralelas — H encaixa em qualquer folga.
+Ordem sugerida (histórica): E antes de F (dashboard do GM fica utilizável cedo) — F e G podem ser paralelas — H encaixa em qualquer folga.
 
 Zustand não sai do projeto — vira cache local/otimista; Supabase é a fonte de verdade compartilhada por cima.
 
@@ -204,9 +215,9 @@ Clicar num token (PC ou NPC) no mapa abre um overlay (fecha por botão X, clique
 
 > **Cuidado com o nome:** já existe `sessao.cenaAtual: string` no Zustand (`src/state/types.ts`) — é o **texto livre** descrevendo a cena, editado ao vivo na aba Sessão. O campo desta seção é outro: um **contador numérico**. Por isso o nome `contadorCena` — não reaproveitar nem sobrescrever o `cenaAtual` existente.
 
+> **⚠ Design original desta seção, superado pela implementação.** O que existe hoje (`src/state/types.ts` `SurtoAtivo`, `src/rules/surto.ts`) é um array `surtosAtivos: SurtoAtivo[]` por ficha (não um único `surto_ativo` opcional), porque surgiu um segundo caso que este design não cobria: Surto disparado **durante combate** mede duração em RODADAS (`rodada + 1d4`), não em `contadorCena` — cada entrada grava o próprio `modo: 'cena' | 'combate'` pra saber qual relógio usar. `avancarCena` zera todo `surtosAtivos` da ficha; encerrar combate poda só as entradas `modo: 'combate'`. Ver `git log` do fix de 20/08 pro histórico do bug que motivou essa forma final.
+
 - Contador de cena `contadorCena` em `sessao_publica` (seção 4/Parte I), incrementado por um botão "Avançar cena" na aba Sessão.
-- Quando o motor de regras dispara Surto, gravar `surto_ativo: { cena_id: contadorCena }` na ficha (não um booleano solto).
-- Exibir marcador (ficha e token) enquanto `personagem.surto_ativo?.cena_id === sessao.contadorCena`.
 - Vantagem de contador em vez de flag manual: um clique em "Avançar cena" invalida o Surto de todos de uma vez, sem iterar personagem por personagem.
 - Token 3D: reaproveitar a lógica de tiers de ruído já existente (brilho/pulso derivado de um cálculo, não de estado imperativo espalhado).
 
@@ -395,7 +406,7 @@ O split de janela de hoje é binário por hash (`src/main.tsx`: `#controle` → 
 - `jogador.html` → `src/entries/jogador.tsx` → `<PlayerApp/>` (novo, reduzido).
 - A janela `#controle` continua, mas só alcançável a partir do `GmApp` (título clicável) — nunca referenciada no bundle do jogador.
 
-`vite.config.ts` ganha `build.rollupOptions.input` com as entradas HTML (o `base: '/mesa-estatica/'` do deploy continua). Efeito-chave: o Rollup faz *tree-shaking* por entrada — `forcarRolagem.ts` e `ControlPanel.tsx`, importados só pela árvore do mestre, **não entram** no chunk do jogador.
+`vite.config.ts` ganha `build.rollupOptions.input` com as entradas HTML (`base: '/'` desde a migração pro Cloudflare Pages — era `/mesa-estatica/` na era GitHub Pages, ver `.claude/docs/storage-r2.md` Parte 3). Efeito-chave: o Rollup faz *tree-shaking* por entrada — `forcarRolagem.ts` e `ControlPanel.tsx`, importados só pela árvore do mestre, **não entram** no chunk do jogador.
 
 **Detecção de papel:** o boot lê a URL (§6 — jogador entra com `?s=<session>&t=<owner_token>`; GM valida `gm_token` server-side). `jogador.tsx` só aceita `owner_token`; sem token válido, mostra "link inválido", nunca o painel.
 
@@ -449,7 +460,7 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 
 > Preenche a lacuna de infra: o "como" concreto de sair do localStorage e virar serviço online. Decisões abaixo **travadas**; nada em aberto. Trabalho **pós-25/07**.
 >
-> **Decisões travadas:** (1) hospedagem = **GitHub Pages + Supabase** (mantém o deploy estático atual); (2) provisionamento = **importar o export JSON uma vez** (seed); (3) auth = **Anonymous Auth** (§6 solução 1); (4) links = **URL do GitHub Pages + query** (`?s=..&t=..`).
+> **Decisões travadas:** (1) hospedagem = ~~GitHub Pages~~ **Cloudflare Pages** + Supabase (mantém o deploy estático, hospedagem migrou depois — ver `.claude/docs/storage-r2.md` Parte 3); (2) provisionamento = **importar o export JSON uma vez** (seed); (3) auth = **Anonymous Auth** (§6 solução 1); (4) links = **URL do site + query** (`?s=..&t=..`).
 >
 > **Lembrete:** adotar Supabase **revoga** o requisito "nada depende de internet em runtime" do CLAUDE.md — passa a valer só pro fallback GM-solo (§13). Atualizar o CLAUDE.md quando a Fase A começar.
 
@@ -474,11 +485,14 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 
 ## 4. Geração de links
 
-- Jogador: `https://queiroz-labs.github.io/mesa-estatica/?s=<session_id>&t=<owner_token>`. O `owner_token` (UUID não-adivinhável) resolve pra 1 ficha (§6).
+- Jogador: `https://estatica-stc.pages.dev/?s=<session_id>&t=<owner_token>` (domínio migrado do GitHub Pages pro Cloudflare Pages — ver `.claude/docs/storage-r2.md` Parte 3). O `owner_token` (UUID não-adivinhável) resolve pra 1 ficha (§6).
 - GM: preferir **não** pôr o `gm_token` na URL (evita vazar em histórico/print) — tela que pede pra colar o token.
 - "Botão que gera todos os links" (§15): tela GM-only listando ficha→link, copiável. Vazou um → GM regenera só aquele `owner_token` (§13).
 
 ## 5. Storage de mapas e mídia
+
+**⚠ desatualizado**: os buckets `media-geral`/`media-gm` abaixo nunca foram implementados —
+é um bucket único `midia` com prefixo por tipo de asset. Ver `.claude/docs/storage-r2.md`.
 
 - Buckets espelhando as políticas de tabela (§9): `media-geral` (todos leem), `media-gm` (só GM). Mapa num bucket `mapas` ou em `media-gm` até ser revelado.
 - Upload de mapa deixa de ser base64 no localStorage: `supabase.storage.upload()` → guarda só a URL. **Reusar `comprimirImagem.ts`** (1600px/JPEG já existe) antes do upload. Vídeo/áudio só no Storage (§9).
@@ -489,8 +503,8 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 
 ## 7. Realtime e Presence
 
-- Ligar Realtime só nas tabelas que o cliente assina: `characters_publico`, `npcs`, `tokens`, `rolls_log`, `sessao_publica`. **Não** em `forced_queue`/`sessao_privada`/`characters_privado` — RLS já bloqueia, e não expor no Realtime reduz a superfície.
-- Presence: canal por `session_id`; indicador **só-GM** de quem está conectado (§15).
+- Ligar Realtime só nas tabelas que o cliente assina. **⚠ desatualizado**: na época da escrita eram 5 tabelas (`characters_publico`, `npcs`, `tokens`, `rolls_log`, `sessao_publica`); hoje são ~15 (`mapa_publico`, `characters_publico/privado`, `npcs_publico/privado`, `tokens`, `iniciativa`, `sessao_publica`, `midia_faixas/estado`, `soundpad_sons/estado`, `log_publico`, `rolls_publicas`, `fow_estado`), à medida que features novas (FoW, soundpad, mídia, iniciativa em tabela própria) precisaram de sync — RLS por linha continua sendo a fronteira real, não a lista. **Nunca** em `forced_queue`/`sessao_privada`/`characters_privado` — isso continua valendo.
+- Presence: canal por `session_id`; indicador **só-GM** de quem está conectado (§15) — **ainda não implementado** (item aberto no checklist §15).
 
 ## 8. Online ↔ offline e reconciliação
 
@@ -507,4 +521,4 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 - [ ] Fallback offline testado (desligar o wifi do GM no meio de uma ação).
 - [ ] CLAUDE.md atualizado: "offline em runtime" agora vale só pro fallback GM-solo.
 
-**Custo:** um grupo pequeno cabe no free tier do Supabase (500 MB DB, ~200 conexões Realtime, 500 K invocações de Edge Function/mês, 1 GB Storage). Sem custo novo além do que já existe (GitHub Pages é grátis).
+**Custo:** um grupo pequeno cabe no free tier do Supabase (500 MB DB, ~200 conexões Realtime, 500 K invocações de Edge Function/mês, 1 GB Storage). Sem custo novo além do que já existe (Cloudflare Pages e R2, dentro da cota, são grátis).

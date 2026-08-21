@@ -75,6 +75,10 @@ Deno.serve(async (req) => {
 
 # Parte 1 — Cloudflare R2 (Storage/egress)
 
+**✅ Concluído** pro áudio (obrigatório neste guia) — cada passo abaixo marca "Já implementado"
+onde aplicável. Imagem de mapa/NPC/ficha **não migrou** (decisão consciente, ver tabela de
+prioridade abaixo — "não vale a pena"), continua no Supabase Storage.
+
 ## Por quê
 
 O bucket único `midia` do Supabase (`supabase/migrations/0008_midia.sql`) hospeda hoje áudio
@@ -326,6 +330,8 @@ bundle:
 
 # Parte 2 — Freesound no soundpad
 
+**✅ Concluído** — cada passo abaixo marca "Já implementado" onde aplicável.
+
 ## Por quê
 
 O soundpad (`src/features/midia/SoundpadGrid.tsx`, grade de 6 slots) só aceita upload manual de
@@ -489,6 +495,11 @@ resposta `{ path, url }` → `definirSomSoundpad(slot, nome, path, url)` → fec
 ---
 
 # Parte 3 — Site: GitHub Pages → Cloudflare Pages
+
+**✅ Concluído.** `deploy.yml` já publica no Cloudflare Pages (`estatica-stc.pages.dev`),
+`vite.config.ts` já está em `base: '/'`. Resto desta seção fica como registro de como foi feito
+(útil se precisar redigitar num projeto novo, ex.: o ambiente de dev isolado do ROADMAP.md) —
+os trechos "hoje é X" abaixo descrevem o estado ANTES desta migração, não o atual.
 
 ## Por quê
 
