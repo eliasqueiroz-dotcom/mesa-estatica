@@ -12,6 +12,7 @@ import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { usarAcaoNpc } from '../../rules/npcAcoes';
 
 const EMPTY_CONDICOES: string[] = [];
+const EMPTY_DURACAO: Record<string, number> = {};
 
 interface Props {
   tipo: 'pc' | 'npc';
@@ -94,7 +95,9 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
   const iniciativa = useStore((s) => s.iniciativa);
   const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[id] ?? EMPTY_CONDICOES);
+  const condicaoDuracao = useStore((s) => s.sessaoPublica.condicaoDuracao?.[id] ?? EMPTY_DURACAO);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
+  const definirDuracaoCondicao = useStore((s) => s.definirDuracaoCondicao);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
@@ -330,15 +333,40 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
             <div className="combate-condicoes">
               {CONDICOES_COMBATE.map((c) => {
                 const ligada = condicoesAtivas.includes(c.id);
+                const rodadasRestantes = condicaoDuracao[c.id];
                 return (
-                  <button
-                    key={c.id}
-                    className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
-                    title={c.efeito}
-                    onClick={() => alternarCondicaoCombate(id, c.id)}
-                  >
-                    {c.nome}
-                  </button>
+                  <div key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                    <button
+                      className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                      title={rodadasRestantes !== undefined ? `${c.efeito} (${rodadasRestantes} rodada${rodadasRestantes === 1 ? '' : 's'} restante${rodadasRestantes === 1 ? '' : 's'})` : c.efeito}
+                      onClick={() => alternarCondicaoCombate(id, c.id)}
+                    >
+                      {c.nome}
+                      {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
+                    </button>
+                    {ligada && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.05rem' }}>
+                        {rodadasRestantes !== undefined && (
+                          <button
+                            className="icone-botao"
+                            title="reduzir duração — 0 volta a manual/persistente (sem prazo)"
+                            onClick={() => definirDuracaoCondicao(id, c.id, rodadasRestantes - 1)}
+                            style={{ fontSize: 11, padding: '0.05em 0.3em' }}
+                          >
+                            −
+                          </button>
+                        )}
+                        <button
+                          className="icone-botao"
+                          title="duração em rodadas — desliga sozinha quando chegar a 0 no fim do turno dela (mesmo mecanismo de Aguardando)"
+                          onClick={() => definirDuracaoCondicao(id, c.id, (rodadasRestantes ?? 0) + 1)}
+                          style={{ fontSize: 11, padding: '0.05em 0.3em' }}
+                        >
+                          +
+                        </button>
+                      </span>
+                    )}
+                  </div>
                 );
               })}
             </div>

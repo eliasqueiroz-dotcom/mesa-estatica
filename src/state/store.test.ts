@@ -305,6 +305,55 @@ describe('undefined em arrays aninhados', () => {
   });
 });
 
+// ===== definirDuracaoCondicao (UI genérica de duração no rastreador/token) =====
+describe('definirDuracaoCondicao', () => {
+  it('define a duração de uma condição pra um participante', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 3);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao).toEqual({ 'pc-1': { exposto: 3 } });
+  });
+
+  it('sobrescreve a duração já existente (clicar "+" de novo)', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 1);
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 2);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1'].exposto).toBe(2);
+  });
+
+  it('rodadas <= 0 remove a entrada — volta a manual/persistente, sem prazo', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 1);
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 0);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1']?.exposto).toBeUndefined();
+  });
+
+  it('rodadas null remove a entrada, mesmo comportamento de 0', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 2);
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', null);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1']?.exposto).toBeUndefined();
+  });
+
+  it('remove a última duração de um participante limpa o participante do mapa inteiro', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 1);
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 0);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1']).toBeUndefined();
+  });
+
+  it('duas condições diferentes no mesmo participante coexistem', () => {
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 2);
+    useStore.getState().definirDuracaoCondicao('pc-1', 'caido', 1);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1']).toEqual({ exposto: 2, caido: 1 });
+
+    useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 0);
+    expect(useStore.getState().sessaoPublica.condicaoDuracao?.['pc-1']).toEqual({ caido: 1 });
+  });
+
+  it('condicaoDuracao undefined não quebra', () => {
+    useStore.setState((s) => ({
+      sessaoPublica: { ...s.sessaoPublica, condicaoDuracao: undefined as any },
+    }));
+    expect(() => useStore.getState().definirDuracaoCondicao('pc-1', 'exposto', 1)).not.toThrow();
+    expect(useStore.getState().sessaoPublica.condicaoDuracao).toEqual({ 'pc-1': { exposto: 1 } });
+  });
+});
+
 // ===== importarJSON =====
 describe('importarJSON', () => {
   beforeEach(() => {

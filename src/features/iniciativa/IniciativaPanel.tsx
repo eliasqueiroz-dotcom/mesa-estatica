@@ -219,7 +219,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     title={podeAdiar ? 'adiar — vai pro fim da ordem desta rodada' : undefined}
                     style={{
                       padding: '0.1em 0.3em', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                      visibility: podeAdiar ? 'visible' : 'hidden', border: podeAdiar ? undefined : 'none',
+                      // `undefined` (não 'visible') quando podeAdiar: um valor explícito aqui
+                      // teria especificidade de inline style e VENCERIA o `visibility: hidden`
+                      // da aba inteira quando o mestre troca de aba com o combate aberto (era
+                      // o bug — a seta "adiar" continuava aparecendo por cima de outras abas).
+                      // Deixando undefined, herda normalmente do ancestral (aba ativa = visível,
+                      // aba escondida = escondido); só força 'hidden' quando !podeAdiar mesmo.
+                      visibility: podeAdiar ? undefined : 'hidden', border: podeAdiar ? undefined : 'none',
                     }}
                   >
                     <IconeAdiar />
@@ -353,15 +359,38 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           const ligada = ativas.includes(c.id);
                           const rodadasRestantes = duracoes[c.id];
                           return (
-                            <button
-                              key={c.id}
-                              className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
-                              title={rodadasRestantes !== undefined ? `${c.efeito} (${rodadasRestantes} rodada${rodadasRestantes === 1 ? '' : 's'} restante${rodadasRestantes === 1 ? '' : 's'})` : c.efeito}
-                              onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
-                            >
-                              {c.nome}
-                              {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
-                            </button>
+                            <div key={c.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                              <button
+                                className={`combate-chip${ligada ? ' combate-chip--ativa' : ''}`}
+                                title={rodadasRestantes !== undefined ? `${c.efeito} (${rodadasRestantes} rodada${rodadasRestantes === 1 ? '' : 's'} restante${rodadasRestantes === 1 ? '' : 's'})` : c.efeito}
+                                onClick={() => alternarCondicaoCombate(e.participanteId, c.id)}
+                              >
+                                {c.nome}
+                                {rodadasRestantes !== undefined && ` (${rodadasRestantes})`}
+                              </button>
+                              {ligada && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.05rem' }}>
+                                  {rodadasRestantes !== undefined && (
+                                    <button
+                                      className="icone-botao"
+                                      title="reduzir duração — 0 volta a manual/persistente (sem prazo)"
+                                      onClick={() => definirDuracaoCondicao(e.participanteId, c.id, rodadasRestantes - 1)}
+                                      style={{ fontSize: 11, padding: '0.05em 0.3em' }}
+                                    >
+                                      −
+                                    </button>
+                                  )}
+                                  <button
+                                    className="icone-botao"
+                                    title="duração em rodadas — desliga sozinha quando chegar a 0 no fim do turno dela (mesmo mecanismo de Aguardando)"
+                                    onClick={() => definirDuracaoCondicao(e.participanteId, c.id, (rodadasRestantes ?? 0) + 1)}
+                                    style={{ fontSize: 11, padding: '0.05em 0.3em' }}
+                                  >
+                                    +
+                                  </button>
+                                </span>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
