@@ -630,37 +630,45 @@ Function até o provedor de IA. Isso é cota de invocação de Edge Function, n�
 diferente do problema de egress que motivou a Parte 1 (imagem/áudio em base64/Storage). Continua
 sem tocar em Supabase Storage em nenhum momento deste fluxo.
 
-Provedor escolhido: [Groq](https://groq.com) — free tier genuinamente gratuito (rate-limited, mas
-de sobra pra um mestre importando fichas ocasionalmente), API compatível com o formato OpenAI
-(`chat/completions`). Trocado a partir do OpenRouter especificamente por velocidade: a Groq roda
-inferência em hardware dedicado (LPU) — o mesmo modelo (`openai/gpt-oss-20b`) sai a ~1000
-tokens/s lá, contra o pool compartilhado e mais lento do free tier da OpenRouter.
+Provedores: **Groq** como primário e **OpenRouter** como fallback — se a Groq falhar (secret
+ausente, rate limit, fora do ar), a function cai pro OpenRouter automaticamente, sem o mestre
+precisar fazer nada. Os dois são free tier genuinamente gratuito e expõem API compatível com o
+formato OpenAI (`chat/completions`), então a lógica de chamada é a mesma pros dois — só muda
+URL/chave/modelo. Groq como primário especificamente por velocidade: roda inferência em hardware
+dedicado (LPU) — o mesmo modelo (`openai/gpt-oss-20b`) sai a ~1000 tokens/s lá, contra o pool
+compartilhado e mais lento do free tier da OpenRouter.
 
-## Passo 1 — criar conta e chave na Groq
+## Passo 1 — criar conta e chave nos dois provedores
 
+**Groq** (primário):
 1. Crie uma conta em [console.groq.com](https://console.groq.com) (grátis).
 2. Gere uma API key em `console.groq.com/keys`.
 3. Confira o catálogo de modelos em `console.groq.com/docs/models` — o line-up pode mudar com o
    tempo, por isso o modelo é configurável por secret (Passo 2) em vez de fixo no código.
 
+**OpenRouter** (fallback):
+1. Crie uma conta em [openrouter.ai](https://openrouter.ai) (grátis).
+2. Gere uma API key em `openrouter.ai/keys`.
+3. Confira o catálogo de modelos gratuitos em `openrouter.ai/models?max_price=0` (id termina em
+   `:free`) — também configurável por secret.
+
+Nenhum dos dois é obrigatório pra function funcionar — se só um secret estiver configurado, ela
+usa só aquele provedor; se nenhum estiver, devolve erro sugerindo o fluxo manual (ver Passo 3).
+
 ## Passo 2 — guardar como secrets do Supabase
 
 ```powershell
 npx.cmd supabase secrets set GROQ_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+npx.cmd supabase secrets set OPENROUTER_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-`GROQ_MODEL` é opcional (default `openai/gpt-oss-20b` no código) — só sete se quiser trocar o
-modelo sem reeditar/redeployar a function:
+`GROQ_MODEL` (default `openai/gpt-oss-20b`) e `OPENROUTER_MODEL` (default `openai/gpt-oss-20b:free`)
+são opcionais — só sete se quiser trocar o modelo de algum dos dois sem reeditar/redeployar a
+function:
 
 ```powershell
 npx.cmd supabase secrets set GROQ_MODEL=algum-outro-modelo
-```
-
-Se a Parte 4 já tinha sido configurada com OpenRouter antes, o secret antigo pode ser removido
-depois de confirmar que a Groq está funcionando (opcional, não obrigatório):
-
-```powershell
-npx.cmd supabase secrets unset OPENROUTER_API_KEY
+npx.cmd supabase secrets set OPENROUTER_MODEL=algum-outro-modelo:free
 ```
 
 ## Passo 3 — Edge Function `converter-ficha-docx`
@@ -668,9 +676,10 @@ npx.cmd supabase secrets unset OPENROUTER_API_KEY
 Mesmo padrão Deno/`esm.sh`/CORS/checagem de GM das outras functions deste guia (mensagem do check
 de GM: `'só o mestre importa ficha por IA'`). Corpo `{ prompt: string }` — o cliente já manda o
 prompt inteiro (schema + instruções + texto do `.docx`, montado por `montarPrompt()` em
-`ImportarPersonagemBotao.tsx`); a function é um relay burro que só segura a chave e repassa pra
-Groq, devolvendo `{ texto: <resposta da IA> }`. Quem valida/casa os campos contra as tabelas
-do jogo continua sendo `importarFichasDeJSON` no cliente — mesma lógica testada do fluxo manual.
+`ImportarPersonagemBotao.tsx`); a function tenta os provedores da lista `provedores()` em ordem
+(Groq, depois OpenRouter) até um devolver texto, e só devolve erro pro cliente se os dois
+falharem. Quem valida/casa os campos contra as tabelas do jogo continua sendo
+`importarFichasDeJSON` no cliente — mesma lógica testada do fluxo manual.
 
 **Código já implementado**: [`supabase/functions/converter-ficha-docx/index.ts`](../../supabase/functions/converter-ficha-docx/index.ts).
 

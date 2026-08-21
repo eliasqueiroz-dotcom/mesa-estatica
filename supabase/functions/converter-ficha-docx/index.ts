@@ -1,15 +1,17 @@
 // Edge Function `converter-ficha-docx` (.claude/docs/storage-r2.md Parte 4)
 //
-// Relay burro pra Groq: recebe o prompt já pronto (schema + instruções + texto extraído do
+// Relay burro pra IA: recebe o prompt já pronto (schema + instruções + texto extraído do
 // .docx, tudo montado no cliente por `montarPrompt()`), chama a IA gratuita com a chave escondida
 // aqui e devolve o texto da resposta puro — quem valida/casa contra as tabelas do jogo é o
 // `importarFichasDeJSON` no cliente, igual ao fluxo manual de colar JSON. O .docx em si nunca
 // passa por aqui nem pelo Supabase Storage — só o texto extraído (pequeno), que é cota de
 // invocação de function, não egress de Storage.
 //
-// Groq em vez de OpenRouter: mesmo modelo (`openai/gpt-oss-20b`), mas rodando em hardware
-// dedicado à velocidade (LPU) — ~1000 tokens/s documentado, bem mais rápido que o pool
-// compartilhado de free tier da OpenRouter. API compatível com o formato OpenAI, ainda gratuito.
+// Groq como primário, OpenRouter como fallback: mesmo modelo (`openai/gpt-oss-20b`) nos dois,
+// mas a Groq roda em hardware dedicado a velocidade (LPU) — ~1000 tokens/s documentado, contra o
+// pool compartilhado e mais lento do free tier da OpenRouter. Se a Groq falhar (rate limit, fora
+// do ar, sem secret configurado), cai pro OpenRouter em vez de devolver erro na hora — mesma API
+// compatível com o formato OpenAI nos dois, então é só trocar URL/chave/modelo.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -21,13 +23,52 @@ const corsHeaders = {
 const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-// modelo padrão na Groq — catálogo/nomes podem mudar com o tempo (confira o atual em
-// console.groq.com/docs/models), por isso dá pra sobrescrever via secret GROQ_MODEL sem precisar
-// reeditar/redeployar o código.
-const MODELO_PADRAO = 'openai/gpt-oss-20b';
+interface Provedor {
+  nome: string;
+  url: string;
+  apiKey: string | undefined;
+  modelo: string;
+}
 
-interface Body {
-  prompt?: string;
+// catálogo/nomes de modelo podem mudar com o tempo em qualquer um dos dois provedores — confira o
+// atual em console.groq.com/docs/models e openrouter.ai/api/v1/models (free: filtrar id ":free").
+// Por isso GROQ_MODEL/OPENROUTER_MODEL sobrescrevem sem precisar reeditar/redeployar o código.
+function provedores(): Provedor[] {
+  return [
+    {
+      nome: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: Deno.env.get('GROQ_API_KEY'),
+      modelo: Deno.env.get('GROQ_MODEL') || 'openai/gpt-oss-20b',
+    },
+    {
+      nome: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: Deno.env.get('OPENROUTER_API_KEY'),
+      modelo: Deno.env.get('OPENROUTER_MODEL') || 'openai/gpt-oss-20b:free',
+    },
+  ];
+}
+
+async function tentarProvedor(p: Provedor, prompt: string): Promise<{ texto: string } | { erro: string }> {
+  if (!p.apiKey) return { erro: `${p.nome} sem chave configurada` };
+
+  let resposta: Response;
+  try {
+    resposta = await fetch(p.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${p.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: p.modelo, messages: [{ role: 'user', content: prompt }], temperature: 0.2 }),
+    });
+  } catch {
+    return { erro: `falha de rede ao chamar ${p.nome}` };
+  }
+  if (!resposta.ok) return { erro: `${p.nome} respondeu com erro (${resposta.status})` };
+
+  const dados = await resposta.json();
+  const texto = dados?.choices?.[0]?.message?.content;
+  if (typeof texto !== 'string' || !texto.trim()) return { erro: `${p.nome} não devolveu texto` };
+  return { texto };
 }
 
 Deno.serve(async (req) => {
@@ -48,7 +89,7 @@ Deno.serve(async (req) => {
   const { data: mestre } = await admin.from('mestres').select('auth_uid').eq('auth_uid', userData.user.id).maybeSingle();
   if (!mestre) return jsonResponse({ erro: 'só o mestre importa ficha por IA' }, 403);
 
-  let body: Body;
+  let body: { prompt?: string };
   try {
     body = await req.json();
   } catch {
@@ -56,37 +97,11 @@ Deno.serve(async (req) => {
   }
   if (!body.prompt?.trim()) return jsonResponse({ erro: 'prompt ausente' }, 400);
 
-  const apiKey = Deno.env.get('GROQ_API_KEY');
-  if (!apiKey) return jsonResponse({ erro: 'importação por IA não configurada neste servidor' }, 501);
-  const modelo = Deno.env.get('GROQ_MODEL') || MODELO_PADRAO;
-
-  let resposta: Response;
-  try {
-    resposta = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: modelo,
-        messages: [{ role: 'user', content: body.prompt }],
-        temperature: 0.2,
-      }),
-    });
-  } catch {
-    return jsonResponse({ erro: 'falha de rede ao chamar a IA — tenta de novo ou usa o fluxo manual' }, 502);
+  for (const p of provedores()) {
+    const resultado = await tentarProvedor(p, body.prompt);
+    if ('texto' in resultado) return jsonResponse({ texto: resultado.texto }, 200);
+    console.error(`[converter-ficha-docx] ${resultado.erro}`);
   }
 
-  if (resposta.status === 429) {
-    return jsonResponse({ erro: 'IA gratuita ocupada agora — tenta de novo em instantes ou usa o fluxo manual' }, 429);
-  }
-  if (!resposta.ok) {
-    return jsonResponse({ erro: `IA respondeu com erro (${resposta.status}) — tenta de novo ou usa o fluxo manual` }, 502);
-  }
-
-  const dados = await resposta.json();
-  const texto = dados?.choices?.[0]?.message?.content;
-  if (typeof texto !== 'string' || !texto.trim()) {
-    return jsonResponse({ erro: 'IA não devolveu texto — tenta de novo ou usa o fluxo manual' }, 502);
-  }
-
-  return jsonResponse({ texto }, 200);
+  return jsonResponse({ erro: 'IA gratuita indisponível agora (Groq e OpenRouter falharam) — tenta de novo em instantes ou usa o fluxo manual' }, 502);
 });
