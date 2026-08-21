@@ -103,6 +103,31 @@ export function iniciarSyncIniciativa(): () => void {
 
   const agendarPush = criarDebouncePorChave<EntradaIniciativa[]>(ATRASO_PUSH_MS, (_chave, entradas) => executarPush(entradas));
 
+  // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts/mapaPublicoSync.ts) —
+  // sem isso, uma sessão sem `localStorage` prévio pra essa origem (máquina nova, domínio
+  // trocado — ver invariantes do ROADMAP.md) mostra a ordem de turno vazia mesmo com combate
+  // em andamento no Supabase, até a próxima rolagem/reordenação recriar o array do zero. Só
+  // aplica se `iniciativa` local ainda estiver vazia quando a resposta chegar — se o mestre já
+  // rolou/mexeu nesse meio-tempo, a edição local vence (mesmo princípio de nunca sobrescrever
+  // uma mudança em voo).
+  cliente
+    .from('iniciativa')
+    .select('*')
+    .order('posicao', { ascending: true })
+    .then(({ data, error }) => {
+      if (error || !data || data.length === 0) return;
+      if (useStore.getState().iniciativa.length > 0) return;
+      const linhas = data as LinhaIniciativa[];
+      for (const linha of linhas) posicoesConhecidas.set(linha.id, linha.posicao);
+      aplicandoRemotoContagem++;
+      try {
+        useStore.setState({ iniciativa: linhas.map(paraEntrada) });
+      } finally {
+        iniciativaAnterior = useStore.getState().iniciativa;
+        aplicandoRemotoContagem--;
+      }
+    });
+
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0 || state.iniciativa === prevState.iniciativa) return;
     agendarPush(CHAVE_PUSH, state.iniciativa);
