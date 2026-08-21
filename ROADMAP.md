@@ -58,11 +58,11 @@ O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, 
 - ~~**Aviso visível sem Supabase em produção**~~ — `AvisoSupabaseAusente.tsx`, banner vermelho só quando `import.meta.env.PROD && !supabase` (nunca aparece em dev local sem `.env`, que é uso válido). Testado com build real sem as env vars.
 - ~~**Auditoria de reuso de token em `vincular-jogador`**~~ — tabela `vinculo_jogador_log` (migração 0023) registra auth_uid anterior → novo a cada vínculo bem-sucedido, sem bloquear (revincular é comportamento válido). Só leitura do mestre; sem UI ainda, é consulta direta no banco.
 
-### Fase 3 — nice to have (parcial, 05/08)
+### Fase 3 — nice to have (concluída em 21/08)
 
 - ~~**ESLint no CI**~~ — `eslint.config.js` novo (flat config, ESLint 10 + typescript-eslint). Só `src/**` (mesmo escopo do `tsconfig.json`); `react-hooks` restrito às regras clássicas (`rules-of-hooks`/`exhaustive-deps`) — o `recommended` do plugin v7 vem com o pacote de regras do React Compiler (purity, refs, set-state-in-effect) que acusa padrões intencionais já usados no projeto (ex.: `ref.current = valor` direto no render em `TokenScene.tsx`) como erro. `no-unused-vars` desligado (o `tsc --strict` já cobre). Gate novo em `deploy.yml`, antes do build. 0 erros, 18 avisos de `react-refresh` (HMR only, não bloqueiam).
 - ~~**`404.html`/`robots.txt`**~~ — página 404 com a identidade visual do app (`public/404.html`, self-contained, sem CDN) + `robots.txt` com `Disallow: /`. Também `<meta name="robots" content="noindex, nofollow">` em `index.html`/`jogador.html` — é o que realmente vale pra um site num subpath (`/mesa-estatica/robots.txt` não é o local padrão que crawlers verificam; a spec do protocolo só olha a raiz do domínio).
-- **Detecção de offline + fila de pendências** — não priorizado por enquanto (é o maior item, mexe nos ~11 módulos de sync); fica registrado pra quando fizer sentido.
+- ~~**Detecção de offline + fila de pendências**~~ — `multiplayer/filaPendencias.ts` (registrar/resolver pendência por módulo+chave, retry automático no evento `online` e na reconexão de canal, persistência só de metadados) + `online` em `lib/statusMesa.ts` + spans novos no `StatusIndicador`. Todos os 15 módulos de sync com tabela/broadcast persistível cobertos (21/08): diff por id (`tokensSync`, `fichasSync`, `npcsSync`, `midiaFaixasSync`, `soundpadSync` — por slot), singleton (`fowSync`, `mapaPublicoSync`, `midiaEstadoSync`, `sessaoPublicaSync`), broadcast puro só no envio garantido de fim de gesto (`reguasSync`, `aoeSync` — `canal.send` não devolve erro observável, gatilho é `online===false` no momento do envio), array inteiro sem re-leitura da store no retry (`iniciativaSync` — motivo: `iniciativaAnterior` já avança de forma otimista antes do resultado do push, reler a store no retry veria um diff vazio; boot faz best-effort upsert-only, sem recuperar delete perdido através de reload) e insert-only por id (`logRollsSync` — log/rollsLog, incluindo `visibilidade` de rolls). `pingSync`/`rolagemAoVivoSync` ficam de fora de propósito (dado descartável, atrasar por reconexão é ruído). `npm test` (584), `npm run lint`, `tsc --noEmit` e `npm run build` verdes. **Não testado**: wifi real desligado com dois clientes de verdade — só simulação de evento `online`/`offline` no DevTools.
 
 ### Ideias sem prioridade
 
@@ -76,7 +76,7 @@ Quatro frentes levantadas em 06/08, depois da caça a bugs. O levantamento técn
 
 Rolagem de jogador transmite pro resto da mesa via broadcast (`dados`, migração 0030) — bandeja própria sempre montada no header (`RolagemAoVivoPlayer.tsx`), cor/nome de quem rolou, aba "Dados" acende se quem vê estiver em outra aba. Rolagem do mestre nunca é transmitida (sigilo por bundle, não checagem em runtime).
 
-**Pendente**: migração 0030 precisa ser aplicada no Supabase de produção — só testado localmente, roundtrip real entre dois clientes ainda não verificado ao vivo.
+**Confirmado em 21/08**: migração 0030 já estava aplicada em produção (`supabase migration list --linked`, `local` = `remote` até 0033). Roundtrip real entre dois clientes não foi testado ao vivo, mas segue o mesmo padrão de policy de 0025 (régua/AoE) e 0029 (ping), ambas já validadas em produção.
 
 ### 2. Ambiente de desenvolvimento isolado da mesa oficial — **só depois de 29/08**
 

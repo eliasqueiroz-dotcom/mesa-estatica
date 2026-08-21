@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import PlayerApp from '../app/PlayerApp';
 import ErrorBoundary from '../app/ErrorBoundary';
 import { instalarHandlerGlobalDeErro } from '../lib/globalErrorHandler';
+import { instalarDetectorConectividade } from '../lib/statusMesa';
+import { instalarRetentativaAutomatica } from '../multiplayer/filaPendencias';
 import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/barlow/400.css';
@@ -20,6 +22,8 @@ import '../styles/fow.css';
 // puxa nada exclusivo de mestre. `ErrorBoundary` é compartilhado (só usa `useStore`), seguro
 // nos dois bundles.
 instalarHandlerGlobalDeErro();
+instalarDetectorConectividade();
+instalarRetentativaAutomatica();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -3,8 +3,17 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { computarDiffFaixas } from './midiaFaixasDiff';
 import { eraRemocaoExplicita } from './remocaoExplicita';
+
+const PREFIXO_DELETE = 'delete:';
+
+/** Mesmo padrão de `resolverReplayToken` em `tokensSync.ts`. */
+export function resolverReplayFaixa(chave: string, faixas: FaixaMidia[]): FaixaMidia | 'apagar' | null {
+  if (chave.startsWith(PREFIXO_DELETE)) return 'apagar';
+  return faixas.find((f) => f.id === chave) ?? null;
+}
 
 /** Reordenar/adicionar/remover não é um arrasto contínuo — mesmo valor de fichas/npcs, não
  *  precisa do 150ms mais curto de `tokensSync.ts`. */
@@ -68,12 +77,9 @@ export function iniciarSyncMidiaFaixas(): () => void {
 
   const agendarUpsert = criarDebouncePorChave<FaixaMidia>(ATRASO_PUSH_MS, (_id, faixa) => {
     pendencias.delete(_id);
-    cliente
-      .from('midia_faixas')
-      .upsert(paraLinha(faixa))
-      .then(({ error }) => {
-        if (error) console.error('[midiaFaixasSync] upsert falhou', error);
-      });
+    executarComRetentativa('midia-faixas-sync', faixa.id, () =>
+      cliente.from('midia_faixas').upsert(paraLinha(useStore.getState().midia.faixas.find((f) => f.id === faixa.id) ?? faixa)),
+    );
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -90,15 +96,22 @@ export function iniciarSyncMidiaFaixas(): () => void {
     // remocaoExplicita.ts.
     for (const id of removidos) {
       if (!eraRemocaoExplicita(id)) continue;
-      cliente
-        .from('midia_faixas')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('[midiaFaixasSync] delete falhou', error);
-        });
+      executarComRetentativa('midia-faixas-sync', `${PREFIXO_DELETE}${id}`, () => cliente.from('midia_faixas').delete().eq('id', id));
     }
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior — relê a store ATUAL.
+  for (const chave of retomarPendenciasPersistidas('midia-faixas-sync')) {
+    const replay = resolverReplayFaixa(chave, useStore.getState().midia.faixas);
+    if (replay === 'apagar') {
+      const id = chave.slice(PREFIXO_DELETE.length);
+      executarComRetentativa('midia-faixas-sync', chave, () => cliente.from('midia_faixas').delete().eq('id', id));
+    } else if (replay) {
+      executarComRetentativa('midia-faixas-sync', chave, () => cliente.from('midia_faixas').upsert(paraLinha(replay)));
+    } else {
+      resolverPendencia('midia-faixas-sync', chave);
+    }
+  }
 
   const canal = cliente
     .channel('midia-faixas-sync')

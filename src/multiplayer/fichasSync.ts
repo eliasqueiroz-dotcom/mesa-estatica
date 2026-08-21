@@ -6,8 +6,18 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
+
+const PREFIXO_DELETE = 'delete:';
+
+/** Dado uma chave pendente (id de ficha, ou `delete:${id}`) e as fichas locais atuais, decide
+ *  o que reenviar — mesmo padrão de `resolverReplayToken` em `tokensSync.ts`. */
+export function resolverReplayFicha(chave: string, fichas: Ficha[]): Ficha | 'apagar' | null {
+  if (chave.startsWith(PREFIXO_DELETE)) return 'apagar';
+  return fichas.find((f) => f.id === chave) ?? null;
+}
 
 const ATRASO_PUSH_MS = 500;
 
@@ -178,8 +188,8 @@ export function iniciarSyncFichas(): () => void {
 
   const agendarPush = criarDebouncePorChave<Ficha>(ATRASO_PUSH_MS, (_id, ficha) => {
     pendencias.delete(_id);
-    empurrarFicha(cliente, ficha).catch((e) =>
-      console.error('[fichasSync] push falhou', e?.message, e?.details, e?.hint, e?.code),
+    executarComRetentativa('fichas-sync', ficha.id, () =>
+      empurrarFicha(cliente, useStore.getState().fichas.find((f) => f.id === ficha.id) ?? ficha).then(() => ({ error: null })),
     );
   });
 
@@ -201,24 +211,34 @@ export function iniciarSyncFichas(): () => void {
       // remocaoExplicita.ts. Sumir da lista local por qualquer outro motivo (aba
       // desatualizada, etc.) nunca deve virar DELETE pra todo mundo.
       if (!idsAtuais.has(idAntigo) && eraRemocaoExplicita(idAntigo)) {
-        cliente
-          .from('characters_publico')
-          .delete()
-          .eq('id', idAntigo)
-          .then(({ error }) => {
-            if (error) console.error('[fichasSync] delete publico falhou', error);
-          });
-        cliente
-          .from('characters_privado')
-          .delete()
-          .eq('id', idAntigo)
-          .then(({ error }) => {
-            if (error) console.error('[fichasSync] delete privado falhou', error);
-          });
+        executarComRetentativa('fichas-sync', `${PREFIXO_DELETE}${idAntigo}`, () =>
+          Promise.all([
+            cliente.from('characters_publico').delete().eq('id', idAntigo),
+            cliente.from('characters_privado').delete().eq('id', idAntigo),
+          ]).then(([rPublico, rPrivado]) => ({ error: rPublico.error ?? rPrivado.error ?? null })),
+        );
       }
     }
     fichasAnteriores = state.fichas;
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior — relê a store ATUAL.
+  for (const chave of retomarPendenciasPersistidas('fichas-sync')) {
+    const replay = resolverReplayFicha(chave, useStore.getState().fichas);
+    if (replay === 'apagar') {
+      const id = chave.slice(PREFIXO_DELETE.length);
+      executarComRetentativa('fichas-sync', chave, () =>
+        Promise.all([
+          cliente.from('characters_publico').delete().eq('id', id),
+          cliente.from('characters_privado').delete().eq('id', id),
+        ]).then(([rPublico, rPrivado]) => ({ error: rPublico.error ?? rPrivado.error ?? null })),
+      );
+    } else if (replay) {
+      executarComRetentativa('fichas-sync', chave, () => empurrarFicha(cliente, replay).then(() => ({ error: null })));
+    } else {
+      resolverPendencia('fichas-sync', chave);
+    }
+  }
 
   const aplicarRemoto = async (id: string) => {
     aplicandoRemotoContagem++;

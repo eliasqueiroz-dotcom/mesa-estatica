@@ -1,7 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial, criarNpcVazio } from '../state/factories';
 import { useStore } from '../state/store';
-import { paraLinhaPublico, paraNpcPublico, paraNpcSemNotasMestre } from './npcsSync';
+import { paraLinhaPublico, paraNpcPublico, paraNpcSemNotasMestre, resolverReplayNpc } from './npcsSync';
+
+describe('resolverReplayNpc', () => {
+  it('chave normal (id de npc) que ainda existe localmente devolve o npc pra reenviar', () => {
+    const npc = { ...criarNpcVazio(), nome: 'Guarda 1' };
+    expect(resolverReplayNpc(npc.id, [npc])).toEqual(npc);
+  });
+
+  it('chave normal que não existe mais localmente devolve null', () => {
+    expect(resolverReplayNpc('sumiu', [criarNpcVazio()])).toBeNull();
+  });
+
+  it('chave "delete:<id>" sempre devolve \'apagar\'', () => {
+    expect(resolverReplayNpc('delete:x', [criarNpcVazio()])).toBe('apagar');
+    expect(resolverReplayNpc('delete:x', [])).toBe('apagar');
+  });
+});
 
 describe('paraLinhaPublico / paraNpcSemNotasMestre', () => {
   it('round-trip preserva os campos públicos do NPC', () => {

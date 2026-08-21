@@ -207,7 +207,6 @@ export default function SoundpadGrid() {
                       <button
                         className="acento"
                         onClick={() => {
-                          console.debug('[soundpad-debug] clique', { slot, tocando, em: new Date().toISOString() });
                           if (tocando) pararSoundpad(slot);
                           else dispararSoundpad(slot);
                         }}

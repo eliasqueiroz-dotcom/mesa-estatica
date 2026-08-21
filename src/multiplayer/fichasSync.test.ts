@@ -1,7 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial, criarFichaVazia } from '../state/factories';
 import { useStore } from '../state/store';
-import { paraFichaPublica, paraLinhaPublico } from './fichasSync';
+import { paraFichaPublica, paraLinhaPublico, resolverReplayFicha } from './fichasSync';
+
+describe('resolverReplayFicha', () => {
+  it('chave normal (id de ficha) que ainda existe localmente devolve a ficha pra reenviar', () => {
+    const ficha = { ...criarFichaVazia(), nome: 'Helena' };
+    expect(resolverReplayFicha(ficha.id, [ficha])).toEqual(ficha);
+  });
+
+  it('chave normal que não existe mais localmente devolve null', () => {
+    expect(resolverReplayFicha('sumiu', [criarFichaVazia()])).toBeNull();
+  });
+
+  it('chave "delete:<id>" sempre devolve \'apagar\'', () => {
+    expect(resolverReplayFicha('delete:x', [criarFichaVazia()])).toBe('apagar');
+    expect(resolverReplayFicha('delete:x', [])).toBe('apagar');
+  });
+});
 
 describe('paraLinhaPublico / paraFichaPublica', () => {
   it('round-trip preserva id/nome/corVisual/foto (o que FichaPublica cobre)', () => {

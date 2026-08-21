@@ -1,4 +1,5 @@
 import { limparErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
+import { usePendenciasDetalhe } from '../multiplayer/filaPendencias';
 
 /**
  * Substitui o "● registrado" estático que sempre dizia "salvo", mesmo quando a gravação
@@ -6,16 +7,20 @@ import { limparErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/st
  * a sincronização com os jogadores estava caída — o mestre só descobria ao vivo, quando um
  * jogador reclamava que não via nada atualizado.
  *
- * Três sinais independentes: `local` (localStorage deste navegador — sempre relevante, mesmo
- * 100% offline), `sync` (Realtime com os jogadores — só existe com Supabase configurado) e
+ * Cinco sinais independentes: `local` (localStorage deste navegador — sempre relevante, mesmo
+ * 100% offline), `sync` (Realtime com os jogadores — só existe com Supabase configurado),
  * `erroRuntime` (algo quebrou fora do ciclo de render — `globalErrorHandler.ts` — sem passar
- * pelo Error Boundary; só aparece quando existe, clique reconhece e some).
+ * pelo Error Boundary; só aparece quando existe, clique reconhece e some), `online`
+ * (`navigator.onLine` — pode cair antes de qualquer canal reportar erro) e pendências de
+ * reenvio (`filaPendencias.ts` — pushes que falharam e aguardam a conexão voltar).
  */
 export default function StatusIndicador() {
   const local = useStatusMesa((s) => s.local);
   const sync = useStatusMesa(statusSincronizacao);
   const canaisComErro = useStatusMesa((s) => s.canaisComErro);
   const erroRuntime = useStatusMesa((s) => s.erroRuntime);
+  const online = useStatusMesa((s) => s.online);
+  const pendencias = usePendenciasDetalhe();
 
   const corLocal = local === 'ok' ? 'var(--rede)' : 'var(--ruido)';
   const textoLocal = local === 'ok' ? '● registrado' : '⚠ não salvou local';
@@ -53,6 +58,19 @@ export default function StatusIndicador() {
           title={`${erroRuntime} — clique pra dispensar`}
         >
           ⚠ erro inesperado
+        </span>
+      )}
+      {!online && (
+        <span style={{ color: 'var(--ruido)' }} title="sem internet — a mesa continua funcionando só nesta tela">
+          ⚠ offline
+        </span>
+      )}
+      {pendencias.length > 0 && (
+        <span
+          style={{ color: 'var(--ruido)' }}
+          title={`aguardando reconexão pra reenviar: ${pendencias.map((p) => `${p.modulo}:${p.chave}`).join(', ')}`}
+        >
+          ⏳ {pendencias.length} pendente{pendencias.length > 1 ? 's' : ''}
         </span>
       )}
     </span>

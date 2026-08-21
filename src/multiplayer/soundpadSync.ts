@@ -3,7 +3,18 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
+
+const PREFIXO_DELETE = 'delete:';
+const CHAVE_ESTADO = 'estado';
+
+/** Diff por SLOT (não por id) — mesmo motivo de `computarDiffSons`: substituir o som de um
+ *  botão troca o id, mas o slot continua sendo a chave estável pra decidir o que reenviar. */
+export function resolverReplaySom(chave: string, sons: SomSoundpad[]): SomSoundpad | 'apagar' | null {
+  if (chave.startsWith(PREFIXO_DELETE)) return 'apagar';
+  return sons.find((s) => String(s.slot) === chave) ?? null;
+}
 
 const ATRASO_PUSH_MS = 500;
 
@@ -120,12 +131,11 @@ export function iniciarSyncSoundpad(): () => void {
 
   const agendarUpsert = criarDebouncePorChave<SomSoundpad>(ATRASO_PUSH_MS, (_chave, som) => {
     pendencias.delete(_chave);
-    cliente
-      .from('soundpad_sons')
-      .upsert(paraLinha(som), { onConflict: 'slot' })
-      .then(({ error }) => {
-        if (error) console.error('[soundpadSync] upsert de som falhou', error);
-      });
+    executarComRetentativa('soundpad-sync', String(som.slot), () =>
+      cliente
+        .from('soundpad_sons')
+        .upsert(paraLinha(useStore.getState().soundpad.sons.find((s) => s.slot === som.slot) ?? som), { onConflict: 'slot' }),
+    );
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -142,13 +152,9 @@ export function iniciarSyncSoundpad(): () => void {
         // mesma trava de `fichasSync`: só apaga se o × da UI marcou de propósito, nunca por
         // inferência de diff (uma aba de mestre desatualizada apagaria o slot de todos).
         if (!eraRemocaoExplicita(som.id)) continue;
-        cliente
-          .from('soundpad_sons')
-          .delete()
-          .eq('slot', som.slot)
-          .then(({ error }) => {
-            if (error) console.error('[soundpadSync] delete de som falhou', error);
-          });
+        executarComRetentativa('soundpad-sync', `${PREFIXO_DELETE}${som.slot}`, () =>
+          cliente.from('soundpad_sons').delete().eq('slot', som.slot),
+        );
       }
     }
 
@@ -156,24 +162,44 @@ export function iniciarSyncSoundpad(): () => void {
     const disparoMudou = state.soundpad.ultimoDisparo !== prevState.soundpad.ultimoDisparo;
     if (volumeMudou || disparoMudou) {
       if (disparoMudou) disparoEmVoo = true;
-      console.debug('[soundpad-debug] upsert de estado enviado', {
-        disparoMudou,
-        ultimoDisparo: state.soundpad.ultimoDisparo,
-      });
-      cliente
-        .from('soundpad_estado')
-        .upsert({
+      executarComRetentativa('soundpad-sync', CHAVE_ESTADO, () => {
+        const atual = useStore.getState().soundpad;
+        return cliente.from('soundpad_estado').upsert({
           id: 'soundpad',
-          volume: state.soundpad.volume,
-          disparo_slot: state.soundpad.ultimoDisparo?.slot ?? null,
-          disparo_em: state.soundpad.ultimoDisparo?.em ?? null,
-          disparo_tipo: state.soundpad.ultimoDisparo?.tipo ?? 'tocar',
-        })
-        .then(({ error }) => {
-          if (error) console.error('[soundpadSync] upsert de estado falhou', error);
+          volume: atual.volume,
+          disparo_slot: atual.ultimoDisparo?.slot ?? null,
+          disparo_em: atual.ultimoDisparo?.em ?? null,
+          disparo_tipo: atual.ultimoDisparo?.tipo ?? 'tocar',
         });
+      });
     }
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior — relê a store ATUAL.
+  for (const chave of retomarPendenciasPersistidas('soundpad-sync')) {
+    if (chave === CHAVE_ESTADO) {
+      executarComRetentativa('soundpad-sync', CHAVE_ESTADO, () => {
+        const atual = useStore.getState().soundpad;
+        return cliente.from('soundpad_estado').upsert({
+          id: 'soundpad',
+          volume: atual.volume,
+          disparo_slot: atual.ultimoDisparo?.slot ?? null,
+          disparo_em: atual.ultimoDisparo?.em ?? null,
+          disparo_tipo: atual.ultimoDisparo?.tipo ?? 'tocar',
+        });
+      });
+      continue;
+    }
+    const replay = resolverReplaySom(chave, useStore.getState().soundpad.sons);
+    if (replay === 'apagar') {
+      const slot = Number(chave.slice(PREFIXO_DELETE.length));
+      executarComRetentativa('soundpad-sync', chave, () => cliente.from('soundpad_sons').delete().eq('slot', slot));
+    } else if (replay) {
+      executarComRetentativa('soundpad-sync', chave, () => cliente.from('soundpad_sons').upsert(paraLinha(replay), { onConflict: 'slot' }));
+    } else {
+      resolverPendencia('soundpad-sync', chave);
+    }
+  }
 
   const canal = cliente
     .channel('soundpad-sync')
@@ -202,7 +228,6 @@ export function iniciarSyncSoundpad(): () => void {
       // reaplicar `ultimoDisparo` aqui só repetiria o efeito.
       const eraNossoProprioEco = disparoEmVoo;
       disparoEmVoo = false;
-      console.debug('[soundpad-debug] eco de soundpad_estado recebido', { linha, eraNossoProprioEco });
       aplicandoRemoto = true;
       try {
         useStore.setState((s) => ({

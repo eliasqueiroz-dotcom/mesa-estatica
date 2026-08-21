@@ -6,6 +6,8 @@ import { consumirForcados } from '../dice/forcarRolagem';
 import { registrarConsumidorForcados } from '../dice/registroForcados';
 import ControlPanel from '../features/controle/ControlPanel';
 import { instalarHandlerGlobalDeErro } from '../lib/globalErrorHandler';
+import { instalarDetectorConectividade } from '../lib/statusMesa';
+import { instalarRetentativaAutomatica } from '../multiplayer/filaPendencias';
 import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/barlow/400.css';
@@ -29,6 +31,8 @@ const ehControle = window.location.hash === '#controle';
 registrarConsumidorForcados(consumirForcados);
 
 instalarHandlerGlobalDeErro();
+instalarDetectorConectividade();
+instalarRetentativaAutomatica();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import type { GradeMapa } from '../state/types';
 
@@ -49,17 +50,17 @@ export function iniciarSyncMapaPublico(): () => void {
     }
   };
 
-  const agendarPush = criarDebouncePorChave<{ imagemDataUrl: string | null; grade: GradeMapa }>(ATRASO_PUSH_MS, (_chave, valor) => {
-    // `imagemDataUrl` ainda em base64 (upload pro Storage em voo) nunca vai pro
-    // Postgres/Realtime — ver imagemPendente.ts. Omite a coluna (upsert preserva o valor
-    // remoto anterior); a próxima mudança, quando o upload virar URL, sincroniza de verdade.
-    const pendente = ehDataUrl(valor.imagemDataUrl);
-    cliente
-      .from('mapa_publico')
-      .upsert({ id: ID_MAPA, ...(pendente ? {} : { imagem_data_url: valor.imagemDataUrl }), grade: valor.grade })
-      .then(({ error }) => {
-        if (error) console.error('[mapaPublicoSync] push falhou', error);
-      });
+  // `imagemDataUrl` ainda em base64 (upload pro Storage em voo) nunca vai pro Postgres/Realtime
+  // — ver imagemPendente.ts. Omite a coluna (upsert preserva o valor remoto anterior); a
+  // próxima mudança, quando o upload virar URL, sincroniza de verdade.
+  const push = () => {
+    const { imagemDataUrl, grade } = useStore.getState().mapa;
+    const pendente = ehDataUrl(imagemDataUrl);
+    return cliente.from('mapa_publico').upsert({ id: ID_MAPA, ...(pendente ? {} : { imagem_data_url: imagemDataUrl }), grade });
+  };
+
+  const agendarPush = criarDebouncePorChave<{ imagemDataUrl: string | null; grade: GradeMapa }>(ATRASO_PUSH_MS, () => {
+    executarComRetentativa('mapa-publico-sync', ID_MAPA, push);
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -67,6 +68,11 @@ export function iniciarSyncMapaPublico(): () => void {
     if (state.mapa.imagemDataUrl === prevState.mapa.imagemDataUrl && state.mapa.grade === prevState.mapa.grade) return;
     agendarPush(ID_MAPA, { imagemDataUrl: state.mapa.imagemDataUrl, grade: state.mapa.grade });
   });
+
+  // reenvia se ficou pendente de uma sessão anterior — singleton, chave sempre ID_MAPA.
+  if (retomarPendenciasPersistidas('mapa-publico-sync').length > 0) {
+    executarComRetentativa('mapa-publico-sync', ID_MAPA, push);
+  }
 
   // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts) — sem linha ainda é no-op.
   cliente

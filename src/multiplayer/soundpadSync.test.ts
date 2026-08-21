@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computarDiffSons, paraLinha, paraSom } from './soundpadSync';
+import { computarDiffSons, paraLinha, paraSom, resolverReplaySom } from './soundpadSync';
 
 const som = (slot: number, nome: string, extra?: Partial<{ id: string; path: string; url: string }>) => ({
   id: extra?.id ?? `id-${slot}`,
@@ -56,5 +56,21 @@ describe('computarDiffSons', () => {
     const { upserts, removidos } = computarDiffSons(antes, depois);
     expect(upserts.map((s) => s.slot)).toEqual([1]);
     expect(removidos).toEqual([]);
+  });
+});
+
+describe('resolverReplaySom', () => {
+  it('chave normal (slot como string) que ainda existe localmente devolve o som pra reenviar', () => {
+    const s = som(2, 'porta');
+    expect(resolverReplaySom('2', [s])).toEqual(s);
+  });
+
+  it('chave normal que não existe mais localmente (slot esvaziado) devolve null', () => {
+    expect(resolverReplaySom('9', [som(2, 'porta')])).toBeNull();
+  });
+
+  it('chave "delete:<slot>" sempre devolve \'apagar\'', () => {
+    expect(resolverReplaySom('delete:4', [som(4, 'grito')])).toBe('apagar');
+    expect(resolverReplaySom('delete:4', [])).toBe('apagar');
   });
 });

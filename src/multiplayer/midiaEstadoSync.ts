@@ -3,6 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EstadoMidia, ModoLoopMidia } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -60,13 +61,15 @@ export function iniciarSyncMidiaEstado(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
-  const agendarPush = criarDebouncePorChave<PatchEstadoMidia>(ATRASO_PUSH_MS, (_chave, midia) => {
-    cliente
+  const push = () => {
+    const { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume } = useStore.getState().midia;
+    return cliente
       .from('midia_estado')
-      .upsert({ id: ID_MIDIA, ...paraLinha(midia) })
-      .then(({ error }) => {
-        if (error) console.error('[midiaEstadoSync] push falhou', error);
-      });
+      .upsert({ id: ID_MIDIA, ...paraLinha({ faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume }) });
+  };
+
+  const agendarPush = criarDebouncePorChave<PatchEstadoMidia>(ATRASO_PUSH_MS, () => {
+    executarComRetentativa('midia-estado-sync', ID_MIDIA, push);
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -84,6 +87,11 @@ export function iniciarSyncMidiaEstado(): () => void {
     }
     agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume });
   });
+
+  // reenvia se ficou pendente de uma sessão anterior — singleton, chave sempre ID_MIDIA.
+  if (retomarPendenciasPersistidas('midia-estado-sync').length > 0) {
+    executarComRetentativa('midia-estado-sync', ID_MIDIA, push);
+  }
 
   const aplicarLinha = (linha: Linha) => {
     aplicandoRemotoContagem++;

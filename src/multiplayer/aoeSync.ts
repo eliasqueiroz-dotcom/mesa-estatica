@@ -1,8 +1,9 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanal, desconectarCanal, useStatusMesa } from '../lib/statusMesa';
 import { useAoeStore, type AoeVivo } from '../state/aoeStore';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehAoeVivo } from './validarPayload';
 
 /** Mesmo valor de `reguasSync.ts` — é feedback ao vivo de um desenho em andamento. */
@@ -62,6 +63,19 @@ export function iniciarSyncAoE(): () => void {
   };
   const agendarEnvio = criarDebouncePorChave<AoeVivo>(ATRASO_PUSH_MS, enviarAgora);
 
+  // Mesmo remédio de `reguasSync.ts`: `canal.send` com `ack:false` não devolve erro
+  // observável — o gatilho de "falhou" é `online === false` no momento do envio. Só o envio
+  // GARANTIDO de fim de desenho entra na fila; o template arrastado ao vivo (`agendarEnvio`)
+  // atrasado por reconexão é ruído, não dado a preservar.
+  const enviarFinalComRetentativa = () => {
+    executarComRetentativa('aoe', CHAVE_DEBOUNCE, () => {
+      if (!useStatusMesa.getState().online) return Promise.resolve({ error: 'offline' });
+      const atual = useAoeStore.getState().template;
+      if (atual && !atual.ativa) void canal.send({ type: 'broadcast', event: 'aoe-template', payload: { template: atual } });
+      return Promise.resolve({ error: null });
+    });
+  };
+
   let templateAnterior = useAoeStore.getState().template;
   const unsubscribeLocal = useAoeStore.subscribe((state) => {
     if (aplicandoRemoto || state.template === templateAnterior) return;
@@ -77,8 +91,14 @@ export function iniciarSyncAoE(): () => void {
     // ainda arrastando: junta a rajada de pointermove numa escrita só. Soltou o ponteiro
     // (ativa:false): envio garantido na hora.
     if (state.template.ativa) agendarEnvio(CHAVE_DEBOUNCE, state.template);
-    else enviarAgora(CHAVE_DEBOUNCE, state.template);
+    else enviarFinalComRetentativa();
   });
+
+  // reenvia um template finalizado que ficou pendente de uma sessão anterior — só se ainda
+  // existir localmente e continuar `ativa: false` (senão a chave é só resolvida).
+  if (retomarPendenciasPersistidas('aoe').length > 0) {
+    enviarFinalComRetentativa();
+  }
 
   return () => {
     unsubscribeLocal();

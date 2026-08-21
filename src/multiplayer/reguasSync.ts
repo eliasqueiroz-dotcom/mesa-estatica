@@ -1,8 +1,9 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanal, desconectarCanal, useStatusMesa } from '../lib/statusMesa';
 import { useReguasStore, type ReguaViva } from '../state/reguasStore';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehReguaViva } from './validarPayload';
 
 /** Mais curto que o de tokens (`tokensSync.ts` usa 150ms) — a régua é feedback ao vivo de uma
@@ -71,6 +72,21 @@ export function iniciarSyncReguas(): () => void {
   };
   const agendarEnvio = criarDebouncePorChave<ReguaViva>(ATRASO_PUSH_MS, enviarAgora);
 
+  // `canal.send` com `ack:false` não devolve erro observável — o gatilho de "falhou" aqui é
+  // `online === false` no momento do envio, não a resposta do `send`. Só o envio GARANTIDO de
+  // fim de medição entra na fila: uma posição ao vivo (`agendarEnvio`, acima) atrasada por
+  // reconexão é ruído de alguns segundos atrás, não dado a preservar.
+  const enviarFinalComRetentativa = (id: string) => {
+    executarComRetentativa('reguas', id, () => {
+      if (!useStatusMesa.getState().online) return Promise.resolve({ error: 'offline' });
+      // relê a store: se a régua já não existe mais, ou voltou a ficar ativa (nova medição
+      // começou), não há o que reenviar — sucesso trivial, não é falha.
+      const atual = useReguasStore.getState().reguas[id];
+      if (atual && !atual.ativa) void canal.send({ type: 'broadcast', event: 'regua', payload: { regua: atual } });
+      return Promise.resolve({ error: null });
+    });
+  };
+
   let reguasAnteriores = useReguasStore.getState().reguas;
   const unsubscribeLocal = useReguasStore.subscribe((state) => {
     if (aplicandoRemoto || state.reguas === reguasAnteriores) return;
@@ -83,9 +99,16 @@ export function iniciarSyncReguas(): () => void {
       // tokensSync.ts). Finalizada (pointerup, ativa:false): envio garantido, fora do throttle
       // — sem isso, a última posição pode ficar pendurada se o throttle nunca disparar.
       if (regua.ativa) agendarEnvio(id, regua);
-      else enviarAgora(id, regua);
+      else enviarFinalComRetentativa(id);
     }
   });
+
+  // reenvia réguas finalizadas que ficaram pendentes de uma sessão anterior — só se ainda
+  // existirem localmente e continuarem `ativa: false` (senão a chave é só resolvida, sem
+  // reenviar nada).
+  for (const id of retomarPendenciasPersistidas('reguas')) {
+    enviarFinalComRetentativa(id);
+  }
 
   return () => {
     unsubscribeLocal();

@@ -3,6 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { SessaoPublica } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -99,14 +100,11 @@ export function iniciarSyncSessaoPublica(): () => void {
   let aplicandoRemotoContagem = 0;
   const pendente = { valor: false };
 
-  const agendarPush = criarDebouncePorChave<SessaoPublica>(ATRASO_PUSH_MS, (_chave, sessaoPublica) => {
+  const push = () => cliente.from('sessao_publica').upsert({ id: ID_SESSAO, ...paraLinha(useStore.getState().sessaoPublica) });
+
+  const agendarPush = criarDebouncePorChave<SessaoPublica>(ATRASO_PUSH_MS, () => {
     pendente.valor = false;
-    cliente
-      .from('sessao_publica')
-      .upsert({ id: ID_SESSAO, ...paraLinha(sessaoPublica) })
-      .then(({ error }) => {
-        if (error) console.error('[sessaoPublicaSync] push falhou', error);
-      });
+    executarComRetentativa('sessao-publica-sync', ID_SESSAO, push);
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -146,6 +144,11 @@ export function iniciarSyncSessaoPublica(): () => void {
   // sem localStorage prévio pra essa origem só vê a sessão pública a partir da próxima
   // mudança. Sem linha ainda (nunca sincronizado) é no-op — não pisa no default local.
   void aplicarRemoto();
+
+  // reenvia se ficou pendente de uma sessão anterior — singleton, chave sempre ID_SESSAO.
+  if (retomarPendenciasPersistidas('sessao-publica-sync').length > 0) {
+    executarComRetentativa('sessao-publica-sync', ID_SESSAO, push);
+  }
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('sessao-publica-sync')

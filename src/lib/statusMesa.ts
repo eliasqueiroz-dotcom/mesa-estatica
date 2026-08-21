@@ -15,6 +15,11 @@ interface StatusMesaState {
    *  callback/timer) — não passa pelo Error Boundary, que só pega erro de render. Mensagem
    *  crua, só pra dar contexto no tooltip; `null` = nada pendente. */
   erroRuntime: string | null;
+  /** `navigator.onLine` — sinal independente dos canais Realtime: um canal pode estar com
+   *  erro por motivo alheio (policy faltando, RLS) mesmo com internet normal, e o browser
+   *  pode saber que caiu a rede antes de qualquer canal reportar erro. `instalarDetectorConectividade`
+   *  mantém isso em dia; sem chamar, fica sempre `true` (assume online). */
+  online: boolean;
 }
 
 /** Store efêmero, fora do `persist` de propósito — é sinal de runtime (gravou agora? o
@@ -25,7 +30,17 @@ export const useStatusMesa = create<StatusMesaState>(() => ({
   canaisConectados: new Set(),
   canaisComErro: new Set(),
   erroRuntime: null,
+  online: typeof navigator === 'undefined' || navigator.onLine,
 }));
+
+/** Chamar uma vez no boot de cada bundle, ao lado de `instalarHandlerGlobalDeErro()` — mesmo
+ *  padrão (`typeof window === 'undefined'` é a saída deliberada em ambiente de teste Node
+ *  puro, sem jsdom, mesmo raciocínio de `criarStorageComDebounce`/`globalErrorHandler.ts`). */
+export function instalarDetectorConectividade(): void {
+  if (typeof window === 'undefined') return;
+  window.addEventListener('online', () => useStatusMesa.setState({ online: true }));
+  window.addEventListener('offline', () => useStatusMesa.setState({ online: false }));
+}
 
 export function marcarLocalOk(): void {
   if (useStatusMesa.getState().local !== 'ok') useStatusMesa.setState({ local: 'ok' });

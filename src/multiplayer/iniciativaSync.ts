@@ -3,6 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EntradaIniciativa } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 
 /** Mesmo valor de `fichasSync.ts`/`npcsSync.ts` — junta a rajada de reordenar/rolar/remover
  *  numa escrita só, em vez de um upsert do array inteiro a cada mudança individual. */
@@ -75,30 +76,25 @@ export function iniciarSyncIniciativa(): () => void {
   const ordenarPorPosicao = (entradas: EntradaIniciativa[]): EntradaIniciativa[] =>
     [...entradas].sort((a, b) => (posicoesConhecidas.get(a.id) ?? 0) - (posicoesConhecidas.get(b.id) ?? 0));
 
+  // Push do array INTEIRO (upsert de todos + delete dos que sumiram), não por id — a chave da
+  // fila de pendências é sempre CHAVE_PUSH, uma única pendência por vez (mesma chave do
+  // debounce). Diferente dos outros módulos: aqui NÃO relemos a store atual no retry — o
+  // `entradas`/`idsRemovidos` já é a versão mais recente no momento em que o push falhou
+  // (`iniciativaAnterior` avança de forma otimista logo abaixo, antes de saber se o push deu
+  // certo), então reler a store no retry compararia contra um `iniciativaAnterior` que já
+  // avançou e devolveria um diff vazio — perderia exatamente a operação que falhou.
   const executarPush = (entradas: EntradaIniciativa[]) => {
-    const linhas = entradas.map(paraLinha);
-    if (linhas.length > 0) {
-      cliente
-        .from('iniciativa')
-        .upsert(linhas)
-        .then(({ error }) => {
-          if (error) console.error('[iniciativaSync] upsert falhou', error.message, error.code);
-        });
-    }
-
     const idsAtuais = new Set(entradas.map((e) => e.id));
     const idsRemovidos = iniciativaAnterior.filter((e) => !idsAtuais.has(e.id)).map((e) => e.id);
-    if (idsRemovidos.length > 0) {
-      cliente
-        .from('iniciativa')
-        .delete()
-        .in('id', idsRemovidos)
-        .then(({ error }) => {
-          if (error) console.error('[iniciativaSync] delete falhou', error.message, error.code);
-        });
-    }
-
     iniciativaAnterior = entradas;
+
+    executarComRetentativa('iniciativa-sync', CHAVE_PUSH, () => {
+      const linhas = entradas.map(paraLinha);
+      const upsertP = linhas.length > 0 ? cliente.from('iniciativa').upsert(linhas) : Promise.resolve({ error: null });
+      const deleteP =
+        idsRemovidos.length > 0 ? cliente.from('iniciativa').delete().in('id', idsRemovidos) : Promise.resolve({ error: null });
+      return Promise.all([upsertP, deleteP]).then(([rUpsert, rDelete]) => ({ error: rUpsert.error ?? rDelete.error ?? null }));
+    });
   };
 
   const agendarPush = criarDebouncePorChave<EntradaIniciativa[]>(ATRASO_PUSH_MS, (_chave, entradas) => executarPush(entradas));
@@ -132,6 +128,19 @@ export function iniciarSyncIniciativa(): () => void {
     if (aplicandoRemotoContagem > 0 || state.iniciativa === prevState.iniciativa) return;
     agendarPush(CHAVE_PUSH, state.iniciativa);
   });
+
+  // reenvia se ficou pendente de uma sessão anterior — reload perde o closure de
+  // `idsRemovidos` acima, então aqui é melhor esforço: reenvia a array ATUAL inteira como
+  // upsert (cobre edições/criações não confirmadas). Uma remoção que não chegou a propagar
+  // antes do reload fica como limitação conhecida — caso raro (offline + remover combatente +
+  // fechar a aba antes de reconectar), não vale a complexidade de rastrear delete através de
+  // reload pra esse módulo.
+  if (retomarPendenciasPersistidas('iniciativa-sync').length > 0) {
+    executarComRetentativa('iniciativa-sync', CHAVE_PUSH, () => {
+      const linhas = useStore.getState().iniciativa.map(paraLinha);
+      return linhas.length > 0 ? cliente.from('iniciativa').upsert(linhas) : Promise.resolve({ error: null });
+    });
+  }
 
   const aplicarRemoto = (payload: { eventType: string; new: object; old: object }) => {
     aplicandoRemotoContagem++;

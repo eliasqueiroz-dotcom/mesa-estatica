@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EstadoFoW, RegiaoFoW, ZonaFoW } from '../state/types';
+import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -90,13 +91,18 @@ export function iniciarSyncFoW(): () => void {
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0) return;
     if (state.mapa.fow === prevState.mapa.fow) return;
-    void cliente
-      .from('fow_estado')
-      .upsert({ id: ID_FOW, ...paraLinha(state.mapa.fow) })
-      .then(({ error }) => {
-        if (error) console.error('[fowSync] push falhou', error);
-      });
+    executarComRetentativa('fow-sync', ID_FOW, () =>
+      cliente.from('fow_estado').upsert({ id: ID_FOW, ...paraLinha(useStore.getState().mapa.fow) }),
+    );
   });
+
+  // reenvia se ficou pendente de uma sessão anterior — singleton, então a única chave
+  // possível é ID_FOW; relê a store ATUAL, não um payload congelado.
+  if (retomarPendenciasPersistidas('fow-sync').length > 0) {
+    executarComRetentativa('fow-sync', ID_FOW, () =>
+      cliente.from('fow_estado').upsert({ id: ID_FOW, ...paraLinha(useStore.getState().mapa.fow) }),
+    );
+  }
 
   return () => {
     unsubscribeLocal();

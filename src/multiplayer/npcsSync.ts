@@ -3,8 +3,17 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
+
+const PREFIXO_DELETE = 'delete:';
+
+/** Mesmo padrão de `resolverReplayFicha` em `fichasSync.ts`. */
+export function resolverReplayNpc(chave: string, npcs: Npc[]): Npc | 'apagar' | null {
+  if (chave.startsWith(PREFIXO_DELETE)) return 'apagar';
+  return npcs.find((n) => n.id === chave) ?? null;
+}
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -156,7 +165,9 @@ export function iniciarSyncNpcs(): () => void {
 
   const agendarPush = criarDebouncePorChave<Npc>(ATRASO_PUSH_MS, (_id, npc) => {
     pendencias.delete(_id);
-    empurrarNpc(cliente, npc).catch((e) => console.error('[npcsSync] push falhou', e));
+    executarComRetentativa('npcs-sync', npc.id, () =>
+      empurrarNpc(cliente, useStore.getState().npcs.find((n) => n.id === npc.id) ?? npc).then(() => ({ error: null })),
+    );
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -176,24 +187,34 @@ export function iniciarSyncNpcs(): () => void {
       // só apaga no servidor se o botão "remover" marcou esse id de propósito — ver
       // remocaoExplicita.ts.
       if (!idsAtuais.has(idAntigo) && eraRemocaoExplicita(idAntigo)) {
-        cliente
-          .from('npcs_publico')
-          .delete()
-          .eq('id', idAntigo)
-          .then(({ error }) => {
-            if (error) console.error('[npcsSync] delete publico falhou', error);
-          });
-        cliente
-          .from('npcs_privado')
-          .delete()
-          .eq('id', idAntigo)
-          .then(({ error }) => {
-            if (error) console.error('[npcsSync] delete privado falhou', error);
-          });
+        executarComRetentativa('npcs-sync', `${PREFIXO_DELETE}${idAntigo}`, () =>
+          Promise.all([
+            cliente.from('npcs_publico').delete().eq('id', idAntigo),
+            cliente.from('npcs_privado').delete().eq('id', idAntigo),
+          ]).then(([rPublico, rPrivado]) => ({ error: rPublico.error ?? rPrivado.error ?? null })),
+        );
       }
     }
     npcsAnteriores = state.npcs;
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior — relê a store ATUAL.
+  for (const chave of retomarPendenciasPersistidas('npcs-sync')) {
+    const replay = resolverReplayNpc(chave, useStore.getState().npcs);
+    if (replay === 'apagar') {
+      const id = chave.slice(PREFIXO_DELETE.length);
+      executarComRetentativa('npcs-sync', chave, () =>
+        Promise.all([
+          cliente.from('npcs_publico').delete().eq('id', id),
+          cliente.from('npcs_privado').delete().eq('id', id),
+        ]).then(([rPublico, rPrivado]) => ({ error: rPublico.error ?? rPrivado.error ?? null })),
+      );
+    } else if (replay) {
+      executarComRetentativa('npcs-sync', chave, () => empurrarNpc(cliente, replay).then(() => ({ error: null })));
+    } else {
+      resolverPendencia('npcs-sync', chave);
+    }
+  }
 
   const aplicarRemoto = async (id: string) => {
     aplicandoRemotoContagem++;

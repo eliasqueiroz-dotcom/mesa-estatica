@@ -2,6 +2,12 @@ import type { EntradaLog, EntradaRoll, TipoLog } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+
+const PREFIXO_LOG = 'log:';
+const PREFIXO_ROLL_INSERT = 'roll-insert:';
+const PREFIXO_ROLL_VISIBILIDADE = 'roll-visibilidade:';
+const CHAVE_LOG_CLEAR = 'log-clear';
 
 interface LinhaLog {
   id: string;
@@ -117,23 +123,12 @@ export function iniciarSyncLogRolls(): () => void {
       if (state.log.length === 0 && logAnterior.length > 0) {
         // limparLog — apaga tudo no servidor também (delete sem filtro exige uma condição
         // sempre-verdadeira no PostgREST).
-        cliente
-          .from('log_publico')
-          .delete()
-          .not('id', 'is', null)
-          .then(({ error }) => {
-            if (error) console.error('[logRollsSync] limpar log falhou', error);
-          });
+        executarComRetentativa('log-rolls-sync', CHAVE_LOG_CLEAR, () => cliente.from('log_publico').delete().not('id', 'is', null));
       } else {
         const idsAnteriores = new Set(logAnterior.map((e) => e.id));
         for (const entrada of state.log) {
           if (!idsAnteriores.has(entrada.id)) {
-            cliente
-              .from('log_publico')
-              .insert(paraLinhaLog(entrada))
-              .then(({ error }) => {
-                if (error) console.error('[logRollsSync] push de log falhou', error);
-              });
+            executarComRetentativa('log-rolls-sync', `${PREFIXO_LOG}${entrada.id}`, () => cliente.from('log_publico').insert(paraLinhaLog(entrada)));
           }
         }
       }
@@ -145,25 +140,50 @@ export function iniciarSyncLogRolls(): () => void {
       for (const roll of state.rollsLog) {
         const anterior = anterioresPorId.get(roll.id);
         if (!anterior) {
-          cliente
-            .from('rolls_publicas')
-            .insert(paraLinhaRoll(roll))
-            .then(({ error }) => {
-              if (error) console.error('[logRollsSync] push de rolagem falhou', error);
-            });
+          executarComRetentativa('log-rolls-sync', `${PREFIXO_ROLL_INSERT}${roll.id}`, () => cliente.from('rolls_publicas').insert(paraLinhaRoll(roll)));
         } else if (anterior.visibilidade !== roll.visibilidade) {
-          cliente
-            .from('rolls_publicas')
-            .update({ visibilidade: roll.visibilidade })
-            .eq('id', roll.id)
-            .then(({ error }) => {
-              if (error) console.error('[logRollsSync] revelar rolagem falhou', error);
-            });
+          executarComRetentativa('log-rolls-sync', `${PREFIXO_ROLL_VISIBILIDADE}${roll.id}`, () =>
+            cliente
+              .from('rolls_publicas')
+              .update({ visibilidade: useStore.getState().rollsLog.find((r) => r.id === roll.id)?.visibilidade ?? roll.visibilidade })
+              .eq('id', roll.id),
+          );
         }
       }
       rollsAnterior = state.rollsLog;
     }
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior. `log`/`rollsLog` são efetivamente
+  // append-only (uma entrada não é editada depois de criada, salvo a visibilidade de rolls) —
+  // então "reler a store" aqui significa achar a entrada pelo id, não recalcular um diff.
+  for (const chave of retomarPendenciasPersistidas('log-rolls-sync')) {
+    if (chave === CHAVE_LOG_CLEAR) {
+      executarComRetentativa('log-rolls-sync', CHAVE_LOG_CLEAR, () => cliente.from('log_publico').delete().not('id', 'is', null));
+    } else if (chave.startsWith(PREFIXO_LOG)) {
+      const id = chave.slice(PREFIXO_LOG.length);
+      const entrada = useStore.getState().log.find((e) => e.id === id);
+      if (entrada) executarComRetentativa('log-rolls-sync', chave, () => cliente.from('log_publico').insert(paraLinhaLog(entrada)));
+      else resolverPendencia('log-rolls-sync', chave);
+    } else if (chave.startsWith(PREFIXO_ROLL_INSERT)) {
+      const id = chave.slice(PREFIXO_ROLL_INSERT.length);
+      const roll = useStore.getState().rollsLog.find((r) => r.id === id);
+      if (roll) executarComRetentativa('log-rolls-sync', chave, () => cliente.from('rolls_publicas').insert(paraLinhaRoll(roll)));
+      else resolverPendencia('log-rolls-sync', chave);
+    } else if (chave.startsWith(PREFIXO_ROLL_VISIBILIDADE)) {
+      const id = chave.slice(PREFIXO_ROLL_VISIBILIDADE.length);
+      const roll = useStore.getState().rollsLog.find((r) => r.id === id);
+      if (roll) {
+        executarComRetentativa('log-rolls-sync', chave, () =>
+          cliente.from('rolls_publicas').update({ visibilidade: roll.visibilidade }).eq('id', id),
+        );
+      } else {
+        resolverPendencia('log-rolls-sync', chave);
+      }
+    } else {
+      resolverPendencia('log-rolls-sync', chave);
+    }
+  }
 
   const canalLog = cliente
     .channel('log-publico-sync')

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FaixaMidia } from '../state/types';
-import { paraFaixa, paraLinha } from './midiaFaixasSync';
+import { paraFaixa, paraLinha, resolverReplayFaixa } from './midiaFaixasSync';
 
 describe('paraLinha / paraFaixa', () => {
   it('round-trip preserva os campos da faixa', () => {
@@ -23,5 +23,22 @@ describe('paraLinha / paraFaixa', () => {
     });
 
     expect(paraFaixa(linha)).toEqual(faixa);
+  });
+});
+
+describe('resolverReplayFaixa', () => {
+  const faixa: FaixaMidia = { id: 'f1', nome: 'Tema', path: 'midia/tema.mp3', url: 'https://x/tema.mp3', ordem: 0, criadoEm: '2026-07-20T10:00:00.000Z' };
+
+  it('chave normal (id de faixa) que ainda existe localmente devolve a faixa pra reenviar', () => {
+    expect(resolverReplayFaixa('f1', [faixa])).toEqual(faixa);
+  });
+
+  it('chave normal que não existe mais localmente devolve null', () => {
+    expect(resolverReplayFaixa('sumiu', [faixa])).toBeNull();
+  });
+
+  it('chave "delete:<id>" sempre devolve \'apagar\'', () => {
+    expect(resolverReplayFaixa('delete:x', [faixa])).toBe('apagar');
+    expect(resolverReplayFaixa('delete:x', [])).toBe('apagar');
   });
 });

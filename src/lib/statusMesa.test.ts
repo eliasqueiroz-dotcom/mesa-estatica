@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   assinarStatusCanal,
   desconectarCanal,
+  instalarDetectorConectividade,
   limparErroRuntime,
   marcarErroRuntime,
   marcarLocalErro,
@@ -12,7 +13,13 @@ import {
 
 describe('statusMesa', () => {
   beforeEach(() => {
-    useStatusMesa.setState({ local: 'ok', canaisConectados: new Set(), canaisComErro: new Set(), erroRuntime: null });
+    useStatusMesa.setState({
+      local: 'ok',
+      canaisConectados: new Set(),
+      canaisComErro: new Set(),
+      erroRuntime: null,
+      online: true,
+    });
   });
 
   it('começa ok/sem-config', () => {
@@ -73,5 +80,15 @@ describe('statusMesa', () => {
     expect(useStatusMesa.getState().erroRuntime).toBe('Cannot read properties of undefined');
     limparErroRuntime();
     expect(useStatusMesa.getState().erroRuntime).toBeNull();
+  });
+
+  describe('instalarDetectorConectividade', () => {
+    it('não lança mesmo sem `window` de verdade (ambiente de teste)', () => {
+      expect(() => instalarDetectorConectividade()).not.toThrow();
+    });
+
+    it('começa online por padrão', () => {
+      expect(useStatusMesa.getState().online).toBe(true);
+    });
   });
 });

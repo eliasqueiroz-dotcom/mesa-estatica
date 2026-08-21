@@ -3,8 +3,20 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
+import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 import { computarDiffTokens } from './tokensDiff';
+
+const PREFIXO_DELETE = 'delete:';
+
+/** Dado uma chave pendente (id de token, ou `delete:${id}`) e o estado ATUAL da store, decide
+ *  o que reenviar — função pura, testável sem mock de Supabase (mesmo padrão de `paraLinha`).
+ *  `null` = nada a fazer (o token não existe mais localmente e não era uma pendência de
+ *  delete — caso raro, mas não deve ficar reenviando pra sempre). */
+export function resolverReplayToken(chave: string, tokens: TokenMapa[]): TokenMapa | 'apagar' | null {
+  if (chave.startsWith(PREFIXO_DELETE)) return 'apagar';
+  return tokens.find((t) => t.id === chave) ?? null;
+}
 
 /** Mais curto que o de fichas/npcs (`ATRASO_PUSH_MS` em `fichasSync.ts`) — posição de token
  *  no mapa quer parecer "ao vivo" pros outros participantes; ainda assim, junta a rajada de
@@ -84,12 +96,9 @@ export function iniciarSyncTokens(): () => void {
     });
 
   const agendarUpsert = criarDebouncePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
-    cliente
-      .from('tokens')
-      .upsert(paraLinha(token))
-      .then(({ error }) => {
-        if (error) console.error('[tokensSync] upsert falhou', error);
-      });
+    executarComRetentativa('tokens-sync', token.id, () =>
+      cliente.from('tokens').upsert(paraLinha(useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token)),
+    );
   });
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
@@ -103,15 +112,23 @@ export function iniciarSyncTokens(): () => void {
     // remocaoExplicita.ts.
     for (const id of removidos) {
       if (!eraRemocaoExplicita(id)) continue;
-      cliente
-        .from('tokens')
-        .delete()
-        .eq('id', id)
-        .then(({ error }) => {
-          if (error) console.error('[tokensSync] delete falhou', error);
-        });
+      executarComRetentativa('tokens-sync', `${PREFIXO_DELETE}${id}`, () => cliente.from('tokens').delete().eq('id', id));
     }
   });
+
+  // reenvia o que ficou pendente de uma sessão anterior (offline no meio de uma edição, ou
+  // aba fechada antes de reconectar) — relê a store ATUAL, nunca um payload congelado.
+  for (const chave of retomarPendenciasPersistidas('tokens-sync')) {
+    const replay = resolverReplayToken(chave, useStore.getState().mapa.tokens);
+    if (replay === 'apagar') {
+      const id = chave.slice(PREFIXO_DELETE.length);
+      executarComRetentativa('tokens-sync', chave, () => cliente.from('tokens').delete().eq('id', id));
+    } else if (replay) {
+      executarComRetentativa('tokens-sync', chave, () => cliente.from('tokens').upsert(paraLinha(replay)));
+    } else {
+      resolverPendencia('tokens-sync', chave);
+    }
+  }
 
   const canal = cliente
     .channel('tokens-sync')
