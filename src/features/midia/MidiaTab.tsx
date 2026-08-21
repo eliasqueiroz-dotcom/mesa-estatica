@@ -98,7 +98,10 @@ export default function MidiaTab() {
       if (ordenadas.length > 0) selecionar(ordenadas[0].id);
       return;
     }
-    atualizarEstadoMidia({ tocando: !midia.tocando });
+    // manda a posição real junto — sem isso, `atualizadoEm` recarimba e `MidiaPlayerGM`
+    // resincroniza `audio.currentTime` pro `posicaoSegundos` velho (parado desde o último
+    // seek), fazendo a faixa voltar pro início ao pausar.
+    atualizarEstadoMidia({ tocando: !midia.tocando, posicaoSegundos: calcularPosicaoEsperada(midia) });
   };
 
   const ir = (direcao: 'proxima' | 'anterior') => {
