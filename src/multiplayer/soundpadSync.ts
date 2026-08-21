@@ -71,6 +71,12 @@ export function iniciarSyncSoundpad(): () => void {
   let aplicandoRemoto = false;
   let sonsAnteriores = useStore.getState().soundpad.sons;
   const pendencias = new Set<string>();
+  // Mesmo problema do `pendencias` de sons, pro disparo: sem isso, o eco do próprio upsert
+  // volta pelo Realtime e reaplica `ultimoDisparo`, tocando o efeito de novo. Comparar o
+  // carimbo `em` pra reconhecer o próprio eco é frágil (Postgres reformata o timestamptz na
+  // volta), então aqui a gente ignora por flag: enquanto um upsert de disparo nosso está no ar,
+  // qualquer eco que chegar nesse meio tempo é presumido como o nosso mesmo, não um disparo novo.
+  let disparoEmVoo = false;
 
   const aplicar = (fn: (s: ReturnType<typeof useStore.getState>) => void) => {
     aplicandoRemoto = true;
@@ -149,6 +155,7 @@ export function iniciarSyncSoundpad(): () => void {
     const volumeMudou = state.soundpad.volume !== prevState.soundpad.volume;
     const disparoMudou = state.soundpad.ultimoDisparo !== prevState.soundpad.ultimoDisparo;
     if (volumeMudou || disparoMudou) {
+      if (disparoMudou) disparoEmVoo = true;
       cliente
         .from('soundpad_estado')
         .upsert({
@@ -187,16 +194,19 @@ export function iniciarSyncSoundpad(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'soundpad_estado' }, (payload) => {
       const linha = payload.new as LinhaEstadoSoundpad | null;
       if (!linha) return;
+      // Eco do nosso próprio upsert de disparo: já tocou localmente na hora do clique,
+      // reaplicar `ultimoDisparo` aqui só repetiria o efeito.
+      const eraNossoProprioEco = disparoEmVoo;
+      disparoEmVoo = false;
       aplicandoRemoto = true;
       try {
         useStore.setState((s) => ({
           soundpad: {
             ...s.soundpad,
             volume: linha.volume,
-            // quem toca/para é o SoundpadPlayer, que dedupe pelo carimbo `em` — reaplicar o
-            // mesmo valor aqui não repete a ação.
-            ultimoDisparo:
-              linha.disparo_slot !== null && linha.disparo_em
+            ultimoDisparo: eraNossoProprioEco
+              ? s.soundpad.ultimoDisparo
+              : linha.disparo_slot !== null && linha.disparo_em
                 ? { slot: linha.disparo_slot, em: linha.disparo_em, tipo: linha.disparo_tipo ?? 'tocar' }
                 : s.soundpad.ultimoDisparo,
           },
