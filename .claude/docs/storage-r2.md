@@ -630,28 +630,37 @@ Function até o provedor de IA. Isso é cota de invocação de Edge Function, n�
 diferente do problema de egress que motivou a Parte 1 (imagem/áudio em base64/Storage). Continua
 sem tocar em Supabase Storage em nenhum momento deste fluxo.
 
-Provedor escolhido: [OpenRouter](https://openrouter.ai) — free tier com vários modelos `:free`,
-API compatível com o formato OpenAI (`chat/completions`).
+Provedor escolhido: [Groq](https://groq.com) — free tier genuinamente gratuito (rate-limited, mas
+de sobra pra um mestre importando fichas ocasionalmente), API compatível com o formato OpenAI
+(`chat/completions`). Trocado a partir do OpenRouter especificamente por velocidade: a Groq roda
+inferência em hardware dedicado (LPU) — o mesmo modelo (`openai/gpt-oss-20b`) sai a ~1000
+tokens/s lá, contra o pool compartilhado e mais lento do free tier da OpenRouter.
 
-## Passo 1 — criar conta e chave no OpenRouter
+## Passo 1 — criar conta e chave na Groq
 
-1. Crie uma conta em [openrouter.ai](https://openrouter.ai) (grátis).
-2. Gere uma API key em `openrouter.ai/keys`.
-3. Confira o catálogo de modelos gratuitos em `openrouter.ai/models?max_price=0` — o line-up muda
-   com o tempo, por isso o modelo é configurável por secret (Passo 2) em vez de fixo no código.
+1. Crie uma conta em [console.groq.com](https://console.groq.com) (grátis).
+2. Gere uma API key em `console.groq.com/keys`.
+3. Confira o catálogo de modelos em `console.groq.com/docs/models` — o line-up pode mudar com o
+   tempo, por isso o modelo é configurável por secret (Passo 2) em vez de fixo no código.
 
 ## Passo 2 — guardar como secrets do Supabase
 
 ```powershell
-npx.cmd supabase secrets set OPENROUTER_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+npx.cmd supabase secrets set GROQ_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-`OPENROUTER_MODEL` é opcional (default `openai/gpt-oss-20b:free` no código — catálogo free muda
-com o tempo, confira o atual em `openrouter.ai/api/v1/models`) — só sete se quiser trocar o modelo
-sem reeditar/redeployar a function:
+`GROQ_MODEL` é opcional (default `openai/gpt-oss-20b` no código) — só sete se quiser trocar o
+modelo sem reeditar/redeployar a function:
 
 ```powershell
-npx.cmd supabase secrets set OPENROUTER_MODEL=algum-outro-modelo:free
+npx.cmd supabase secrets set GROQ_MODEL=algum-outro-modelo
+```
+
+Se a Parte 4 já tinha sido configurada com OpenRouter antes, o secret antigo pode ser removido
+depois de confirmar que a Groq está funcionando (opcional, não obrigatório):
+
+```powershell
+npx.cmd supabase secrets unset OPENROUTER_API_KEY
 ```
 
 ## Passo 3 — Edge Function `converter-ficha-docx`
@@ -659,8 +668,8 @@ npx.cmd supabase secrets set OPENROUTER_MODEL=algum-outro-modelo:free
 Mesmo padrão Deno/`esm.sh`/CORS/checagem de GM das outras functions deste guia (mensagem do check
 de GM: `'só o mestre importa ficha por IA'`). Corpo `{ prompt: string }` — o cliente já manda o
 prompt inteiro (schema + instruções + texto do `.docx`, montado por `montarPrompt()` em
-`ImportarPersonagemBotao.tsx`); a function é um relay burro que só segura a chave e repassa pro
-OpenRouter, devolvendo `{ texto: <resposta da IA> }`. Quem valida/casa os campos contra as tabelas
+`ImportarPersonagemBotao.tsx`); a function é um relay burro que só segura a chave e repassa pra
+Groq, devolvendo `{ texto: <resposta da IA> }`. Quem valida/casa os campos contra as tabelas
 do jogo continua sendo `importarFichasDeJSON` no cliente — mesma lógica testada do fluxo manual.
 
 **Código já implementado**: [`supabase/functions/converter-ficha-docx/index.ts`](../../supabase/functions/converter-ficha-docx/index.ts).
@@ -676,7 +685,9 @@ do jogo continua sendo `importarFichasDeJSON` no cliente — mesma lógica testa
 
 ## Passo 5 — testar
 
-- Deploy da function: `npx.cmd supabase functions deploy converter-ficha-docx`.
+- Deploy da function: `npx.cmd supabase functions deploy converter-ficha-docx --use-api` (rodar a
+  partir da raiz do projeto; a flag `--use-api` empacota do lado do servidor — necessária se o
+  Docker não estiver rodando localmente).
 - Sem Supabase configurado (`npm run dev` num clone limpo sem `.env`): confirmar que só o fluxo
   manual aparece no modal e que ele funciona como antes.
 - Com Supabase configurado: logado como mestre, subir um `.docx` de exemplo (pode gerar um pelo
