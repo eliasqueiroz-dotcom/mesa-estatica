@@ -6,7 +6,7 @@ import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
-import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import { badgeCondicoes, nomeCondicao } from '../../rules/data/condicoesCombate';
 import AoEOverlay from './AoEOverlay';
 import { comprimirImagem } from '../../lib/comprimirImagem';
 import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
@@ -390,7 +390,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
               title={partesTitulo.join(' — ')}
             >
               <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={36} />
-              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
+              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{badgeCondicoes(t.condicoes)}</span>}
               <span
                 className="mapa-token__remover"
                 role="button"

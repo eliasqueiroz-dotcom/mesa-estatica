@@ -159,21 +159,25 @@
   outline-offset: 3px;
 }
 
-/* Contador de condições de combate ativas — canto inferior-esquerdo, oposto ao × de remover. */
+/* Condições de combate ativas — canto inferior-esquerdo, oposto ao × de remover. Mostra a
+   abreviação (3 letras) da 1ª condição ativa + "+N" se houver mais (badgeCondicoes,
+   condicoesCombate.ts) — um número sozinho não dizia QUAL condição, só quantas; hover no
+   token continua trazendo os nomes completos via `title`. */
 .mapa-token__condicoes {
   position: absolute;
   bottom: -8px;
   left: -8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
-  border-radius: 8px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 4px;
   background: var(--concrete-1);
   border: 1px solid var(--rede-dim);
   color: var(--rede);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 8px;
+  letter-spacing: 0.02em;
   line-height: 1;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { calcularSanidadeMaxima } from '../../rules/derivados';
-import { nomeCondicao } from '../../rules/data/condicoesCombate';
+import { badgeCondicoes, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
@@ -247,7 +247,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
               title={partesTitulo.join(' — ')}
             >
               <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={36} />
-              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{t.condicoes.length}</span>}
+              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{badgeCondicoes(t.condicoes)}</span>}
             </div>
           );
         })}
