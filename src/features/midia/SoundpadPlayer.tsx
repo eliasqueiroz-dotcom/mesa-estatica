@@ -52,7 +52,11 @@ export default function SoundpadPlayer() {
     // exemplo) — mesmo carimbo, string diferente. Comparar string batia igual só na ação
     // local e falhava no eco, tocando o efeito duas vezes (reinicia quando o eco chega).
     const carimbo = new Date(ultimoDisparo.em).getTime();
-    if (carimbo === jaTocado.current) return;
+    if (carimbo === jaTocado.current) {
+      console.debug('[soundpad-debug] efeito ignorado (já tocado)', { ultimoDisparo, carimbo });
+      return;
+    }
+    console.debug('[soundpad-debug] efeito processado', { ultimoDisparo, carimbo, anterior: jaTocado.current });
     jaTocado.current = carimbo;
     const { slot, tipo } = ultimoDisparo;
 
@@ -77,6 +81,7 @@ export default function SoundpadPlayer() {
     audio.addEventListener('ended', encerrar);
     audiosPorSlot.current.set(slot, audio);
     useSoundpadUiStore.getState().marcarTocando(slot);
+    console.debug('[soundpad-debug] audio.play()', { slot, url: som.url });
     audio.play().catch(encerrar);
   }, [ultimoDisparo]);
 

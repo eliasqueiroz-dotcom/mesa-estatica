@@ -206,7 +206,10 @@ export default function SoundpadGrid() {
                     <>
                       <button
                         className="acento"
-                        onClick={() => (tocando ? pararSoundpad(slot) : dispararSoundpad(slot))}
+                        onClick={() => {
+                          console.debug('[soundpad-debug] clique', { slot, tocando, em: new Date().toISOString() });
+                          tocando ? pararSoundpad(slot) : dispararSoundpad(slot);
+                        }}
                         title={tocando ? `parar "${som.nome}"` : `disparar "${som.nome}" pra todos`}
                         style={{
                           flex: 1,

@@ -156,6 +156,10 @@ export function iniciarSyncSoundpad(): () => void {
     const disparoMudou = state.soundpad.ultimoDisparo !== prevState.soundpad.ultimoDisparo;
     if (volumeMudou || disparoMudou) {
       if (disparoMudou) disparoEmVoo = true;
+      console.debug('[soundpad-debug] upsert de estado enviado', {
+        disparoMudou,
+        ultimoDisparo: state.soundpad.ultimoDisparo,
+      });
       cliente
         .from('soundpad_estado')
         .upsert({
@@ -198,6 +202,7 @@ export function iniciarSyncSoundpad(): () => void {
       // reaplicar `ultimoDisparo` aqui só repetiria o efeito.
       const eraNossoProprioEco = disparoEmVoo;
       disparoEmVoo = false;
+      console.debug('[soundpad-debug] eco de soundpad_estado recebido', { linha, eraNossoProprioEco });
       aplicandoRemoto = true;
       try {
         useStore.setState((s) => ({

@@ -1247,16 +1247,24 @@ export const useStore = create<Store>()(
         const atual = get().soundpad.ultimoDisparo;
         if (atual && atual.slot === slot && atual.tipo === 'tocar') {
           const diff = Date.now() - new Date(atual.em).getTime();
-          if (diff < 200) return;
+          if (diff < 200) {
+            console.debug('[soundpad-debug] dispararSoundpad ignorado (debounce 200ms)', { slot, diff });
+            return;
+          }
         }
+        const em = new Date().toISOString();
+        console.debug('[soundpad-debug] dispararSoundpad aplicado', { slot, em });
         set((s) => ({
-          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString(), tipo: 'tocar' } },
+          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em, tipo: 'tocar' } },
         }));
       },
-      pararSoundpad: (slot) =>
+      pararSoundpad: (slot) => {
+        const em = new Date().toISOString();
+        console.debug('[soundpad-debug] pararSoundpad aplicado', { slot, em });
         set((s) => ({
-          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em: new Date().toISOString(), tipo: 'parar' } },
-        })),
+          soundpad: { ...s.soundpad, ultimoDisparo: { slot, em, tipo: 'parar' } },
+        }));
+      },
 
       registrarLog: (tipo, texto, personagemId = null, visibilidade) => {
         const sessaoPublica = get().sessaoPublica;
