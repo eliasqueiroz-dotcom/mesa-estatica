@@ -64,6 +64,7 @@ export default function ImportarPersonagemBotao() {
   const [texto, setTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [convertendo, setConvertendo] = useState(false);
+  const [resultado, setResultado] = useState<string | null>(null);
 
   const copiarPrompt = async () => {
     await navigator.clipboard.writeText(montarPrompt());
@@ -86,10 +87,12 @@ export default function ImportarPersonagemBotao() {
           : `${r.nomeParaExibir}: ${acao}.\n  - ${r.avisos.join('\n  - ')}`,
       );
     }
-    window.alert(`${resultados.length} personagem(ns) processado(s).\n\n${linhas.join('\n\n')}`);
+    // resultado inline em vez de window.alert: dialog nativo pode ficar bloqueado/mudo em
+    // contexto embutido (ex.: sem permissão do site aceita) sem avisar — a ficha já foi
+    // criada/atualizada acima de qualquer forma, então a confirmação não pode depender disso.
+    setResultado(`${resultados.length} personagem(ns) processado(s).\n\n${linhas.join('\n\n')}`);
     setTexto('');
     setErro(null);
-    setStatus('fechado');
   };
 
   const importarDoTexto = () => {
@@ -146,6 +149,7 @@ export default function ImportarPersonagemBotao() {
     setStatus('fechado');
     setTexto('');
     setErro(null);
+    setResultado(null);
   };
 
   useEffect(() => {
@@ -189,46 +193,59 @@ export default function ImportarPersonagemBotao() {
             ×
           </button>
         </div>
-        {supabase && (
+        {resultado ? (
           <>
+            <p className="vazio" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+              {resultado}
+            </p>
+            <button className="acento" onClick={fechar}>
+              fechar
+            </button>
+          </>
+        ) : (
+          <>
+            {supabase && (
+              <>
+                <p className="vazio" style={{ margin: 0 }}>
+                  carregue o .docx do jogador e a IA converte sozinha, sem precisar copiar/colar nada.
+                </p>
+                <label className="mapa-upload-botao acento" style={{ fontSize: '13px', padding: '0.5em 0.8em', opacity: convertendo ? 0.6 : 1 }}>
+                  {convertendo ? 'convertendo…' : 'carregar .docx (IA converte automático)'}
+                  <input type="file" accept=".docx" hidden disabled={convertendo} onChange={importarDeDocx} />
+                </label>
+                <p className="vazio" style={{ margin: 0, fontSize: '12px' }}>
+                  ou, se preferir controlar a IA você mesmo:
+                </p>
+              </>
+            )}
             <p className="vazio" style={{ margin: 0 }}>
-              carregue o .docx do jogador e a IA converte sozinha, sem precisar copiar/colar nada.
+              1. copie o prompt abaixo e mande pra sua IA junto com o .docx do jogador. 2. cole aqui embaixo o JSON que ela devolver (ou
+              carregue como arquivo .json).
+              {!supabase && ' (importação automática por IA precisa de Supabase configurado.)'}
             </p>
-            <label className="mapa-upload-botao acento" style={{ fontSize: '13px', padding: '0.5em 0.8em', opacity: convertendo ? 0.6 : 1 }}>
-              {convertendo ? 'convertendo…' : 'carregar .docx (IA converte automático)'}
-              <input type="file" accept=".docx" hidden disabled={convertendo} onChange={importarDeDocx} />
-            </label>
-            <p className="vazio" style={{ margin: 0, fontSize: '12px' }}>
-              ou, se preferir controlar a IA você mesmo:
-            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={copiarPrompt}>{status === 'copiado' ? 'copiado' : 'copiar prompt pra IA'}</button>
+              <label className="mapa-upload-botao" style={{ fontSize: '13px', padding: '0.5em 0.8em' }}>
+                carregar .json
+                <input type="file" accept=".json,application/json" hidden onChange={importarDeArquivo} />
+              </label>
+            </div>
+            <textarea
+              rows={8}
+              placeholder="cole aqui o JSON que a IA devolveu"
+              value={texto}
+              onChange={(e) => {
+                setTexto(e.target.value);
+                setErro(null);
+              }}
+              style={{ width: '100%' }}
+            />
+            {erro && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erro}</span>}
+            <button className="acento" onClick={importarDoTexto} disabled={!texto.trim()}>
+              importar
+            </button>
           </>
         )}
-        <p className="vazio" style={{ margin: 0 }}>
-          1. copie o prompt abaixo e mande pra sua IA junto com o .docx do jogador. 2. cole aqui embaixo o JSON que ela devolver (ou
-          carregue como arquivo .json).
-          {!supabase && ' (importação automática por IA precisa de Supabase configurado.)'}
-        </p>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={copiarPrompt}>{status === 'copiado' ? 'copiado' : 'copiar prompt pra IA'}</button>
-          <label className="mapa-upload-botao" style={{ fontSize: '13px', padding: '0.5em 0.8em' }}>
-            carregar .json
-            <input type="file" accept=".json,application/json" hidden onChange={importarDeArquivo} />
-          </label>
-        </div>
-        <textarea
-          rows={8}
-          placeholder="cole aqui o JSON que a IA devolveu"
-          value={texto}
-          onChange={(e) => {
-            setTexto(e.target.value);
-            setErro(null);
-          }}
-          style={{ width: '100%' }}
-        />
-        {erro && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erro}</span>}
-        <button className="acento" onClick={importarDoTexto} disabled={!texto.trim()}>
-          importar
-        </button>
       </div>
     </div>
   );
