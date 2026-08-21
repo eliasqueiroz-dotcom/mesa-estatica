@@ -133,7 +133,7 @@ export default function CombatOverlay() {
         onPointerDown={iniciarArrasto}
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: arrastando ? 'grabbing' : 'grab', userSelect: 'none', touchAction: 'none' }}
       >
-        <h3 className="label" style={{ margin: 0, fontSize: 12 }}>
+        <h3 className="label" style={{ margin: 0, fontSize: 13 }}>
           combate {modoCombate ? `· rodada ${iniciativa.rodada}` : ''}
         </h3>
         <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
@@ -142,7 +142,7 @@ export default function CombatOverlay() {
             onClick={() => setVista((v) => (v === 'iniciativa' ? 'log' : 'iniciativa'))}
             title={vista === 'iniciativa' ? 'ver log de combate' : 'ver iniciativa'}
             onPointerDown={(ev) => ev.stopPropagation()}
-            style={{ fontSize: 10 }}
+            style={{ fontSize: 11 }}
           >
             {vista === 'iniciativa' ? 'log' : 'iniciativa'}
           </button>
@@ -162,7 +162,7 @@ export default function CombatOverlay() {
       </div>
       {vista === 'iniciativa' && modoCombate && combatenteAtual && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.45rem', flexWrap: 'wrap' }}>
-          <div className="mono" style={{ fontSize: 11, flex: 1, minWidth: 0 }}>
+          <div className="mono" style={{ fontSize: 12, flex: 1, minWidth: 0 }}>
             <span style={{ color: 'var(--rede)' }}>vez de {combatenteAtual.nome}</span>
             {proximoCombatente && (
               <span className="vazio"> · próximo: {proximoCombatente.nome}</span>
@@ -173,7 +173,7 @@ export default function CombatOverlay() {
             onClick={avancarTurno}
             title="próximo turno (espaço ou n)"
             style={{
-              fontSize: 12, padding: '0.3em 0.7em', flexShrink: 0,
+              fontSize: 13, padding: '0.3em 0.7em', flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
               boxShadow: '0 0 12px var(--rede-glow)',
             }}

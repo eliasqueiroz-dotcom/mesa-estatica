@@ -40,7 +40,7 @@ export default function CombatLogView({ iniciativa }: Props) {
         <select
           value={filtroParticipante}
           onChange={(e) => setFiltroParticipante(e.target.value)}
-          style={{ fontSize: 11, flex: 1, minWidth: 0 }}
+          style={{ fontSize: 12, flex: 1, minWidth: 0 }}
         >
           <option value="">todos os combatentes</option>
           {iniciativa.map((e) => (
@@ -52,7 +52,7 @@ export default function CombatLogView({ iniciativa }: Props) {
         <select
           value={filtroRodada}
           onChange={(e) => setFiltroRodada(e.target.value)}
-          style={{ fontSize: 11, flexShrink: 0 }}
+          style={{ fontSize: 12, flexShrink: 0 }}
         >
           <option value="">todas as rodadas</option>
           {rodadasDisponiveis.map((r) => (
@@ -64,9 +64,9 @@ export default function CombatLogView({ iniciativa }: Props) {
       </div>
 
       {entradas.length === 0 ? (
-        <p className="vazio" style={{ fontSize: 11 }}>nada de combate no log ainda.</p>
+        <p className="vazio" style={{ fontSize: 12 }}>nada de combate no log ainda.</p>
       ) : (
-        <div className="mono" style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <div className="mono" style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           {entradas.map((e) => (
             <div key={e.id}>
               [{new Date(e.timestamp).toLocaleTimeString()}] {e.texto}

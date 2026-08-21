@@ -82,7 +82,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
       {mostrarGlossario && (
         <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
           {CONDICOES_COMBATE.map((c) => (
-            <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 11 }}>
+            <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
               <strong style={{ color: 'var(--ink)' }}>{c.nome}</strong> — {c.efeito}
             </p>
           ))}
@@ -94,15 +94,15 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
       {iniciativa.length === 0 ? (
         <>
           {disponiveis.length === 0 ? (
-            <p className="vazio" style={{ fontSize: 11, margin: '0.25rem 0' }}>nenhum combatente disponível.</p>
+            <p className="vazio" style={{ fontSize: 12, margin: '0.25rem 0' }}>nenhum combatente disponível.</p>
           ) : (
             <>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 12, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}>
                 <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
                 selecionar todos
               </label>
               <label
-                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 12, marginBottom: '0.3rem', color: 'var(--ink-dim)' }}
                 title="1 d20 + a maior Agilidade entre os NPCs selecionados — todos com o mesmo valor de iniciativa"
               >
                 <input type="checkbox" checked={agruparNpcs} onChange={(e) => setAgruparNpcs(e.target.checked)} />
@@ -114,13 +114,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   <label
                     key={p.id}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 12,
+                      display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: 13,
                       marginBottom: '0.2rem', opacity: marcado ? 1 : 0.5,
                     }}
                   >
                     <input type="checkbox" checked={marcado} onChange={() => toggleSelecionado(p.id)} />
                     <span className="mono">{p.nome}</span>
-                    <span className="vazio" style={{ fontSize: 10 }}>({p.tipo === 'pc' ? 'PC' : 'NPC'})</span>
+                    <span className="vazio" style={{ fontSize: 11 }}>({p.tipo === 'pc' ? 'PC' : 'NPC'})</span>
                   </label>
                 );
               })}
@@ -168,7 +168,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
                   onClick={() => toggleExpandido(e.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: podeArrastar ? 'grab' : 'pointer', fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: podeArrastar ? 'grab' : 'pointer', fontSize: 13,
                     padding: '0.1rem 0',
                   }}
                 >
@@ -186,7 +186,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     tabIndex={0}
                     onClick={(ev) => { ev.stopPropagation(); removerDaIniciativa(e.id); }}
                     title="remover"
-                    style={{ color: 'var(--ruido)', padding: '0.1em 0.3em', fontSize: 10, lineHeight: 1, flexShrink: 0 }}
+                    style={{ color: 'var(--ruido)', padding: '0.1em 0.3em', fontSize: 11, lineHeight: 1, flexShrink: 0 }}
                   >
                     ×
                   </span>
@@ -224,16 +224,16 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     <IconeAdiar />
                   </span>
-                  <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }} title="posição na ordem de turno">
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }} title="posição na ordem de turno">
                     {i + 1}
                   </span>
-                  <span className="mono" style={{ color: 'var(--rede)', fontSize: 11, minWidth: 12, flexShrink: 0 }}>
+                  <span className="mono" style={{ color: 'var(--rede)', fontSize: 12, minWidth: 12, flexShrink: 0 }}>
                     {naVez ? '▶' : ''}
                   </span>
                   <span
                     className="mono"
                     style={{
-                      flex: 1, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 44,
+                      flex: 1, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 44,
                       color: naVez ? 'var(--rede)' : undefined,
                     }}
                     title={e.nome}
@@ -250,7 +250,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                             : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).')
                           : 'PV em 25% ou menos do máximo'
                       }
-                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 9, padding: '0.1em 0.35em', flexShrink: 0 }}
+                      style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 10, padding: '0.1em 0.35em', flexShrink: 0 }}
                     >
                       {foraDeCombate ? (ativas.includes('estavel') ? 'estável' : 'fora de combate') : 'crítico'}
                     </span>
@@ -264,7 +264,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   )}
                   <span
                     className="mono"
-                    style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 26, textAlign: 'right' }}
+                    style={{ fontSize: 11, color: 'var(--ink-faint)', flexShrink: 0, minWidth: 26, textAlign: 'right' }}
                     title={
                       e.d20 !== undefined && e.agilidade !== undefined
                         ? `rolagem iniciativa: d20 ${e.d20} + agilidade ${e.agilidade} = ${e.valor}`
@@ -278,13 +278,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       <div style={{ width: 36 }}>
                         <BarraSegmentada atual={pv.atual} maximo={pv.maximo} variante="pv" corPreenchimento={corPv(pv.atual, pv.maximo)} compacta />
                       </div>
-                      <span className="mono" style={{ fontSize: 10, minWidth: 32, textAlign: 'right' }}>
+                      <span className="mono" style={{ fontSize: 11, minWidth: 32, textAlign: 'right' }}>
                         {pv.atual}/{pv.maximo}
                       </span>
                     </div>
                   )}
                   {defesa && (
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 24, justifyContent: 'flex-end' }} title="defesa">
+                    <span className="mono" style={{ fontSize: 12, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem', minWidth: 24, justifyContent: 'flex-end' }} title="defesa">
                       <IconeEscudo size={12} />{defesa.valor}
                     </span>
                   )}
@@ -298,7 +298,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       <span
                         key={s.id}
                         className="badge"
-                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start', marginBottom: '0.25rem', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                        style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', alignSelf: 'flex-start', marginBottom: '0.25rem', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                         title={TABELA_SURTO.find((e) => e.nome === s.escolha)?.descricao ?? ''}
                       >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -318,7 +318,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                               <span
                                 key={a.id}
                                 className="badge"
-                                style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                style={{ alignSelf: 'flex-start', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                                 title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
                               >
                                 <IconeLamina size={10} /> {a.nome || 'arma'}
@@ -338,7 +338,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                               className="combate-chip combate-chip--ativa"
                               onClick={() => usarAcaoNpc(e.participanteId, e.nome, a)}
                               title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
-                              style={{ fontSize: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              style={{ fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                             >
                               <IconeLamina size={10} /> {a.nome}
                             </button>
@@ -371,17 +371,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                         <div>
                           <span className="combate-rotulo">pv</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', flexWrap: 'wrap' }}>
-                            <button className="icone-botao" onClick={() => pv.aplicar(-10)} title="−10 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−10</button>
-                            <button className="icone-botao" onClick={() => pv.aplicar(-5)} title="−5 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−5</button>
-                            <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="−1 PV" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−1</button>
-                            <span className="mono" style={{ fontSize: 11, minWidth: 32, textAlign: 'center' }}>{pv.atual}</span>
-                            <button className="icone-botao" onClick={() => pv.aplicar(1)} title="+1 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+1</button>
-                            <button className="icone-botao" onClick={() => pv.aplicar(5)} title="+5 (ajuste — não é cura, regras.md)" style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+5</button>
+                            <button className="icone-botao" onClick={() => pv.aplicar(-1)} title="−1 PV" style={{ fontSize: 11, padding: '0.1em 0.35em' }}>−1</button>
+                            <span className="mono" style={{ fontSize: 12, minWidth: 32, textAlign: 'center' }}>{pv.atual}</span>
+                            <button className="icone-botao" onClick={() => pv.aplicar(1)} title="+1 (ajuste — não é cura, regras.md)" style={{ fontSize: 11, padding: '0.1em 0.35em' }}>+1</button>
                             <input
                               type="number"
                               placeholder="dano"
                               title="dano livre — Enter aplica"
-                              style={{ width: 44, fontSize: 10, padding: '0.1em 0.25em' }}
+                              style={{ width: 44, fontSize: 11, padding: '0.1em 0.25em' }}
                               onKeyDown={(ev) => {
                                 if (ev.key !== 'Enter') return;
                                 const alvo = ev.target as HTMLInputElement;
@@ -398,20 +395,20 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           <span className="combate-rotulo">defesa</span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                             <span style={{ color: 'var(--real)', display: 'inline-flex' }}><IconeEscudo size={12} /></span>
-                            <button className="icone-botao" onClick={() => defesa.ajustar(-1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
-                            <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa.valor}</span>
-                            <button className="icone-botao" onClick={() => defesa.ajustar(1)} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                            <button className="icone-botao" onClick={() => defesa.ajustar(-1)} style={{ fontSize: 11, padding: '0.1em 0.35em' }}>−</button>
+                            <span className="mono" style={{ fontSize: 12, minWidth: 20, textAlign: 'center' }}>{defesa.valor}</span>
+                            <button className="icone-botao" onClick={() => defesa.ajustar(1)} style={{ fontSize: 11, padding: '0.1em 0.35em' }}>+</button>
                           </div>
                         </div>
                       )}
                     </div>
                     {pv && pv.atual <= 0 && !ativas.includes('estavel') && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                        <span className="vazio" style={{ fontSize: 10 }}>socorro:</span>
+                        <span className="vazio" style={{ fontSize: 11 }}>socorro:</span>
                         <select
                           value={socorristaPorAlvo[e.participanteId] ?? ''}
                           onChange={(ev) => definirSocorrista(e.participanteId, ev.target.value)}
-                          style={{ fontSize: 10 }}
+                          style={{ fontSize: 11 }}
                         >
                           <option value="">quem tenta?</option>
                           {fichas
@@ -425,7 +422,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           disabled={!socorristaPorAlvo[e.participanteId]}
                           onClick={() => tentarEstabilizar(e.participanteId)}
                           title="Medicina (Intelecto) DT 15 — estabiliza a 0 PV (regras.md)"
-                          style={{ fontSize: 10 }}
+                          style={{ fontSize: 11 }}
                         >
                           estabilizar
                         </button>
@@ -443,7 +440,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 borderTop: '1px solid var(--rede-dim)', padding: '0.4rem 0', marginTop: '0.15rem',
               }}
             >
-              <span className="mono" style={{ fontSize: 11, color: 'var(--rede)' }}>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--rede)' }}>
                 aplicar a {selecionadosAplicar.size}:
               </span>
               <input
@@ -451,7 +448,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 placeholder="dano"
                 value={danoEmMassa}
                 onChange={(ev) => setDanoEmMassa(ev.target.value)}
-                style={{ width: 52, fontSize: 11, padding: '0.1em 0.3em' }}
+                style={{ width: 52, fontSize: 12, padding: '0.1em 0.3em' }}
               />
               <button
                 className="icone-botao"
@@ -461,7 +458,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   if (valor) aplicarDanoEmMassa(-Math.abs(valor));
                   setDanoEmMassa('');
                 }}
-                style={{ fontSize: 10 }}
+                style={{ fontSize: 11 }}
               >
                 dano
               </button>
@@ -473,14 +470,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   if (valor) aplicarDanoEmMassa(Math.abs(valor));
                   setDanoEmMassa('');
                 }}
-                style={{ fontSize: 10 }}
+                style={{ fontSize: 11 }}
               >
                 ajuste
               </button>
               <select
                 value={condicaoEmMassa}
                 onChange={(ev) => setCondicaoEmMassa(ev.target.value)}
-                style={{ fontSize: 10 }}
+                style={{ fontSize: 11 }}
               >
                 <option value="">condição…</option>
                 {CONDICOES_COMBATE.map((c) => (
@@ -491,14 +488,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                 className="icone-botao"
                 disabled={!condicaoEmMassa}
                 onClick={() => { if (condicaoEmMassa) aplicarCondicaoEmMassa(condicaoEmMassa); }}
-                style={{ fontSize: 10 }}
+                style={{ fontSize: 11 }}
               >
                 aplicar
               </button>
               <button
                 className="icone-botao"
                 onClick={limparSelecaoAplicar}
-                style={{ fontSize: 10, marginLeft: 'auto', color: 'var(--ink-dim)' }}
+                style={{ fontSize: 11, marginLeft: 'auto', color: 'var(--ink-dim)' }}
               >
                 limpar seleção
               </button>
@@ -513,7 +510,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
               <button
                 className="icone-botao"
                 onClick={() => setAdicionarAberto(!adicionarAberto)}
-                style={{ fontSize: 11, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                style={{ fontSize: 12, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
               >
                 {adicionarAberto ? <IconeChevron aberto /> : <IconeMais size={12} />}
                 {adicionarAberto ? 'recolher' : 'adicionar combatente'}
@@ -521,15 +518,15 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
               {adicionarAberto && (
                 <div style={{ marginTop: '0.3rem' }}>
                   {disponiveis.length === 0 ? (
-                    <p className="vazio" style={{ fontSize: 10, margin: 0 }}>nenhum disponível.</p>
+                    <p className="vazio" style={{ fontSize: 11, margin: 0 }}>nenhum disponível.</p>
                   ) : (
                     <>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 10, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}>
                         <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
                         selecionar todos
                       </label>
                       <label
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 10, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.2rem', color: 'var(--ink-dim)' }}
                         title="1 d20 + a maior Agilidade entre os NPCs selecionados — todos com o mesmo valor de iniciativa"
                       >
                         <input type="checkbox" checked={agruparNpcs} onChange={(e) => setAgruparNpcs(e.target.checked)} />
@@ -538,14 +535,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       {disponiveis.map((p) => {
                         const marcado = selecionadosIniciativa.includes(p.id);
                         return (
-                          <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 11, marginBottom: '0.15rem', opacity: marcado ? 1 : 0.5 }}>
+                          <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: 12, marginBottom: '0.15rem', opacity: marcado ? 1 : 0.5 }}>
                             <input type="checkbox" checked={marcado} onChange={() => toggleSelecionado(p.id)} />
                             <span className="mono">{p.nome}</span>
                           </label>
                         );
                       })}
                       {adicionarDisponiveis.length > 0 && (
-                        <button className="icone-botao acento" onClick={rolarSelecionados} style={{ marginTop: '0.2rem', fontSize: 10 }}>
+                        <button className="icone-botao acento" onClick={rolarSelecionados} style={{ marginTop: '0.2rem', fontSize: 11 }}>
                           + adicionar e rolar
                         </button>
                       )}

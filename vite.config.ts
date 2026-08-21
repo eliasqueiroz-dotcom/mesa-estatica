@@ -23,6 +23,11 @@ export default defineConfig({
       '**/.{idea,git,cache,output,temp}/**',
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
       'tests/**',
+      // Worktree de agente (`.claude/worktrees/<nome>/`) é um checkout completo do repo — sem
+      // excluir, o vitest varre e RODA os testes de lá também, dobrando arquivos/tempo em
+      // silêncio enquanto o worktree existir (achado ao vivo: 87 "arquivos"/1009 testes, quando
+      // o repo real só tem 45/533 — a diferença era a cópia inteira de src/ dentro do worktree).
+      '**/.claude/worktrees/**',
     ],
   },
   build: {
