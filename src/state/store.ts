@@ -525,9 +525,12 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   // Só toca fichas que já têm `armas` de verdade — não fabrica o array pra quem nunca teve.
   if (versaoAnterior < 31 && estado.fichas) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    estado.fichas = (estado.fichas as any[]).map((f: any) =>
-      Array.isArray(f.armas) ? { ...f, armas: f.armas.map((a: any) => ({ periciaAtaqueId: null, ...a })) } : f,
-    );
+    estado.fichas = (estado.fichas as any[]).map((f: any) => {
+      if (!Array.isArray(f.armas)) return f;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const armas = f.armas.map((a: any) => ({ periciaAtaqueId: null, ...a }));
+      return { ...f, armas };
+    });
   }
   return estado as Store;
 }
