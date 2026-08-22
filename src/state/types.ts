@@ -89,6 +89,10 @@ export interface Ficha {
 
   pericias: Record<string, GrauPericia>; // chave = DefinicaoPericia.id
 
+  /** ids de DefinicaoPericia fixados como atalho no Rolador de teste — campo aditivo opcional
+   *  (mesmo padrão de EntradaLog.visibilidade), ausente = nenhuma favorita, sem migração. */
+  periciasFavoritas?: string[];
+
   traumas: TraumaFicha[]; // máx 3
 
   kitAntecedente: string;

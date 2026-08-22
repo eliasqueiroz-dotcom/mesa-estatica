@@ -3,6 +3,7 @@ import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoViv
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import { marcarComoProprio, useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import type { Ficha } from '../../state/types';
+import FeedRolagensJogador from './FeedRolagensJogador';
 import RoladorSanidadeJogador from './RoladorSanidadeJogador';
 import RoladorSurtoJogador from './RoladorSurtoJogador';
 import RoladorTesteJogador from './RoladorTesteJogador';
@@ -91,6 +92,7 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       {erro && !modo2D && <p style={{ color: 'var(--ruido)' }}>erro: {erro}</p>}
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
+      <FeedRolagensJogador />
       <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />

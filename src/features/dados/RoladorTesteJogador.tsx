@@ -30,6 +30,7 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
+  const atualizarFicha = useStore((s) => s.atualizarFicha);
 
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [resultado, setResultado] = useState<{ d20: number; modificador: number; total: number } | null>(null);
@@ -39,6 +40,12 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
 
   const podeRolar = ready && !rolando;
+  const favoritas = ficha.periciasFavoritas ?? [];
+
+  const alternarFavorita = () => {
+    const novas = favoritas.includes(periciaId) ? favoritas.filter((id) => id !== periciaId) : [...favoritas, periciaId];
+    atualizarFicha(ficha.id, { periciasFavoritas: novas });
+  };
 
   const rolarTeste = () => {
     setRolando(true);
@@ -80,13 +87,41 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
       <div className="campos-grid" style={{ gridTemplateColumns: '1fr' }}>
         <div>
           <label htmlFor="rtj-pericia">Perícia</label>
-          <select id="rtj-pericia" value={periciaId} onChange={(e) => setPericiaId(e.target.value)}>
-            {PERICIAS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome} ({ATRIBUTOS.find((a) => a.id === p.atributo)!.nome})
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <select id="rtj-pericia" value={periciaId} onChange={(e) => setPericiaId(e.target.value)} style={{ flex: 1 }}>
+              {PERICIAS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome} ({ATRIBUTOS.find((a) => a.id === p.atributo)!.nome})
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="icone-botao"
+              title={favoritas.includes(periciaId) ? 'remover dos favoritos' : 'fixar como favorita'}
+              onClick={alternarFavorita}
+            >
+              {favoritas.includes(periciaId) ? '★' : '☆'}
+            </button>
+          </div>
+          {favoritas.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+              {favoritas.map((id) => {
+                const p = PERICIAS.find((x) => x.id === id);
+                if (!p) return null;
+                return (
+                  <button
+                    key={id}
+                    className="pill"
+                    onClick={() => setPericiaId(id)}
+                    style={{ background: periciaId === id ? 'var(--concrete-2)' : 'var(--concrete-1)' }}
+                  >
+                    {p.nome}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

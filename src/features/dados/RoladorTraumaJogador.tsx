@@ -81,6 +81,7 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
       (grupos) => {
         const perda = grupos[0].value;
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
+        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id, 'publica');
         setResolvido(true);
       },
       'ruido',
@@ -91,6 +92,7 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
   const interpretar = () => {
     if (!trauma) return;
     ajustarDeterminacao(ficha.id, ficha.determinacao + 1);
+    registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · interpretou a Resposta, +1 Determinação`, ficha.id, 'publica');
     setResolvido(true);
   };
 

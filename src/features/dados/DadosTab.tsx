@@ -1,6 +1,7 @@
 import { useDiceBox } from '../../dice/useDiceBox';
 import { consumirForcados } from '../../dice/forcarRolagem';
 import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoVivo';
+import FeedRolagens from './FeedRolagens';
 import RoladorTeste from './RoladorTeste';
 import RoladorSanidade from './RoladorSanidade';
 import RoladorSurto from './RoladorSurto';
@@ -46,6 +47,7 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
       {erro && !modo2D && <p style={{ color: 'var(--ruido)' }}>erro: {erro}</p>}
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
+      <FeedRolagens />
       <RoladorTeste ready={podeRolar} rolar={rolar} />
       <RoladorSanidade ready={podeRolar} rolar={rolar} />
       <RoladorSurto ready={podeRolar} rolar={rolar} />
