@@ -11,7 +11,10 @@ import StatusGrupoSection from './sections/StatusGrupoSection';
  *  "Cena atual" é a maior seção (mistura público/privado) — fica na largura toda, primeira,
  *  acima do resto. As demais seções (mistura de [Público]/[Privado], cada uma se rotula) viram
  *  um grid de caixas do mesmo tamanho lado a lado — `alignItems: 'stretch'` (padrão do grid)
- *  iguala a altura das caixas em cada linha. */
+ *  iguala a altura das caixas em cada linha. `minmax(max(320px, ...), 1fr)` trava em no máximo
+ *  3 colunas por linha mesmo em telas largas (Estado da mesa e Status do grupo têm gauges/linhas
+ *  de dados que ficam ilegíveis espremidos em 4+ colunas) — abaixo de ~1000px, o `max(320px, …)`
+ *  assume e o `auto-fit` volta a encolher pra 2 ou 1 coluna normalmente. */
 export default function SessaoTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -19,16 +22,16 @@ export default function SessaoTab() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(max(320px, (100% - 2rem) / 3), 1fr))',
           gap: '1rem',
         }}
       >
         <SituacaoSection />
         <EstatisticasSection />
         <StatusGrupoSection />
-        <EstadoMesaSection />
         <ProximosEventosSection />
         <LembretesSection />
+        <EstadoMesaSection />
         <MiniLogSection />
       </div>
     </div>
