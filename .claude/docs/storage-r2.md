@@ -703,3 +703,74 @@ falharem. Quem valida/casa os campos contra as tabelas do jogo continua sendo
   próprio botão "exportar .docx" da ficha) e confirmar que a ficha é criada/atualizada certo.
 - Testar rate-limit/erro (ex.: secret ausente ou sessão de não-mestre) e confirmar que a mensagem
   de erro aparece na UI sugerindo o fluxo manual, sem travar.
+
+# Parte 5 — Backup da sessão também na nuvem (R2, prefixo `saves/`)
+
+## Por quê
+
+Os botões "exportar"/"importar" do topo do app do mestre (`App.tsx`, componente
+`ExportarImportar`) fazem backup/restauração do estado inteiro da sessão
+(`exportarJSON`/`importarJSON` em `state/store.ts`) só localmente — nada fora da máquina do
+mestre. Esta parte estende: **exportar** também sobe uma cópia pro R2 (prefixo `saves/`, além do
+`sfx/` já usado pelo áudio), e **importar** ganha uma segunda opção pra escolher um save da nuvem
+numa lista (com data/hora e tamanho), aplicar ou apagar.
+
+Reaproveita 100% a infra que já existe — mesmo bucket, mesmo mecanismo de upload assinado
+(`presign-r2-upload`) e de exclusão (`remover-r2-objeto`), só adicionando `'saves/'` em
+`PREFIXOS_PERMITIDOS` das duas. O único gap era **listar** objetos de um prefixo pro cliente (só
+existia uma soma interna de bytes pra cota) — resolvido com a function nova `listar-r2-objetos`.
+
+URL pública simples (mesmo padrão do áudio hoje, sem auth pra ler o conteúdo) — decisão consciente
+de manter consistente com o resto do bucket em vez de montar um caminho de leitura autenticada só
+pra saves.
+
+## Passo 1 — Edge Function `listar-r2-objetos`
+
+Mesmo preâmbulo padrão (CORS, check de mestre — mensagem `'só o mestre lista saves'`). Corpo
+`{ prefixo: string }`, validado contra `PREFIXOS_PERMITIDOS` (mesma lista das outras duas
+functions do bucket — mantenha as três em sincronia). Pagina por `ListObjectsV2` com `prefix` na
+query (mesmo padrão de `usoAtualBucket` em `presign-r2-upload`), mas em vez de só somar `<Size>`,
+extrai por bloco `<Contents>`: `<Key>`, `<LastModified>`, `<Size>`, monta `publicUrl` com
+`R2_PUBLIC_BASE_URL` (mesmo secret já usado pelas outras functions). Devolve
+`{ objetos: [{ key, lastModified, size, publicUrl }] }` ordenado por `lastModified` decrescente.
+
+**Código já implementado**: [`supabase/functions/listar-r2-objetos/index.ts`](../../supabase/functions/listar-r2-objetos/index.ts).
+
+## Passo 2 — cliente
+
+- `src/multiplayer/uploadR2.ts` — nova função `listarR2(prefixo)`, mesmo formato de erro de
+  `uploadR2`/`deletarR2` (`extrairMensagemErro`). `uploadR2`/`deletarR2` em si não mudaram — já
+  eram genéricas por `path`.
+- `App.tsx` (`ExportarImportar`): `exportar()` continua baixando local (nome agora com data **e**
+  hora, `estatica-mesa-<YYYY-MM-DDTHH-mm-ss>.json` — antes só tinha a data) e, se `supabase`
+  estiver configurado, também sobe a mesma blob pro R2 em
+  `saves/estatica-mesa-<carimbo>-<sufixo aleatório curto>.json` (sufixo só na chave da nuvem,
+  motivo: URL é pública, o sufixo dificulta enumerar saves adivinhando timestamp). O download
+  local nunca depende do upload — falha na nuvem só mostra um aviso inline pequeno ao lado dos
+  botões, sem travar nem usar `window.alert` (mesmo motivo da correção anterior desta sessão em
+  `ImportarPersonagemBotao.tsx`: dialog nativo pode ficar mudo em contexto sem permissão do site
+  aceita).
+- `src/app/ImportarNuvemModal.tsx` (novo): botão "importar (nuvem)" ao lado do "importar (local)"
+  — só aparece com `supabase` configurado. Abre modal listando os saves (`listarR2('saves/')`),
+  cada linha com data/hora formatada + tamanho, duas ações com confirmação inline (não
+  `window.confirm` nativo, mesmo padrão de `ResetSessao.tsx`/`FoWOverlay.tsx`): "usar este" (baixa
+  o conteúdo da `publicUrl` e chama `importarJSON`) e "apagar" (`deletarR2`, remove da lista).
+
+## Passo 3 — liberar o prefixo nas functions existentes
+
+Em `presign-r2-upload/index.ts` e `remover-r2-objeto/index.ts`: `PREFIXOS_PERMITIDOS` passa a
+`['sfx/', 'saves/']` nas duas. A trava de cota (`LIMITE_BYTES = 8GB`, `usoAtualBucket`) já soma o
+bucket inteiro — `saves/` só passa a competir pelo mesmo teto que `sfx/`, sem lógica nova
+necessária (JSON de estado é só texto estruturado, sem base64 — dezenas/poucas centenas de KB por
+save, irrelevante frente aos ~2GB livres).
+
+## Passo 4 — testar
+
+- Deploy das três: `npx.cmd supabase functions deploy presign-r2-upload --use-api`,
+  `remover-r2-objeto --use-api` e `listar-r2-objetos --use-api` (Docker não rodando → precisa da
+  flag, mesma situação da Parte 4).
+- Sanity check sem auth: `curl -X POST .../functions/v1/listar-r2-objetos` deve devolver `401`.
+- Com Supabase configurado: "exportar" baixa local e aparece um save novo em "importar (nuvem)";
+  "usar este" aplica e sobrescreve a sessão atual; "apagar" remove da lista e do bucket.
+- Sem Supabase configurado: só "importar (local)" aparece, "exportar" continua baixando local sem
+  tentar subir nem quebrar a UI.

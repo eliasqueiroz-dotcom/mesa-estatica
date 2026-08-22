@@ -16,8 +16,8 @@ const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 // prefixos liberados hoje — adicione 'img/mapa/' se um dia migrar mapas também (storage-r2.md).
-// mantenha em sincronia com PREFIXOS_PERMITIDOS de `remover-r2-objeto`.
-const PREFIXOS_PERMITIDOS = ['sfx/'];
+// mantenha em sincronia com PREFIXOS_PERMITIDOS de `remover-r2-objeto` e `listar-r2-objetos`.
+const PREFIXOS_PERMITIDOS = ['sfx/', 'saves/'];
 
 // 8GB — margem de segurança abaixo do free tier de 10GB do R2 (acima disso a Cloudflare cobra).
 // checa só ESTE bucket: se a conta Cloudflare tiver outros buckets R2, o uso total da conta

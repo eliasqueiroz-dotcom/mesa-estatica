@@ -33,8 +33,11 @@ import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import AvisoSupabaseAusente from './AvisoSupabaseAusente';
+import ImportarNuvemModal from './ImportarNuvemModal';
 import LogTab from './LogTab';
 import StatusIndicador from './StatusIndicador';
+import { supabase } from '../lib/supabaseClient';
+import { uploadR2 } from '../multiplayer/uploadR2';
 
 const ATALHOS: Record<string, string> = {
   sessao: '1',
@@ -66,26 +69,54 @@ const ABAS: { id: AbaId; label: string }[] = [
  *  garantir que o backup realmente saia. Reseta a cada exportação (manual ou por este lembrete). */
 const INTERVALO_LEMBRETE_BACKUP_MS = 15 * 60 * 1000;
 
+/** `YYYY-MM-DDTHH-mm-ss` em horário local — usado tanto no nome do arquivo local quanto (com um
+ *  sufixo aleatório a mais) na chave do save na nuvem. */
+function carimboDataHora(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
+type StatusNuvem = 'idle' | 'salvando' | 'ok' | 'erro';
+
 function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   const exportarJSON = useStore((s) => s.exportarJSON);
   const importarJSON = useStore((s) => s.importarJSON);
   const inputRef = useRef<HTMLInputElement>(null);
   const [precisaBackup, setPrecisaBackup] = useState(false);
+  const [statusNuvem, setStatusNuvem] = useState<StatusNuvem>('idle');
+  const [erroNuvem, setErroNuvem] = useState<string | null>(null);
+  const [nuvemAberta, setNuvemAberta] = useState(false);
 
   useEffect(() => {
     const id = setInterval(() => setPrecisaBackup(true), INTERVALO_LEMBRETE_BACKUP_MS);
     return () => clearInterval(id);
   }, []);
 
-  const exportar = () => {
+  const exportar = async () => {
+    const carimbo = carimboDataHora();
     const blob = new Blob([exportarJSON()], { type: 'application/json' });
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `estatica-mesa-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `estatica-mesa-${carimbo}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setPrecisaBackup(false);
+
+    // backup local nunca depende do upload — se a nuvem falhar (sem Supabase, cota cheia, rede),
+    // o arquivo local já saiu de qualquer forma.
+    if (!supabase) return;
+    setStatusNuvem('salvando');
+    const sufixo = crypto.randomUUID().slice(0, 6);
+    const { url: publicUrl, erro } = await uploadR2(`saves/estatica-mesa-${carimbo}-${sufixo}.json`, blob, 'application/json');
+    if (publicUrl) {
+      setStatusNuvem('ok');
+    } else {
+      setStatusNuvem('erro');
+      setErroNuvem(erro ?? 'falha ao salvar na nuvem');
+    }
   };
 
   const importar = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +136,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
       <StatusIndicador />
-      <div style={{ display: 'flex', gap: '0.4rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <button
           className={precisaBackup ? 'acento' : undefined}
           onClick={exportar}
@@ -113,13 +144,30 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
         >
           {precisaBackup ? 'exportar ⚠' : 'exportar'}
         </button>
-        <button onClick={() => inputRef.current?.click()}>importar</button>
+        <button onClick={() => inputRef.current?.click()}>importar (local)</button>
+        {supabase && <button onClick={() => setNuvemAberta(true)}>importar (nuvem)</button>}
+        {statusNuvem === 'salvando' && (
+          <span className="vazio" style={{ fontSize: '11px' }}>
+            salvando na nuvem…
+          </span>
+        )}
+        {statusNuvem === 'ok' && (
+          <span className="vazio" style={{ fontSize: '11px' }}>
+            salvo na nuvem
+          </span>
+        )}
+        {statusNuvem === 'erro' && (
+          <span style={{ fontSize: '11px', color: 'var(--ruido)' }} title={erroNuvem ?? undefined}>
+            nuvem: falhou
+          </span>
+        )}
         {/* botão de controle agora oculto; o controle é acessível clicando no título principal */}
         <button onClick={abrirControle} title="janela secreta do mestre — não compartilhar" style={{ display: 'none' }}>
           controle
         </button>
         <input ref={inputRef} type="file" accept="application/json" hidden onChange={importar} />
       </div>
+      {nuvemAberta && <ImportarNuvemModal onFechar={() => setNuvemAberta(false)} />}
     </div>
   );
 }

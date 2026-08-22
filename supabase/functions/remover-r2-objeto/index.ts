@@ -16,8 +16,8 @@ const corsHeaders = {
 const jsonResponse = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-// mesmos prefixos liberados de `presign-r2-upload` — mantenha as duas listas em sincronia.
-const PREFIXOS_PERMITIDOS = ['sfx/'];
+// mesmos prefixos liberados de `presign-r2-upload` — mantenha as listas em sincronia.
+const PREFIXOS_PERMITIDOS = ['sfx/', 'saves/'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

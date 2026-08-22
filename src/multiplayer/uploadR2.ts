@@ -74,3 +74,31 @@ export async function deletarR2(path: string): Promise<boolean> {
 export function isUrlSupabaseStorage(url: string): boolean {
   return url.includes('/storage/v1/object/public/');
 }
+
+export interface ObjetoR2 {
+  key: string;
+  lastModified: string;
+  size: number;
+  publicUrl: string;
+}
+
+export interface ResultadoListagemR2 {
+  objetos: ObjetoR2[] | null;
+  erro?: string;
+}
+
+/** Lista os objetos de um prefixo permitido do R2 (ex.: `saves/`) via a Edge Function
+ * `listar-r2-objetos` — usado pelo `ImportarNuvemModal` pra montar a lista de saves disponíveis. */
+export async function listarR2(prefixo: string): Promise<ResultadoListagemR2> {
+  const cliente = supabase;
+  if (!cliente) return { objetos: null };
+
+  const { data, error } = await cliente.functions.invoke<{ objetos: ObjetoR2[] }>('listar-r2-objetos', {
+    body: { prefixo },
+  });
+  if (error || !data) {
+    console.error('[listarR2] falhou', error);
+    return { objetos: null, erro: await extrairMensagemErro(error) };
+  }
+  return { objetos: data.objetos };
+}
