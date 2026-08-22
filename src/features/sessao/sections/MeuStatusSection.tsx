@@ -37,20 +37,32 @@ export default function MeuStatusSection() {
       <h3>meu status</h3>
       <div className="mono" style={{ fontSize: '13px' }}>
         <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span>PV {ficha.pvAtual}/{pvMaximo}</span>
-          <span style={{ color: COR_TIER_RUIDO[tierRuido] }}>
+          <span title={`Pontos de Vida: ${ficha.pvAtual} de ${pvMaximo}`}>PV {ficha.pvAtual}/{pvMaximo}</span>
+          <span
+            style={{ color: COR_TIER_RUIDO[tierRuido] }}
+            title={`Sanidade: ${ficha.sanidadeAtual} de ${sanidadeMaxima} — ${NOME_TIER_RUIDO[tierRuido]}`}
+          >
             SAN {ficha.sanidadeAtual}/{sanidadeMaxima} · {NOME_TIER_RUIDO[tierRuido]}
           </span>
-          <span>DET {ficha.determinacao}/2</span>
-          <span style={traumasAtivos >= 3 ? { color: 'var(--ruido)' } : undefined}>TRM {traumasAtivos}/3</span>
+          <span title={`Determinação: ${ficha.determinacao} de 2`}>DET {ficha.determinacao}/2</span>
+          <span
+            style={traumasAtivos >= 3 ? { color: 'var(--ruido)' } : undefined}
+            title={`Traumas ativos: ${traumasAtivos} de 3 (no máximo — 3+ é "à beira de se perder")`}
+          >
+            TRM {traumasAtivos}/3
+          </span>
           {emSurto && (
-            <span className="badge" style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}>
+            <span
+              className="badge"
+              style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)' }}
+              title="surto ativo agora — efeito especial em jogo"
+            >
               surto
             </span>
           )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1 }} title={`Pontos de Vida: ${ficha.pvAtual} de ${pvMaximo}`}>
             <BarraSegmentada
               atual={ficha.pvAtual}
               maximo={pvMaximo}
@@ -59,7 +71,10 @@ export default function MeuStatusSection() {
               compacta
             />
           </div>
-          <div style={{ flex: 1 }}>
+          <div
+            style={{ flex: 1 }}
+            title={`Sanidade: ${ficha.sanidadeAtual} de ${sanidadeMaxima} — ${NOME_TIER_RUIDO[tierRuido]}`}
+          >
             <BarraSegmentada atual={ficha.sanidadeAtual} maximo={sanidadeMaxima} variante="sanidade" tier={tierRuido} compacta />
           </div>
         </div>
