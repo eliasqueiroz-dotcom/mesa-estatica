@@ -92,12 +92,14 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       {erro && !modo2D && <p style={{ color: 'var(--ruido)' }}>erro: {erro}</p>}
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
-      <FeedRolagensJogador />
       <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RolagemLivreJogador fichaId={ficha.id} ready={podeRolar} rolar={rolarEBroadcast} />
+      <div style={{ gridColumn: 'span 2' }}>
+        <FeedRolagensJogador />
+      </div>
     </div>
   );
 }

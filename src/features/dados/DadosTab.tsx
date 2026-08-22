@@ -47,13 +47,15 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
       {erro && !modo2D && <p style={{ color: 'var(--ruido)' }}>erro: {erro}</p>}
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
-      <FeedRolagens />
       <RoladorTeste ready={podeRolar} rolar={rolar} />
       <RoladorSanidade ready={podeRolar} rolar={rolar} />
       <RoladorSurto ready={podeRolar} rolar={rolar} />
       <RoladorTrauma ready={podeRolar} rolar={rolar} />
       <RolagemLivre ready={podeRolar} rolar={rolar} />
       <RoladorTabelas ready={podeRolar} rolar={rolar} />
+      <div style={{ gridColumn: 'span 2' }}>
+        <FeedRolagens />
+      </div>
     </div>
   );
 }
