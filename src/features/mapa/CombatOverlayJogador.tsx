@@ -12,10 +12,13 @@ interface Props {
 }
 
 export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap, npcs }: Props) {
-  const { modoCombate, rodada, indiceAtualTurno } = useStore((s) => s.sessaoPublica);
+  const { modoCombate, rodada, turnoAtualId } = useStore((s) => s.sessaoPublica);
 
   const [aberto, setAberto] = useState(false);
-  const minhaVez = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === minhaFicha.id;
+  // por id da entrada — ver comentário equivalente em CombateJogadorView.tsx (RLS de
+  // `iniciativa` pode omitir a linha de um NPC oculto, então nem sempre há uma entrada com
+  // `turnoAtualId` pra achar aqui, e é isso mesmo).
+  const minhaVez = modoCombate && iniciativa.some((e) => e.id === turnoAtualId && e.participanteId === minhaFicha.id);
 
   // o painel se abre sozinho quando o turno vira pro jogador — ele não precisa lembrar de
   // clicar em "ATK" pra ver que é a vez dele. Só dispara na TRANSIÇÃO (deps: [minhaVez]) — se

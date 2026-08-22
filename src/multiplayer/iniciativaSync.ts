@@ -47,7 +47,7 @@ export const paraEntrada = (r: LinhaIniciativa): EntradaIniciativa => ({
 
 /**
  * Sincroniza a ordem de turno (mesa-estatica-multiplayer-completo.md §6.3, migração 0006) —
- * faltava: `sessaoPublica.modoCombate/indiceAtualTurno/rodada/condicoesCombate` já
+ * faltava: `sessaoPublica.modoCombate/turnoAtualId/rodada/condicoesCombate` já
  * sincronizavam, mas a ORDEM em si (array `iniciativa`) não tinha tabela nenhuma. `posicao`
  * é escrita explicitamente a partir do índice do array local a cada push — Postgres não tem
  * ordem implícita de linha. Reordenar/rolar/remover em qualquer combinação sempre dispara um

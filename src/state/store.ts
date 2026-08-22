@@ -123,13 +123,14 @@ interface Acoes {
    *  uma vez" por entidade, isso só compartilha o resultado. Só NPCs (`npcs`), nunca fichas. */
   rolarIniciativaGrupo: (participanteIds: string[]) => void;
   /** Rerrola só UM combatente já na lista (d20+Agilidade, mesma regra) e reinsere na posição
-   *  ordenada — mantém `indiceAtualTurno` grudado em quem estiver na vez, mesmo que a
-   *  reordenação desloque índices. Reordena por `valor` (perde o desempate por Agilidade da
-   *  rolagem original, que não fica guardado por entrada — aceitável pra um rerrol pontual). */
+   *  ordenada — `turnoAtualId` não precisa de ajuste algum: é o id da entrada, não sua posição.
+   *  Reordena por `valor` (perde o desempate por Agilidade da rolagem original, que não fica
+   *  guardado por entrada — aceitável pra um rerrol pontual). */
   rerolarIniciativaDe: (participanteId: string) => void;
   removerDaIniciativa: (id: string) => void;
   limparIniciativa: () => void;
-  /** Reordena a lista de iniciativa (drag-and-drop). Ajusta `indiceAtualTurno` se o turno atual for movido. */
+  /** Reordena a lista de iniciativa (drag-and-drop) — `turnoAtualId` não precisa de ajuste,
+   *  pelo mesmo motivo de `rerolarIniciativaDe`. */
   reordenarIniciativa: (de: number, para: number) => void;
 
   /** Rola iniciativa se ainda não houver, e liga o modo combate na 1ª entrada da ordem. */
@@ -532,29 +533,25 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
       return { ...f, armas };
     });
   }
+  // v31 → v32: sessaoPublica.indiceAtualTurno (índice de array) vira turnoAtualId (id da
+  // entrada de iniciativa) — a RLS da tabela `iniciativa` no Supabase passa a poder omitir
+  // linhas de NPC oculto pro jogador, e um índice numérico desalinha entre o array cheio do
+  // mestre e o array filtrado do jogador. Um id de entrada não desalinha nunca: ou a entrada
+  // está lá, ou não está.
+  if (versaoAnterior < 32 && estado.sessaoPublica && 'indiceAtualTurno' in estado.sessaoPublica) {
+    const indice = estado.sessaoPublica.indiceAtualTurno;
+    const iniciativa = Array.isArray(estado.iniciativa) ? estado.iniciativa : [];
+    const { indiceAtualTurno: _descartado, ...resto } = estado.sessaoPublica;
+    estado.sessaoPublica = { ...resto, turnoAtualId: iniciativa[indice]?.id ?? null };
+  }
   return estado as Store;
 }
 
-/** Encaixa entradas novas na iniciativa (por valor) mantendo a seta de turno na MESMA
- *  pessoa. Reancorar é obrigatório: inserir alguém antes do índice atual desloca todos os
- *  índices seguintes, e sem isso o turno pularia de combatente — mesmo cuidado que
- *  `rerolarIniciativaDe` já tomava. */
-function comIniciativaInserida(
-  s: Store,
-  entradas: EntradaIniciativa[],
-): Pick<Store, 'iniciativa' | 'sessaoPublica'> {
-  const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
-  const iniciativa = inserirNaIniciativa(s.iniciativa, entradas);
-  const novoIndice = participanteIdNaVez
-    ? iniciativa.findIndex((e) => e.participanteId === participanteIdNaVez)
-    : -1;
-  return {
-    iniciativa,
-    sessaoPublica: {
-      ...s.sessaoPublica,
-      indiceAtualTurno: novoIndice >= 0 ? novoIndice : s.sessaoPublica.indiceAtualTurno,
-    },
-  };
+/** Encaixa entradas novas na iniciativa (por valor). `turnoAtualId` não precisa de reancoragem
+ *  aqui — é o id de uma entrada já existente, inserir combatentes novos em qualquer posição do
+ *  array nunca muda o id de quem já estava na vez. */
+function comIniciativaInserida(s: Store, entradas: EntradaIniciativa[]): Pick<Store, 'iniciativa'> {
+  return { iniciativa: inserirNaIniciativa(s.iniciativa, entradas) };
 }
 
 export const useStore = create<Store>()(
@@ -977,36 +974,25 @@ export const useStore = create<Store>()(
         const agilidade = ficha?.atributos.agilidade ?? npc?.agilidade ?? 0;
         const d20 = rolarDadoComForcados(20, participanteId, 'iniciativa');
         const novoValor = d20 + agilidade;
-        const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
         const reordenada = s.iniciativa
           .map((e) => (e.participanteId === participanteId ? { ...e, valor: novoValor, d20, agilidade } : e))
           .sort((a, b) => b.valor - a.valor);
-        const novoIndice = participanteIdNaVez ? reordenada.findIndex((e) => e.participanteId === participanteIdNaVez) : -1;
-        set({
-          iniciativa: reordenada,
-          sessaoPublica: {
-            ...s.sessaoPublica,
-            indiceAtualTurno: novoIndice >= 0 ? novoIndice : s.sessaoPublica.indiceAtualTurno,
-          },
-        });
+        set({ iniciativa: reordenada });
         get().registrarLog('iniciativa', `${entrada.nome} rerrolou iniciativa — d20+${agilidade}=${novoValor}`);
       },
       removerDaIniciativa: (id) =>
         set((s) => {
           const removido = s.iniciativa.find((e) => e.id === id);
-          const participanteIdNaVez = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
+          const idxRemovido = s.iniciativa.findIndex((e) => e.id === id);
           const iniciativa = s.iniciativa.filter((e) => e.id !== id);
 
-          const novoIndice = participanteIdNaVez
-            ? iniciativa.findIndex((e) => e.participanteId === participanteIdNaVez)
-            : -1;
-          // o próprio combatente da vez foi removido — a próxima entrada assume o mesmo slot,
-          // clampado pro fim da lista se ele era o último (mesmo cuidado de reancorar que
-          // comIniciativaInserida/rerolarIniciativaDe já tomam ao mutar a lista).
-          const indiceAtualTurno =
-            novoIndice >= 0
-              ? novoIndice
-              : Math.min(s.sessaoPublica.indiceAtualTurno, Math.max(0, iniciativa.length - 1));
+          // se o removido não era quem estava na vez, `turnoAtualId` já é o id certo — não
+          // precisa procurar nada. Se era, a próxima entrada assume o mesmo slot, clampado pro
+          // fim da lista se ele era o último.
+          const turnoAtualId =
+            s.sessaoPublica.turnoAtualId !== id
+              ? s.sessaoPublica.turnoAtualId
+              : iniciativa[Math.min(idxRemovido, iniciativa.length - 1)]?.id ?? null;
 
           // condicoesCombate/condicaoDuracao são indexados por participanteId, não pelo id da
           // entrada de iniciativa — só limpa se não sobrar nenhuma outra entrada com esse
@@ -1027,7 +1013,7 @@ export const useStore = create<Store>()(
 
           return {
             iniciativa,
-            sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno, condicoesCombate, condicaoDuracao },
+            sessaoPublica: { ...s.sessaoPublica, turnoAtualId, condicoesCombate, condicaoDuracao },
           };
         }),
       limparIniciativa: () => set({ iniciativa: [] }),
@@ -1037,37 +1023,30 @@ export const useStore = create<Store>()(
           const ordem = [...s.iniciativa];
           const [movido] = ordem.splice(de, 1);
           ordem.splice(para, 0, movido);
-          let indiceAtualTurno = s.sessaoPublica.indiceAtualTurno;
-          if (de === indiceAtualTurno) {
-            indiceAtualTurno = para;
-          } else if (de < indiceAtualTurno && para >= indiceAtualTurno) {
-            indiceAtualTurno--;
-          } else if (de > indiceAtualTurno && para <= indiceAtualTurno) {
-            indiceAtualTurno++;
-          }
-          return { iniciativa: ordem, sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno } };
+          return { iniciativa: ordem };
         }),
 
       iniciarModoCombate: () => {
         if (get().iniciativa.length === 0) get().rolarIniciativaTodos();
         if (get().iniciativa.length === 0) return; // ninguém pra lutar — não liga o modo.
         set((s) => ({
-          sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno: 0, rodada: 1 },
+          sessaoPublica: { ...s.sessaoPublica, modoCombate: true, turnoAtualId: s.iniciativa[0]?.id ?? null, rodada: 1 },
         }));
       },
       avancarTurno: () =>
         set((s) => {
           const total = s.iniciativa.length;
           if (total === 0) return s;
-          const participanteAtual = s.iniciativa[s.sessaoPublica.indiceAtualTurno]?.participanteId;
-          const proximo = (s.sessaoPublica.indiceAtualTurno + 1) % total;
+          const indiceAtual = s.iniciativa.findIndex((e) => e.id === s.sessaoPublica.turnoAtualId);
+          const participanteAtual = indiceAtual >= 0 ? s.iniciativa[indiceAtual].participanteId : undefined;
+          const proximo = indiceAtual >= 0 ? (indiceAtual + 1) % total : 0;
           const rodada = proximo === 0 ? s.sessaoPublica.rodada + 1 : s.sessaoPublica.rodada;
           // decrementa a duração das condições de quem TERMINOU o turno agora — chega a 0,
           // some sozinha (decrementarDuracoesCombate em rules/combate.ts).
           const { condicoesCombate, condicaoDuracao } = participanteAtual
             ? decrementarDuracoesCombate(s.sessaoPublica.condicoesCombate, s.sessaoPublica.condicaoDuracao ?? {}, participanteAtual)
             : { condicoesCombate: s.sessaoPublica.condicoesCombate, condicaoDuracao: s.sessaoPublica.condicaoDuracao };
-          return { sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: proximo, rodada, condicoesCombate, condicaoDuracao } };
+          return { sessaoPublica: { ...s.sessaoPublica, turnoAtualId: s.iniciativa[proximo].id, rodada, condicoesCombate, condicaoDuracao } };
         }),
       encerrarModoCombate: () =>
         set((s) => ({
