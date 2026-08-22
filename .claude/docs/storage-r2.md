@@ -741,20 +741,24 @@ extrai por bloco `<Contents>`: `<Key>`, `<LastModified>`, `<Size>`, monta `publi
 - `src/multiplayer/uploadR2.ts` — nova função `listarR2(prefixo)`, mesmo formato de erro de
   `uploadR2`/`deletarR2` (`extrairMensagemErro`). `uploadR2`/`deletarR2` em si não mudaram — já
   eram genéricas por `path`.
-- `App.tsx` (`ExportarImportar`): `exportar()` continua baixando local (nome agora com data **e**
-  hora, `estatica-mesa-<YYYY-MM-DDTHH-mm-ss>.json` — antes só tinha a data) e, se `supabase`
-  estiver configurado, também sobe a mesma blob pro R2 em
-  `saves/estatica-mesa-<carimbo>-<sufixo aleatório curto>.json` (sufixo só na chave da nuvem,
-  motivo: URL é pública, o sufixo dificulta enumerar saves adivinhando timestamp). O download
-  local nunca depende do upload — falha na nuvem só mostra um aviso inline pequeno ao lado dos
-  botões, sem travar nem usar `window.alert` (mesmo motivo da correção anterior desta sessão em
-  `ImportarPersonagemBotao.tsx`: dialog nativo pode ficar mudo em contexto sem permissão do site
-  aceita).
-- `src/app/ImportarNuvemModal.tsx` (novo): botão "importar (nuvem)" ao lado do "importar (local)"
-  — só aparece com `supabase` configurado. Abre modal listando os saves (`listarR2('saves/')`),
-  cada linha com data/hora formatada + tamanho, duas ações com confirmação inline (não
-  `window.confirm` nativo, mesmo padrão de `ResetSessao.tsx`/`FoWOverlay.tsx`): "usar este" (baixa
-  o conteúdo da `publicUrl` e chama `importarJSON`) e "apagar" (`deletarR2`, remove da lista).
+- `App.tsx` (`ExportarImportar`): um único botão "exportar" e um único "importar" no header — cada
+  um abre um menu de 2 opções (`local`/`nuvem`, componente `BotaoComMenu`, fecha ao clicar fora ou
+  `Esc`) em vez de dois botões lado a lado. Sem `supabase` configurado não tem escolha real a
+  fazer, então o clique vai direto pro caminho local (sem abrir menu) — mesmo padrão de
+  degradação graciosa do resto do app.
+  - "exportar" → "local": baixa como antes (nome agora com data **e** hora,
+    `estatica-mesa-<YYYY-MM-DDTHH-mm-ss>.json` — antes só tinha a data). "exportar" → "nuvem": sobe
+    pro R2 em `saves/estatica-mesa-<carimbo>-<sufixo aleatório curto>.json` (sufixo só na chave da
+    nuvem, motivo: URL é pública, o sufixo dificulta enumerar saves adivinhando timestamp) — ação
+    separada da local agora (antes local e nuvem aconteciam juntas num clique só). Falha na nuvem
+    mostra um aviso inline pequeno ao lado dos botões, sem `window.alert` (mesmo motivo da correção
+    anterior desta sessão em `ImportarPersonagemBotao.tsx`: dialog nativo pode ficar mudo em
+    contexto sem permissão do site aceita).
+  - "importar" → "local": comportamento de sempre (seletor de arquivo do SO). "importar" → "nuvem":
+    abre `src/app/ImportarNuvemModal.tsx` (novo), lista os saves (`listarR2('saves/')`), cada linha
+    com data/hora formatada + tamanho, duas ações com confirmação inline (não `window.confirm`
+    nativo, mesmo padrão de `ResetSessao.tsx`/`FoWOverlay.tsx`): "usar este" (baixa o conteúdo da
+    `publicUrl` e chama `importarJSON`) e "apagar" (`deletarR2`, remove da lista).
 
 ## Passo 3 — liberar o prefixo nas functions existentes
 
@@ -770,7 +774,8 @@ save, irrelevante frente aos ~2GB livres).
   `remover-r2-objeto --use-api` e `listar-r2-objetos --use-api` (Docker não rodando → precisa da
   flag, mesma situação da Parte 4).
 - Sanity check sem auth: `curl -X POST .../functions/v1/listar-r2-objetos` deve devolver `401`.
-- Com Supabase configurado: "exportar" baixa local e aparece um save novo em "importar (nuvem)";
-  "usar este" aplica e sobrescreve a sessão atual; "apagar" remove da lista e do bucket.
-- Sem Supabase configurado: só "importar (local)" aparece, "exportar" continua baixando local sem
+- Com Supabase configurado: "exportar" → "nuvem" sobe um save novo, que aparece em "importar" →
+  "nuvem"; "usar este" aplica e sobrescreve a sessão atual; "apagar" remove da lista e do bucket.
+- Sem Supabase configurado: clicar "importar"/"exportar" vai direto pro caminho local (sem abrir
+  menu), "exportar" continua baixando local sem
   tentar subir nem quebrar a UI.

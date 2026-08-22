@@ -78,6 +78,90 @@ function carimboDataHora(): string {
 }
 
 type StatusNuvem = 'idle' | 'salvando' | 'ok' | 'erro';
+type MenuId = 'exportar' | 'importar' | null;
+
+/** Botão-gatilho + menu de 2 opções (local/nuvem) que fecha sozinho ao clicar fora ou Esc. Sem
+ *  `supabase` configurado não tem escolha real a fazer, então nem mostra o menu — `onSemNuvem` é
+ *  chamado direto (mesmo padrão de degradação graciosa do resto do app). */
+function BotaoComMenu({
+  label,
+  className,
+  title,
+  temNuvem,
+  aberto,
+  onAbrir,
+  onFechar,
+  onSemNuvem,
+  onLocal,
+  onNuvem,
+}: {
+  label: string;
+  className?: string;
+  title?: string;
+  temNuvem: boolean;
+  aberto: boolean;
+  onAbrir: () => void;
+  onFechar: () => void;
+  onSemNuvem: () => void;
+  onLocal: () => void;
+  onNuvem: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!aberto) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onFechar();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [aberto, onFechar]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className={className} title={title} onClick={temNuvem ? onAbrir : onSemNuvem}>
+        {label}
+      </button>
+      {aberto && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: '0.25rem',
+            background: 'var(--concrete-1)',
+            border: '1px solid var(--concrete-2)',
+            borderRadius: '4px',
+            display: 'flex',
+            flexDirection: 'column',
+            zIndex: 70,
+            minWidth: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <button
+            onClick={() => {
+              onLocal();
+              onFechar();
+            }}
+            style={{ textAlign: 'left', padding: '0.4rem 0.7rem' }}
+          >
+            local
+          </button>
+          <button
+            onClick={() => {
+              onNuvem();
+              onFechar();
+            }}
+            style={{ textAlign: 'left', padding: '0.4rem 0.7rem' }}
+          >
+            nuvem
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   const exportarJSON = useStore((s) => s.exportarJSON);
@@ -87,39 +171,50 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
   const [statusNuvem, setStatusNuvem] = useState<StatusNuvem>('idle');
   const [erroNuvem, setErroNuvem] = useState<string | null>(null);
   const [nuvemAberta, setNuvemAberta] = useState(false);
+  const [menuAberto, setMenuAberto] = useState<MenuId>(null);
 
   useEffect(() => {
     const id = setInterval(() => setPrecisaBackup(true), INTERVALO_LEMBRETE_BACKUP_MS);
     return () => clearInterval(id);
   }, []);
 
-  const exportar = async () => {
-    const carimbo = carimboDataHora();
-    const blob = new Blob([exportarJSON()], { type: 'application/json' });
+  useEffect(() => {
+    if (!menuAberto) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuAberto(null);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [menuAberto]);
 
+  const exportarLocal = () => {
+    const blob = new Blob([exportarJSON()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `estatica-mesa-${carimbo}.json`;
+    a.download = `estatica-mesa-${carimboDataHora()}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setPrecisaBackup(false);
+  };
 
-    // backup local nunca depende do upload — se a nuvem falhar (sem Supabase, cota cheia, rede),
-    // o arquivo local já saiu de qualquer forma.
-    if (!supabase) return;
+  const exportarNuvem = async () => {
     setStatusNuvem('salvando');
+    const blob = new Blob([exportarJSON()], { type: 'application/json' });
     const sufixo = crypto.randomUUID().slice(0, 6);
-    const { url: publicUrl, erro } = await uploadR2(`saves/estatica-mesa-${carimbo}-${sufixo}.json`, blob, 'application/json');
+    const { url: publicUrl, erro } = await uploadR2(`saves/estatica-mesa-${carimboDataHora()}-${sufixo}.json`, blob, 'application/json');
     if (publicUrl) {
       setStatusNuvem('ok');
+      setPrecisaBackup(false);
     } else {
       setStatusNuvem('erro');
       setErroNuvem(erro ?? 'falha ao salvar na nuvem');
     }
   };
 
-  const importar = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const importarLocal = () => inputRef.current?.click();
+
+  const importarDeArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
     arquivo.text().then((texto) => {
@@ -137,15 +232,28 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
       <StatusIndicador />
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-        <button
+        <BotaoComMenu
+          label={precisaBackup ? 'exportar ⚠' : 'exportar'}
           className={precisaBackup ? 'acento' : undefined}
-          onClick={exportar}
           title={precisaBackup ? 'já faz 15+ min do último backup — considere exportar de novo' : 'confie no papel, não na nuvem'}
-        >
-          {precisaBackup ? 'exportar ⚠' : 'exportar'}
-        </button>
-        <button onClick={() => inputRef.current?.click()}>importar (local)</button>
-        {supabase && <button onClick={() => setNuvemAberta(true)}>importar (nuvem)</button>}
+          temNuvem={!!supabase}
+          aberto={menuAberto === 'exportar'}
+          onAbrir={() => setMenuAberto('exportar')}
+          onFechar={() => setMenuAberto(null)}
+          onSemNuvem={exportarLocal}
+          onLocal={exportarLocal}
+          onNuvem={exportarNuvem}
+        />
+        <BotaoComMenu
+          label="importar"
+          temNuvem={!!supabase}
+          aberto={menuAberto === 'importar'}
+          onAbrir={() => setMenuAberto('importar')}
+          onFechar={() => setMenuAberto(null)}
+          onSemNuvem={importarLocal}
+          onLocal={importarLocal}
+          onNuvem={() => setNuvemAberta(true)}
+        />
         {statusNuvem === 'salvando' && (
           <span className="vazio" style={{ fontSize: '11px' }}>
             salvando na nuvem…
@@ -165,7 +273,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
         <button onClick={abrirControle} title="janela secreta do mestre — não compartilhar" style={{ display: 'none' }}>
           controle
         </button>
-        <input ref={inputRef} type="file" accept="application/json" hidden onChange={importar} />
+        <input ref={inputRef} type="file" accept="application/json" hidden onChange={importarDeArquivo} />
       </div>
       {nuvemAberta && <ImportarNuvemModal onFechar={() => setNuvemAberta(false)} />}
     </div>
