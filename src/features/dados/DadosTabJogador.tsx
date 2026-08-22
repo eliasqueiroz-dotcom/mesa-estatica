@@ -13,6 +13,9 @@ import RolagemLivreJogador from './RolagemLivreJogador';
 interface Props {
   ficha: Ficha;
   active?: boolean;
+  /** Incrementado por `PlayerApp.tsx` quando o jogador clica em "rolar" no lembrete de Sanidade
+   *  do log (`LogTabJogador.tsx`) — repassado pro rolador disparar sozinho. */
+  pedidoRapidoSanidade?: number;
 }
 
 /**
@@ -24,7 +27,7 @@ interface Props {
  * de PC/NPC, que são fluxos do mestre. Sanidade só mostra os dados brutos (não aplica a
  * perda) — ver comentário em `RoladorSanidadeJogador.tsx`.
  */
-export default function DadosTabJogador({ ficha, active = true }: Props) {
+export default function DadosTabJogador({ ficha, active = true, pedidoRapidoSanidade }: Props) {
   const { ready, rolando, erro, modo2D, rolar, reproduzir } = useDiceBox('dice-bandeja-jogador', active, 100, resolverRolagemJogador);
   const podeRolar = ready && !rolando;
 
@@ -93,7 +96,7 @@ export default function DadosTabJogador({ ficha, active = true }: Props) {
       {!ready && !erro && <p className="vazio">carregando física dos dados…</p>}
 
       <RoladorTesteJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
-      <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
+      <RoladorSanidadeJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} pedidoRapido={pedidoRapidoSanidade} />
       <RoladorSurtoJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RoladorTraumaJogador ficha={ficha} ready={podeRolar} rolar={rolarEBroadcast} />
       <RolagemLivreJogador fichaId={ficha.id} ready={podeRolar} rolar={rolarEBroadcast} />

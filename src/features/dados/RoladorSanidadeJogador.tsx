@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
 import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
@@ -34,6 +34,11 @@ interface Props {
     colorset?: ColorsetId,
     personagemId?: string | null,
   ) => void;
+  /** Incrementado por `PlayerApp.tsx` a partir do botão "rolar" no lembrete de Sanidade do log
+   *  (`LogTabJogador.tsx` → `rolagemRapidaSanidadeStore`) — ao mudar, força o gatilho
+   *  'perturbador' (mesmo dado 1d4 do "ver aliado a 0 PV", regras.md) e dispara a rolagem
+   *  sozinho, sem o jogador precisar escolher o gatilho na mão. */
+  pedidoRapido?: number;
 }
 
 /**
@@ -44,7 +49,7 @@ interface Props {
  * o real). Mostra só os dados brutos (d20 + perda rolada); o mestre aplica a perda de
  * verdade na própria tela, com a DT real.
  */
-export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
+export default function RoladorSanidadeJogador({ ficha, ready, rolar, pedidoRapido }: Props) {
   const registrarLog = useStore((s) => s.registrarLog);
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
   const [rolando, setRolando] = useState(false);
@@ -52,21 +57,43 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
 
   const gatilho = PERDA_SANIDADE.find((g) => g.id === gatilhoId)!;
 
-  const rolarSanidade = () => {
+  const rolarSanidade = (gatilhoIdAlvo: GatilhoSanidade = gatilhoId) => {
+    const gatilhoAlvo = PERDA_SANIDADE.find((g) => g.id === gatilhoIdAlvo)!;
     setRolando(true);
-    const perdaTermo = parseDado(gatilho.dado);
+    const perdaTermo = parseDado(gatilhoAlvo.dado);
     rolar(
       [{ sides: 20, qty: 1 }, perdaTermo],
       (grupos) => {
         const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
         setResultado({ d20, perdaRolada });
         setRolando(false);
-        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · teste de sanidade ${gatilho.nome}(Vontade) → 1d20: ${d20}, perda_rolada=${perdaRolada}`, ficha.id, 'publica');
+        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · teste de sanidade ${gatilhoAlvo.nome}(Vontade) → 1d20: ${d20}, perda_rolada=${perdaRolada}`, ficha.id, 'publica');
       },
       'ruido',
       ficha.id,
     );
   };
+
+  // Botão "rolar" do lembrete de Sanidade no log (LogTabJogador.tsx) — mesmo padrão de
+  // `pedidoRolagem` em QuickRollOverlayJogador.tsx: incrementa de fora, `pendenteRef` espera
+  // `ready` ficar true antes de disparar (a bandeja física pode não estar pronta ainda quando o
+  // jogador troca de aba).
+  const pendenteRef = useRef(false);
+  useEffect(() => {
+    if (!pedidoRapido) return;
+    setGatilhoId('perturbador');
+    if (ready && !rolando) rolarSanidade('perturbador');
+    else pendenteRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoRapido]);
+
+  useEffect(() => {
+    if (ready && pendenteRef.current) {
+      pendenteRef.current = false;
+      if (!rolando) rolarSanidade('perturbador');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, rolando]);
 
   return (
     <section className="secao">
@@ -85,7 +112,7 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar }: Props) {
         </div>
       </div>
 
-      <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || rolando} onClick={rolarSanidade}>
+      <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || rolando} onClick={() => rolarSanidade()}>
         rolar Vontade + {gatilho.dado}
       </button>
 

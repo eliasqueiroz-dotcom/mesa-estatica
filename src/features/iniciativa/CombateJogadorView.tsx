@@ -1,6 +1,7 @@
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
+import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
 import CombatenteResumo from '../combate/CombatenteResumo';
@@ -13,9 +14,14 @@ interface Props {
   semMoldura?: boolean;
   /** Mapa participanteId → corVisual, usado pra mostrar bolinha colorida antes do nome. Opcional — omitido no uso standalone (NPCs tab). */
   corMap?: Record<string, string>;
+  /** NPCs visíveis pro jogador (já filtrados por `visivel` — RLS de `npcs_publico`, migração
+   *  0003). Uma entrada de iniciativa tipo 'npc' cujo participanteId não está aqui é um NPC
+   *  ainda não revelado: o nome real fica escondido (mostra "???") pra não estragar reveals/
+   *  sustos. Opcional — sem a lista, mostra tudo (uso standalone fora do app do jogador). */
+  npcs?: NpcPublico[];
 }
 
-export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura, corMap }: Props) {
+export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura, corMap, npcs }: Props) {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
@@ -66,6 +72,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
           {iniciativa.map((e, i) => {
             const ativo = i === indiceAtualTurno;
             const souEu = ehMeuTurno(e.participanteId);
+            const oculto = e.tipo === 'npc' && npcs !== undefined && !npcs.some((n) => n.id === e.participanteId);
             const pvMaximo = calcularPvMaximo(basePV, minhaFicha.atributos.vigor);
             const defesa = calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa);
             const surtosVisiveis = surtosAtivosNaSessao(minhaFicha.surtosAtivos, { modoCombate, contadorCena, rodada });
@@ -83,7 +90,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                     }}
                   />
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {e.nome || 'sem nome'}
+                    {oculto ? '???' : e.nome || 'sem nome'}
                     {souEu && <span className="badge" style={{ marginLeft: '0.4rem' }}>você</span>}
                   </span>
                   <span

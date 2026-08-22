@@ -91,6 +91,16 @@ export function resolverEstabilizar(params: {
   return { teste, estabilizou: teste.sucesso };
 }
 
+/** Primeiros socorros (recuperar PV) é 1×/pessoa/cena, mesmo em falha (regras.md, tabela de
+ *  ações de combate). Ausência de entrada pro alvo = ainda não tentado nesta cena. */
+export function podeUsarPrimeirosSocorros(usos: Record<string, number>, alvoId: string, contadorCena: number): boolean {
+  return usos[alvoId] !== contadorCena;
+}
+
+export function registrarUsoPrimeirosSocorros(usos: Record<string, number>, alvoId: string, contadorCena: number): Record<string, number> {
+  return { ...usos, [alvoId]: contadorCena };
+}
+
 export interface DecrementoDuracoes {
   condicoesCombate: Record<string, string[]>;
   condicaoDuracao: Record<string, Record<string, number>>;

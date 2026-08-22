@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { rolarDadoComForcados } from '../dice/registroForcados';
-import { resolverEstabilizar } from '../rules/combate';
+import { podeUsarPrimeirosSocorros, registrarUsoPrimeirosSocorros, resolverEstabilizar } from '../rules/combate';
 import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
 import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
 import { useCombateUiStore } from '../state/combateUiStore';
@@ -36,6 +36,7 @@ export function useIniciativa() {
   const npcs = useStore((s) => s.npcs);
   const basePV = useStore((s) => s.config.basePV);
   const selecionadosIniciativa = useStore((s) => s.sessaoPrivada.selecionadosIniciativa);
+  const primeirosSocorrosCena = useStore((s) => s.sessaoPrivada.primeirosSocorrosCena) ?? {};
   const atualizarSessaoPrivada = useStore((s) => s.atualizarSessaoPrivada);
   const rolarIniciativaTodos = useStore((s) => s.rolarIniciativaTodos);
   const rolarIniciativa = useStore((s) => s.rolarIniciativa);
@@ -191,7 +192,9 @@ export function useIniciativa() {
   const limparSelecaoAplicar = limparSelecaoAplicarUi;
 
   /** Dano (delta negativo) ou ajuste (delta positivo — nunca "cura": regras.md "não existe
-   *  cura em combate", o app só corrige erro de digitação) em todos os selecionados de uma vez.
+   *  cura em combate", o app só corrige erro de digitação; a única exceção sancionada é
+   *  Primeiros Socorros — `tentarPrimeirosSocorros`, ação própria com teste e trava
+   *  1×/pessoa/cena) em todos os selecionados de uma vez.
    *  1 clique em vez de 1 por alvo — é a granada em 4 combatentes virando 1 ação, não 40. */
   const aplicarDanoEmMassa = (delta: number) => {
     if (selecionadosAplicar.size === 0 || delta === 0) return;
@@ -254,6 +257,46 @@ export function useIniciativa() {
     if (estabilizou) alternarCondicaoCombate(alvoId, 'estavel');
   };
 
+  const podePrimeirosSocorros = (alvoId: string) => podeUsarPrimeirosSocorros(primeirosSocorrosCena, alvoId, contadorCena);
+
+  /** Medicina (Intelecto) DT 15 recupera 1d4 PV de quem NÃO está a 0 PV (regras.md, tabela de
+   *  ações — "Primeiros socorros"). Exceção sancionada a "não existe cura em combate": trava
+   *  1×/pessoa/cena, mesmo em falha (a tentativa consome a chance, não só o sucesso). */
+  const tentarPrimeirosSocorros = (alvoId: string) => {
+    if (!podePrimeirosSocorros(alvoId)) return;
+    const socorristaId = socorristaPorAlvo[alvoId];
+    const socorrista = fichas.find((f) => f.id === socorristaId);
+    if (!socorrista) return;
+    const alvo = iniciativa.find((e) => e.participanteId === alvoId);
+    if (!alvo) return;
+    const pvMaximoSocorrista = calcularPvMaximo(basePV, socorrista.atributos.vigor);
+    const ferido = estaFerido(socorrista.pvAtual, pvMaximoSocorrista);
+    const grauMedicina = socorrista.pericias['medicina'] ?? 0;
+    const d20 = rolarDadoComForcados(20, socorrista.id, 'teste');
+    const { teste, estabilizou: sucesso } = resolverEstabilizar({ d20, intelecto: socorrista.atributos.intelecto, grauMedicina, socorristaFerido: ferido });
+    const nomeSocorrista = socorrista.nome || 'personagem';
+    let resultadoTexto = 'falhou';
+    if (sucesso) {
+      const curado = rolarDadoComForcados(4, alvoId, 'teste');
+      pvDoCombatente(alvoId, alvo.tipo)?.aplicar(curado);
+      resultadoTexto = `recuperou ${curado} PV`;
+    }
+    registrarLog(
+      'teste',
+      `${nomeSocorrista} tenta primeiros socorros em ${alvo.nome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${resultadoTexto}`,
+      socorrista.id,
+    );
+    registrarRoll({
+      origem: nomeSocorrista,
+      personagemId: socorrista.id,
+      formula: `d20${teste.modificador >= 0 ? '+' : ''}${teste.modificador}`,
+      total: teste.total,
+      bruto: d20,
+      visibilidade: 'publica',
+    });
+    atualizarSessaoPrivada({ primeirosSocorrosCena: registrarUsoPrimeirosSocorros(primeirosSocorrosCena, alvoId, contadorCena) });
+  };
+
   return {
     iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
     condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs, basePV,
@@ -269,6 +312,7 @@ export function useIniciativa() {
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
+    podePrimeirosSocorros, tentarPrimeirosSocorros,
     agruparNpcs, setAgruparNpcs,
   };
 }

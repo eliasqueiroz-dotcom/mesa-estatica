@@ -34,6 +34,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
+    podePrimeirosSocorros, tentarPrimeirosSocorros,
     agruparNpcs, setAgruparNpcs,
   } = hook;
 
@@ -454,6 +455,36 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           style={{ fontSize: 11 }}
                         >
                           estabilizar
+                        </button>
+                      </div>
+                    )}
+                    {pv && pv.atual > 0 && pv.atual < pv.maximo && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                        <span className="vazio" style={{ fontSize: 11 }}>socorro:</span>
+                        <select
+                          value={socorristaPorAlvo[e.participanteId] ?? ''}
+                          onChange={(ev) => definirSocorrista(e.participanteId, ev.target.value)}
+                          style={{ fontSize: 11 }}
+                        >
+                          <option value="">quem tenta?</option>
+                          {fichas
+                            .filter((f) => f.id !== e.participanteId && (pvDoCombatente(f.id, 'pc')?.atual ?? 1) > 0)
+                            .map((f) => (
+                              <option key={f.id} value={f.id}>{f.nome || 'sem nome'}</option>
+                            ))}
+                        </select>
+                        <button
+                          className="icone-botao"
+                          disabled={!socorristaPorAlvo[e.participanteId] || !podePrimeirosSocorros(e.participanteId)}
+                          onClick={() => tentarPrimeirosSocorros(e.participanteId)}
+                          title={
+                            podePrimeirosSocorros(e.participanteId)
+                              ? 'Medicina (Intelecto) DT 15 — recupera 1d4 PV, 1×/pessoa/cena (regras.md)'
+                              : 'já tentado nesta cena'
+                          }
+                          style={{ fontSize: 11 }}
+                        >
+                          primeiros socorros
                         </button>
                       </div>
                     )}

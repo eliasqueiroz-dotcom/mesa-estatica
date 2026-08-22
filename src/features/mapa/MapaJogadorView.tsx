@@ -255,7 +255,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         <PingOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
         <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
         <FoWViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
-        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
+        <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} npcs={npcs} />
         <CrachasOverlayJogador minhaFicha={minhaFicha} outrasFichas={outrasFichas} />
       </div>
 

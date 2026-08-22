@@ -5,6 +5,8 @@ import {
   estaForaDeCombate,
   filtrarLogDeCombate,
   gerarResumoCombate,
+  podeUsarPrimeirosSocorros,
+  registrarUsoPrimeirosSocorros,
   resolverEstabilizar,
   DT_ESTABILIZAR,
 } from './combate';
@@ -56,6 +58,33 @@ describe('resolverEstabilizar', () => {
   it('usa DT 15 fixo', () => {
     const r = resolverEstabilizar({ d20: 10, intelecto: 0, grauMedicina: 0, socorristaFerido: false });
     expect(r.teste.dt).toBe(DT_ESTABILIZAR);
+  });
+});
+
+describe('podeUsarPrimeirosSocorros / registrarUsoPrimeirosSocorros', () => {
+  it('sem uso registrado, pode usar', () => {
+    expect(podeUsarPrimeirosSocorros({}, 'p1', 3)).toBe(true);
+  });
+
+  it('já usado nesta cena (sucesso ou falha), não pode usar de novo', () => {
+    const usos = registrarUsoPrimeirosSocorros({}, 'p1', 3);
+    expect(podeUsarPrimeirosSocorros(usos, 'p1', 3)).toBe(false);
+  });
+
+  it('cena avançou desde o uso, volta a poder usar', () => {
+    const usos = registrarUsoPrimeirosSocorros({}, 'p1', 3);
+    expect(podeUsarPrimeirosSocorros(usos, 'p1', 4)).toBe(true);
+  });
+
+  it('não mexe no uso de outro participante', () => {
+    const usos = registrarUsoPrimeirosSocorros({}, 'p1', 3);
+    expect(podeUsarPrimeirosSocorros(usos, 'p2', 3)).toBe(true);
+  });
+
+  it('registrarUsoPrimeirosSocorros não muta o objeto original', () => {
+    const usos = {};
+    registrarUsoPrimeirosSocorros(usos, 'p1', 3);
+    expect(usos).toEqual({});
   });
 });
 

@@ -288,6 +288,10 @@ export interface SessaoPrivada {
   dificuldadeCenaCustom: number;
   /** IDs de participante selecionados pra iniciativa (persiste entre sessões). */
   selecionadosIniciativa: string[];
+  /** participanteId → contadorCena em que Primeiros Socorros (recuperar PV) foi usado nele —
+   *  1×/pessoa/cena mesmo em falha (regras.md). Ausente = ainda não usado nesta cena. Campo
+   *  aditivo opcional (mesmo padrão de `Ficha.periciasFavoritas`), sem migração. */
+  primeirosSocorrosCena?: Record<string, number>;
 }
 
 export interface EstadoConfig {

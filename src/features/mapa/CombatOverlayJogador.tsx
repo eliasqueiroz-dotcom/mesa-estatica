@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CombateJogadorView from '../iniciativa/CombateJogadorView';
+import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
 
@@ -7,9 +8,10 @@ interface Props {
   iniciativa: EntradaIniciativa[];
   minhaFicha: Ficha;
   corMap: Record<string, string>;
+  npcs: NpcPublico[];
 }
 
-export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap }: Props) {
+export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap, npcs }: Props) {
   const { modoCombate, rodada, indiceAtualTurno } = useStore((s) => s.sessaoPublica);
 
   const [aberto, setAberto] = useState(false);
@@ -106,7 +108,7 @@ export default function CombatOverlayJogador({ iniciativa, minhaFicha, corMap }:
               ×
             </button>
           </div>
-          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} semMoldura />
+          <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} npcs={npcs} semMoldura />
         </div>
       )}
       <button

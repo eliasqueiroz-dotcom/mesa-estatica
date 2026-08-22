@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
-import type { TipoLog } from '../state/types';
+import type { EntradaLog, TipoLog } from '../state/types';
 
 const LABELS_TIPO: Record<TipoLog | 'todos', string> = {
   todos: 'todos',
@@ -74,8 +74,19 @@ function RolsSection({ podeLimpar }: { podeLimpar: boolean }) {
  * `acoes` é um slot pra botões que só existem no lado do mestre (hoje, "iniciar sessão limpa"),
  * renderizado ao lado de "limpar log". É slot em vez de import direto justamente porque este
  * arquivo entra no bundle do jogador — quem passa o conteúdo é o `LogTab.tsx`, que não entra.
+ *
+ * `renderAcaoEntrada` é o mesmo idioma de slot, só que por-linha em vez de por-tela — hoje usado
+ * por `LogTabJogador.tsx` pra oferecer "rolar" ao lado do lembrete de teste de Sanidade.
  */
-export default function LogView({ podeLimpar, acoes }: { podeLimpar: boolean; acoes?: ReactNode }) {
+export default function LogView({
+  podeLimpar,
+  acoes,
+  renderAcaoEntrada,
+}: {
+  podeLimpar: boolean;
+  acoes?: ReactNode;
+  renderAcaoEntrada?: (e: EntradaLog) => ReactNode;
+}) {
   const log = useStore((s) => s.log);
   const fichas = useStore((s) => s.fichas);
   const limparLog = useStore((s) => s.limparLog);
@@ -152,8 +163,11 @@ export default function LogView({ podeLimpar, acoes }: { podeLimpar: boolean; ac
       ) : (
         <div className="mono" style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           {logFiltrado.map((e) => (
-            <div key={e.id}>
-              [{new Date(e.timestamp).toLocaleTimeString()}] {LABELS_TIPO[e.tipo]} · {e.texto}
+            <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>
+                [{new Date(e.timestamp).toLocaleTimeString()}] {LABELS_TIPO[e.tipo]} · {e.texto}
+              </span>
+              {renderAcaoEntrada?.(e)}
             </div>
           ))}
         </div>

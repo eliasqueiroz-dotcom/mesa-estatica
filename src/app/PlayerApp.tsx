@@ -32,6 +32,7 @@ import { iniciarSyncRolagemAoVivo } from '../multiplayer/rolagemAoVivoSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
+import { useRolagemRapidaSanidadeStore } from '../state/rolagemRapidaSanidadeStore';
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
 import AvisoSupabaseAusente from './AvisoSupabaseAusente';
@@ -66,6 +67,7 @@ export default function PlayerApp() {
   const [aba, setAba] = useState<AbaId>('sessao');
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
+  const [pedidosSanidadeRapida, setPedidosSanidadeRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
 
@@ -82,6 +84,15 @@ export default function PlayerApp() {
   if (minhaFicha) corMap[minhaFicha.id] = minhaFicha.corVisual;
   for (const f of outrasFichas) corMap[f.id] = f.corVisual;
   for (const n of npcs) corMap[n.id] = n.corVisual ?? COR_NPC_PADRAO;
+
+  // botão "rolar" no lembrete de Sanidade do log (LogTabJogador.tsx) — troca pra aba Dados e
+  // pede pro RoladorSanidadeJogador disparar sozinho (repassado via pedidosSanidadeRapida).
+  const pedidoSanidade = useRolagemRapidaSanidadeStore((s) => s.pedido);
+  useEffect(() => {
+    if (pedidoSanidade === 0) return;
+    setAba('dados');
+    setPedidosSanidadeRapida((p) => p + 1);
+  }, [pedidoSanidade]);
 
   // sync de tokens (posição no mapa) + log/rolagens — mesmos módulos do GmApp (App.tsx), RLS
   // ainda aberta pra `tokens` desde a Fase A; gated pela mesma auth anônima que `useMinhaFicha`
@@ -261,7 +272,7 @@ export default function PlayerApp() {
           }}
         >
           {possuiFicha && minhaFicha ? (
-            <DadosTabJogador ficha={minhaFicha} active={aba === 'dados'} />
+            <DadosTabJogador ficha={minhaFicha} active={aba === 'dados'} pedidoRapidoSanidade={pedidosSanidadeRapida} />
           ) : (
             <p className="vazio">sem ficha vinculada — nada pra rolar.</p>
           )}
@@ -307,7 +318,7 @@ export default function PlayerApp() {
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {minhaFicha && (
-              <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} />
+              <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} npcs={npcs} />
             )}
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>
