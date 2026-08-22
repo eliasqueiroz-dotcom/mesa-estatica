@@ -1,4 +1,5 @@
 import { useStore } from '../../state/store';
+import MeuStatusSection from './sections/MeuStatusSection';
 
 const N = 5;
 
@@ -23,6 +24,7 @@ export default function SessaoPublicaView() {
 
   return (
     <div className="sessao-publica-view">
+      <MeuStatusSection />
       <section className="secao">
         <h3>situação da sessão</h3>
         <div className="campos-grid">
