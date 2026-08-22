@@ -201,6 +201,9 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
       dano: a.dano ?? '',
       alcance: a.alcance ?? '',
       nota: a.nota ?? '',
+      // FichaImportavel (formato solto vindo de IA) não tem esse campo — quem importa escolhe
+      // a perícia de ataque depois, na própria ficha.
+      periciaAtaqueId: null,
     }));
     patch.armas = armas;
   }

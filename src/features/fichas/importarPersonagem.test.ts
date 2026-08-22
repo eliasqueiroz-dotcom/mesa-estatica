@@ -78,6 +78,11 @@ describe('converterFichaImportada', () => {
     expect(patch.armas![0].id).toBeTruthy();
   });
 
+  it('armas importadas vêm com periciaAtaqueId null (usuário escolhe depois, na ficha)', () => {
+    const { patch } = converterFichaImportada({ armas: [{ nome: 'Faca', dano: '1d6' }] }, 20);
+    expect(patch.armas![0].periciaAtaqueId).toBeNull();
+  });
+
   it('cor inválida é ignorada com aviso; cor hex válida entra no patch', () => {
     const invalida = converterFichaImportada({ corVisual: 'azul' }, 20);
     expect(invalida.patch.corVisual).toBeUndefined();

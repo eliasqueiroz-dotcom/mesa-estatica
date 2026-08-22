@@ -1,23 +1,49 @@
 import { useState } from 'react';
 import { rolarDadosComForcados } from '../../../dice/registroForcados';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
+import { PERICIAS } from '../../../rules/data/pericias';
+import { calcularPvMaximo, estaFerido } from '../../../rules/derivados';
 import { calcularDanoAtaque, parseDanoArma } from '../../../rules/teste';
 import { useStore } from '../../../state/store';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
+  const basePV = useStore((s) => s.config.basePV);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
   const [arsenalSelect, setArsenalSelect] = useState('');
   const [protecaoSelect, setProtecaoSelect] = useState('');
-  /** "margem 10+ (ou 20 natural)" da rolagem de ATAQUE que já aconteceu em RoladorTeste — o
-   *  mestre marca antes de clicar "rolar dano" pra este disparo específico usar dano máximo em
-   *  vez da rolagem (regras.md). Por linha de arma, não persiste — é um flag de "próxima rolagem". */
+  /** "margem 10+ (ou 20 natural)" no ataque — 100% manual (a rolagem de ataque não compara mais
+   *  contra a DT da cena, então não há margem pra pré-marcar sozinho): o mestre marca à mão,
+   *  narrativamente, antes de clicar "dano" pra este disparo específico usar dano máximo em vez
+   *  da rolagem (regras.md). Por linha de arma, não persiste — é um flag de "próxima rolagem". */
   const [margem10Mais, setMargem10Mais] = useState<Record<string, boolean>>({});
   /** Resultado da última rolagem de dano por arma — mostrado na própria ficha (não só no log),
    *  pro jogador ver na hora sem precisar abrir a aba Log. */
   const [resultados, setResultados] = useState<Record<string, { texto: string; erro: boolean }>>({});
+  /** Resultado da última rolagem de ATAQUE por arma — mesmo espírito do `resultados` acima. */
+  const [resultadosAtaque, setResultadosAtaque] = useState<Record<string, string>>({});
+
+  const rolarAtaque = (arma: ArmaFicha) => {
+    if (!arma.periciaAtaqueId) return;
+    const pericia = PERICIAS.find((p) => p.id === arma.periciaAtaqueId);
+    if (!pericia) return;
+    const grauPericia = ficha.pericias[pericia.id] ?? 0;
+    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
+    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
+    const [d20] = rolarDadosComForcados(1, 20, ficha.id, 'teste');
+    const nomePersonagem = ficha.nome || 'Personagem';
+    const nomeArma = arma.nome || 'arma';
+
+    const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
+    const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
+    const total = d20 + modificador;
+    const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
+    registrarLog('teste', `${nomePersonagem} · ${nomeArma} · ataque → 1d20: ${d20}${modStr} = ${total}`, ficha.id, 'publica');
+    registrarRoll({ origem: nomePersonagem, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade: 'publica' });
+    setResultadosAtaque((prev) => ({ ...prev, [arma.id]: `d20=${d20}${modStr}=${total}` }));
+  };
 
   const rolarDano = (arma: ArmaFicha) => {
     const parsed = parseDanoArma(arma.dano);
@@ -71,7 +97,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
   };
 
   const adicionarVazia = () => {
-    const nova: ArmaFicha = { id: crypto.randomUUID(), nome: '', bonusAtaque: '', dano: '', alcance: '', nota: '' };
+    const nova: ArmaFicha = { id: crypto.randomUUID(), nome: '', bonusAtaque: '', dano: '', alcance: '', nota: '', periciaAtaqueId: null };
     onChange({ armas: [...ficha.armas, nova] });
   };
 
@@ -85,6 +111,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
       dano: def.somaVigor ? `${def.dano} + Vigor` : def.dano,
       alcance: `${def.alcanceMetros} m`,
       nota: def.nota,
+      periciaAtaqueId: def.somaVigor ? 'briga' : 'pontaria',
     };
     onChange({ armas: [...ficha.armas, nova] });
   };
@@ -107,7 +134,7 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
               <th>Dano</th>
               <th>Alcance</th>
               <th>Nota</th>
-              <th>Rolar dano</th>
+              <th>Rolar</th>
               <th />
             </tr>
           </thead>
@@ -130,7 +157,23 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
                   <input value={a.nota} onChange={(e) => atualizar(a.id, { nota: e.target.value })} />
                 </td>
                 <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <select
+                      value={a.periciaAtaqueId ?? ''}
+                      title="perícia que governa o ataque desta arma"
+                      onChange={(e) => atualizar(a.id, { periciaAtaqueId: e.target.value || null })}
+                      style={{ maxWidth: 110 }}
+                    >
+                      <option value="">— perícia —</option>
+                      {PERICIAS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => rolarAtaque(a)} disabled={!a.periciaAtaqueId}>
+                      atacar
+                    </button>
                     <button onClick={() => rolarDano(a)} disabled={a.dano.trim() === ''}>
                       dano
                     </button>
@@ -146,6 +189,11 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
                       crít.
                     </label>
                   </div>
+                  {resultadosAtaque[a.id] && (
+                    <div className="mono" style={{ marginTop: '0.3rem', fontSize: '11px', whiteSpace: 'nowrap', color: 'var(--rede)' }}>
+                      {resultadosAtaque[a.id]}
+                    </div>
+                  )}
                   {resultados[a.id] && (
                     <div
                       className="mono"

@@ -4,9 +4,7 @@ import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { descricaoResultado, resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
-import { useDtDaCena } from './useDtDaCena';
 
 interface RoladorTesteProps {
   ready: boolean;
@@ -34,14 +32,13 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [bonus, setBonus] = useState(0);
   const [privado, setPrivado] = useState(false);
-  const [resultadoRolagem, setResultadoRolagem] = useState<{ sucesso: boolean; d20: number; modificador: number; total: number; descricao?: string } | null>(null);
+  const [resultadoRolagem, setResultadoRolagem] = useState<{ d20: number; modificador: number; total: number } | null>(null);
   const [rolando, setRolando] = useState(false);
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
-  const dt = useDtDaCena();
 
   useEffect(() => {
     setPrivado(modo === 'npc');
@@ -62,23 +59,17 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
         const ferido = estaFerido(ficha.pvAtual, pvMaximo);
         const grauPericia = ficha.pericias[periciaId] ?? 0;
-        const r = resolverTeste({
-          d20,
-          atributoId: pericia.atributo,
-          valorAtributo: ficha.atributos[pericia.atributo],
-          grauPericia,
-          personagemFerido: ferido,
-          dt,
-        });
-        setResultadoRolagem({ sucesso: r.sucesso, d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
+        const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
+        const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
+        const total = d20 + modificador;
+        setResultadoRolagem({ d20, modificador, total });
         setRolando(false);
 
         const origem = ficha.nome || 'Personagem';
-        const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
-        const rotulo = r.sucesso ? 'sucesso' : 'falha';
+        const formula = `d20${modificador >= 0 ? '+' : ''}${modificador}`;
         registrarLog(
           'teste',
-          `${origem} · ${rotulo} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          `${origem} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modificador >= 0 ? '+' : ''}${modificador} = ${total}`,
           ficha.id,
           visibilidade,
         );
@@ -86,7 +77,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           origem,
           personagemId: ficha.id,
           formula,
-          total: r.total,
+          total,
           bruto: d20,
           visibilidade,
         });
@@ -94,23 +85,15 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
     } else if (modo === 'npc' && npc) {
       rolar('1d20', (grupos) => {
         const d20 = grupos[0]?.rolls[0]?.value ?? 0;
-        const r = resolverTeste({
-          d20,
-          atributoId: 'vontade',
-          valorAtributo: bonus,
-          grauPericia: 0,
-          personagemFerido: false,
-          dt,
-        });
-        setResultadoRolagem({ sucesso: r.sucesso, d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
+        const total = d20 + bonus;
+        setResultadoRolagem({ d20, modificador: bonus, total });
         setRolando(false);
 
         const origem = npc.nome || 'NPC';
-        const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
-        const rotulo = r.sucesso ? 'sucesso' : 'falha';
+        const formula = `d20${bonus >= 0 ? '+' : ''}${bonus}`;
         registrarLog(
           'teste',
-          `${origem} · ${rotulo} · teste → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          `${origem} · teste → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
           npc.id,
           visibilidade,
         );
@@ -118,7 +101,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
           origem,
           personagemId: npc.id,
           formula,
-          total: r.total,
+          total,
           bruto: d20,
           visibilidade,
         });
@@ -234,18 +217,10 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
       </div>
 
       {resultadoRolagem && (
-        <div
-          className="alerta-banner mono"
-          style={{
-            marginTop: '0.75rem',
-            borderColor: resultadoRolagem.sucesso ? 'var(--rede)' : 'var(--ruido)',
-            color: resultadoRolagem.sucesso ? 'var(--rede)' : 'var(--ruido)',
-          }}
-        >
+        <div className="alerta-banner mono" style={{ marginTop: '0.75rem' }}>
           <span>
             d20={resultadoRolagem.d20} {resultadoRolagem.modificador >= 0 ? '+' : ''}
             {resultadoRolagem.modificador} = {resultadoRolagem.total}
-            {resultadoRolagem.descricao ? ` — ${resultadoRolagem.descricao}` : ''}
           </span>
         </div>
       )}

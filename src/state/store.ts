@@ -521,6 +521,14 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = (estado.fichas as any[]).map((f: any) => ({ ...f, surtosAtivos: [] }));
   }
+  // v30 → v31: periciaAtaqueId em ArmaFicha (rolagem de ataque direto da linha, na ficha).
+  // Só toca fichas que já têm `armas` de verdade — não fabrica o array pra quem nunca teve.
+  if (versaoAnterior < 31 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.fichas = (estado.fichas as any[]).map((f: any) =>
+      Array.isArray(f.armas) ? { ...f, armas: f.armas.map((a: any) => ({ periciaAtaqueId: null, ...a })) } : f,
+    );
+  }
   return estado as Store;
 }
 
@@ -1435,7 +1443,7 @@ export const useStore = create<Store>()(
             atributos: { ...ATRIBUTOS_ZERO, ...f.atributos },
             pericias: f.pericias ?? {},
             traumas: f.traumas ?? [],
-            armas: f.armas ?? [],
+            armas: (f.armas ?? []).map((a) => ({ ...a, periciaAtaqueId: a.periciaAtaqueId ?? null })),
             kitInvestigacao: f.kitInvestigacao ?? [],
             reguladores: f.reguladores ?? [],
             vinculos: f.vinculos ?? [],

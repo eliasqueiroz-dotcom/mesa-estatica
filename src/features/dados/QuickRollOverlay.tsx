@@ -3,9 +3,7 @@ import { useDiceBox } from '../../dice/useDiceBox';
 import { consumirForcados } from '../../dice/forcarRolagem';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
-import { descricaoResultado, resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
-import { useDtDaCena } from './useDtDaCena';
 
 interface QuickRollOverlayProps {
   abaAtual: string;
@@ -30,13 +28,12 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const [bonus, setBonus] = useState(0);
   const [privado, setPrivado] = useState(false);
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
-  const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number; descricao?: string } | null>(null);
+  const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
 
   const ficha = fichas.find((f) => f.id === fichaAtivaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
-  const dt = useDtDaCena();
 
   useEffect(() => {
     setPrivado(quem === 'npc');
@@ -82,19 +79,14 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
         const ferido = estaFerido(ficha.pvAtual, pvMaximo);
         const grauPericia = ficha.pericias[periciaId] ?? 0;
-        const r = resolverTeste({
-          d20,
-          atributoId: pericia.atributo,
-          valorAtributo: ficha.atributos[pericia.atributo],
-          grauPericia,
-          personagemFerido: ferido,
-          dt,
-        });
-        setResultadoRoll({ d20: r.d20, modificador: r.modificador, total: r.total, descricao: descricaoResultado(r) });
-        const formula = `d20${r.modificador >= 0 ? '+' : ''}${r.modificador}`;
+        const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
+        const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
+        const total = d20 + modificador;
+        setResultadoRoll({ d20, modificador, total });
+        const formula = `d20${modificador >= 0 ? '+' : ''}${modificador}`;
         registrarLog(
           'teste',
-          `${ficha.nome || 'Personagem'} · ${atributo.nome}+${pericia.nome} → ${d20}${r.modificador >= 0 ? '+' : ''}${r.modificador} = ${r.total} · ${descricaoResultado(r)}`,
+          `${ficha.nome || 'Personagem'} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modificador >= 0 ? '+' : ''}${modificador} = ${total}`,
           ficha.id,
           visibilidade,
         );
@@ -102,7 +94,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           origem: ficha.nome || 'Personagem',
           personagemId: ficha.id,
           formula,
-          total: r.total,
+          total,
           bruto: d20,
           visibilidade,
         });
@@ -315,7 +307,6 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
                 {resultadoRoll.modificador === 0
                   ? `1d20 → ${resultadoRoll.total}`
                   : `1d20: ${resultadoRoll.d20}${resultadoRoll.modificador > 0 ? ` + ${resultadoRoll.modificador}` : ` - ${Math.abs(resultadoRoll.modificador)}`} = ${resultadoRoll.total}`}
-                {resultadoRoll.descricao ? ` — ${resultadoRoll.descricao}` : ''}
               </span>
             </div>
           )}

@@ -47,6 +47,9 @@ export interface ArmaFicha {
   dano: string;
   alcance: string;
   nota: string;
+  /** id de `DefinicaoPericia` que governa o ataque desta arma (rolagem direta na ficha) —
+   *  null = arma antiga/sem perícia escolhida ainda, botão de atacar fica desabilitado. */
+  periciaAtaqueId: string | null;
 }
 
 export type TipoRegulador = 'generico' | 'pleno' | 'ajuste';

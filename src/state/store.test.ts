@@ -1311,6 +1311,19 @@ describe('migrate', () => {
     const estado = migrate({ fichas: [{ id: 'f1', nome: 'Helena' }] }, 29);
     expect(estado.fichas[0].surtosAtivos).toEqual([]);
   });
+
+  it('v30 → v31: injeta periciaAtaqueId null em armas existentes', () => {
+    const estado = migrate(
+      { fichas: [{ id: 'f1', nome: 'Helena', armas: [{ id: 'a1', nome: 'Faca', dano: '1d4' }] }] },
+      30,
+    );
+    expect(estado.fichas[0].armas[0]).toMatchObject({ id: 'a1', nome: 'Faca', periciaAtaqueId: null });
+  });
+
+  it('v30 → v31: não fabrica armas em ficha que nunca teve o campo', () => {
+    const estado = migrate({ fichas: [{ id: 'f1', nome: 'Helena' }] }, 30);
+    expect(estado.fichas[0]).not.toHaveProperty('armas');
+  });
 });
 
 describe('adicionarPista/atualizarPista/removerPista', () => {
