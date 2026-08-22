@@ -37,7 +37,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const turnoAtualId = useStore((s) => s.sessaoPublica.turnoAtualId);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,7 +71,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   }, [mapa.imagemDataUrl]);
 
   const meuToken = mapa.tokens.find((t) => t.participanteId === minhaFicha.id);
-  const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
+  const participanteNaVez = modoCombate ? iniciativa.find((e) => e.id === turnoAtualId)?.participanteId ?? null : null;
 
   const corMap: Record<string, string> = {};
   corMap[minhaFicha.id] = minhaFicha.corVisual;

@@ -94,7 +94,7 @@ function linhaRemota(override: Partial<ReturnType<typeof paraLinha>> = {}) {
     atmosfera: '',
     contador_cena: 1,
     modo_combate: false,
-    indice_atual_turno: 0,
+    turno_atual_id: null,
     rodada: 1,
     condicoes_combate: {},
     condicao_duracao: {},

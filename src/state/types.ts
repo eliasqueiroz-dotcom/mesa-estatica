@@ -222,7 +222,12 @@ export interface SessaoPublica {
   /** Modo combate por turnos (Parte II §4). A ordem em si continua em `EstadoGlobal.iniciativa`
    *  (já existia) — aqui só o estado de "de quem é a vez". */
   modoCombate: boolean;
-  indiceAtualTurno: number;
+  /** id da `EntradaIniciativa` cuja vez é agora — null fora de combate/lista vazia. Por id, não
+   *  por índice de array: a lista de iniciativa que o JOGADOR recebe pode ter menos entradas que
+   *  a do mestre (RLS oculta linhas de NPC com `visivel: false`), e um índice numérico desalinha
+   *  entre os dois lados assim que os tamanhos divergem. Um id nunca desalinha — ou a entrada tá
+   *  lá, ou não tá. */
+  turnoAtualId: string | null;
   rodada: number;
   /** Condições de combate por combatente (participanteId → ids de `CONDICOES_COMBATE`). Lembrete
    *  visual pro mestre, não modificador automático (Parte II §4). Limpo ao encerrar o combate. */

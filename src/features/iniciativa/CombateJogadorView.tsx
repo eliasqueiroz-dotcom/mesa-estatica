@@ -21,10 +21,13 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
-  const { modoCombate, indiceAtualTurno, rodada, contadorCena, condicoesCombate } = sessaoPublica;
+  const { modoCombate, turnoAtualId, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
-  const minhaVez = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === minhaFicha.id;
+  // por id da entrada, não índice: se for a vez de um NPC oculto, a RLS de `iniciativa` nem
+  // devolve essa linha pro jogador — `turnoAtualId` não bate com nenhum item deste array (e
+  // ninguém marca "sua vez" à toa), em vez de um índice desalinhado apontar pra outra pessoa.
+  const minhaVez = modoCombate && iniciativa.some((e) => e.id === turnoAtualId && e.participanteId === minhaFicha.id);
 
   const conteudo = !modoCombate ? (
     semMoldura ? (
@@ -63,8 +66,8 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
         <p className="vazio">aguardando o mestre rolar iniciativa.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {iniciativa.map((e, i) => {
-            const ativo = i === indiceAtualTurno;
+          {iniciativa.map((e) => {
+            const ativo = e.id === turnoAtualId;
             const souEu = ehMeuTurno(e.participanteId);
             const pvMaximo = calcularPvMaximo(basePV, minhaFicha.atributos.vigor);
             const defesa = calcularDefesa(minhaFicha.atributos.agilidade, minhaFicha.equipamentoModificadorDefesa);

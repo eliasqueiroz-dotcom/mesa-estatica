@@ -65,7 +65,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const turnoAtualId = useStore((s) => s.sessaoPublica.turnoAtualId);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
   const iniciativa = useStore((s) => s.iniciativa);
 
@@ -261,7 +261,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     inicioCliqueRef.current = null;
   };
 
-  const participanteNaVez = modoCombate ? iniciativa[indiceAtualTurno]?.participanteId ?? null : null;
+  const participanteNaVez = modoCombate ? iniciativa.find((e) => e.id === turnoAtualId)?.participanteId ?? null : null;
 
   const tokensVisuais = mapa.tokens.map((t) => {
     const p = participantePorId(t.participanteId);

@@ -723,7 +723,7 @@ describe('rerolarIniciativaDe', () => {
         { id: 'e1', participanteId: 'n1', tipo: 'npc', nome: 'Alvo', valor: 20 },
         { id: 'e2', participanteId: 'n2', tipo: 'npc', nome: 'Fixo', valor: 10 },
       ],
-      sessaoPublica: { ...useStore.getState().sessaoPublica, modoCombate: true, indiceAtualTurno: 1 },
+      sessaoPublica: { ...useStore.getState().sessaoPublica, modoCombate: true, turnoAtualId: 'e2' },
     });
   };
 
@@ -737,12 +737,12 @@ describe('rerolarIniciativaDe', () => {
     vi.restoreAllMocks();
   });
 
-  it('mantém indiceAtualTurno grudado em quem estava na vez, mesmo com a reordenação', () => {
-    montarIniciativa(); // indiceAtualTurno=1 → 'n2' (Fixo) está na vez
+  it('mantém turnoAtualId grudado em quem estava na vez, mesmo com a reordenação', () => {
+    montarIniciativa(); // turnoAtualId='e2' → 'n2' (Fixo) está na vez
     vi.spyOn(Math, 'random').mockReturnValue(0); // d20 = 1 → n1 cai pra depois de n2
     useStore.getState().rerolarIniciativaDe('n1');
     const s = useStore.getState();
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('n2');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('n2');
     vi.restoreAllMocks();
   });
 
@@ -762,38 +762,38 @@ describe('removerDaIniciativa', () => {
     { id: 'e4', participanteId: 'd', tipo: 'npc' as const, nome: 'D', valor: 5 },
   ];
 
-  it('remove quem não está na vez — reancora indiceAtualTurno na MESMA pessoa', () => {
+  it('remove quem não está na vez — turnoAtualId continua apontando pra MESMA pessoa', () => {
     useStore.setState((s) => ({
       iniciativa: iniciativaABCD(),
-      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' está na vez
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e3' }, // 'c' está na vez
     }));
     useStore.getState().removerDaIniciativa('e1'); // remove 'a', antes de 'c'
     const s = useStore.getState();
     expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['b', 'c', 'd']);
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('c');
   });
 
   it('remove o próprio combatente da vez — assume o slot seguinte em vez de pular alguém', () => {
     useStore.setState((s) => ({
       iniciativa: iniciativaABCD(),
-      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' está na vez
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e3' }, // 'c' está na vez
     }));
     useStore.getState().removerDaIniciativa('e3'); // remove a própria 'c'
     const s = useStore.getState();
     expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b', 'd']);
-    expect(s.sessaoPublica.indiceAtualTurno).toBe(2);
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('d');
+    expect(s.sessaoPublica.turnoAtualId).toBe('e4');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('d');
   });
 
   it('remove o último da lista enquanto ele está na vez — clampa pro novo último', () => {
     useStore.setState((s) => ({
       iniciativa: iniciativaABCD().slice(0, 3), // a, b, c
-      sessaoPublica: { ...s.sessaoPublica, indiceAtualTurno: 2 }, // 'c' (último) está na vez
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e3' }, // 'c' (último) está na vez
     }));
     useStore.getState().removerDaIniciativa('e3');
     const s = useStore.getState();
     expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b']);
-    expect(s.sessaoPublica.indiceAtualTurno).toBe(1);
+    expect(s.sessaoPublica.turnoAtualId).toBe('e2');
   });
 
   it('limpa condicoesCombate/condicaoDuracao órfãos do participante removido', () => {
@@ -943,7 +943,8 @@ describe('rolarIniciativaGrupo', () => {
 });
 
 // Combatente adicionado NO MEIO de um combate: antes ele era sempre anexado no fim da
-// lista, ignorando o valor rolado (a lista é posicional — `avancarTurno` usa o índice).
+// lista, ignorando o valor rolado. `turnoAtualId` é o id de uma entrada, não uma posição —
+// inserir alguém em qualquer ponto do array nunca precisa reancorar a vez.
 describe('adicionar combatente com combate em andamento', () => {
   const criarNpc = (id: string, nome: string, agilidade: number) => ({
     id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,
@@ -956,38 +957,38 @@ describe('adicionar combatente com combate em andamento', () => {
     { id: 'e3', participanteId: 'c', tipo: 'npc' as const, nome: 'C', valor: 5 },
   ];
 
-  const prepararCombate = (agilidadeDoNovo: number, indiceAtualTurno: number) => {
+  const prepararCombate = (agilidadeDoNovo: number, turnoAtualId: string) => {
     useStore.setState((s) => ({
       npcs: [criarNpc('novo', 'Novo', agilidadeDoNovo)],
       iniciativa: iniciativaBase.map((e) => ({ ...e })),
-      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno },
+      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, turnoAtualId },
     }));
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11
   };
 
   it('entra na posição do valor rolado, não no fim da lista', () => {
-    prepararCombate(0, 0); // 11 + 0 = 11 → entre B (12) e C (5)
+    prepararCombate(0, 'e1'); // 11 + 0 = 11 → entre B (12) e C (5)
     useStore.getState().rolarIniciativa(['novo']);
     expect(useStore.getState().iniciativa.map((e) => e.participanteId)).toEqual(['a', 'b', 'novo', 'c']);
     vi.restoreAllMocks();
   });
 
   it('inserir DEPOIS do turno atual não move a seta de turno', () => {
-    prepararCombate(0, 1); // B está na vez; novo (11) entra depois dele
+    prepararCombate(0, 'e2'); // B está na vez; novo (11) entra depois dele
     useStore.getState().rolarIniciativa(['novo']);
     const s = useStore.getState();
-    expect(s.sessaoPublica.indiceAtualTurno).toBe(1);
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('b');
+    expect(s.sessaoPublica.turnoAtualId).toBe('e2');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('b');
     vi.restoreAllMocks();
   });
 
-  it('inserir ANTES do turno atual empurra o índice — a vez continua da mesma pessoa', () => {
-    prepararCombate(4, 2); // C está na vez; novo (11+4=15) entra antes, entre A e B
+  it('inserir ANTES do turno atual não muda o id — a vez continua da mesma pessoa', () => {
+    prepararCombate(4, 'e3'); // C está na vez; novo (11+4=15) entra antes, entre A e B
     useStore.getState().rolarIniciativa(['novo']);
     const s = useStore.getState();
     expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'novo', 'b', 'c']);
-    expect(s.sessaoPublica.indiceAtualTurno).toBe(3);
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+    expect(s.sessaoPublica.turnoAtualId).toBe('e3');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('c');
     vi.restoreAllMocks();
   });
 
@@ -995,13 +996,13 @@ describe('adicionar combatente com combate em andamento', () => {
     useStore.setState((s) => ({
       npcs: [criarNpc('g1', 'G1', 4), criarNpc('g2', 'G2', 2)],
       iniciativa: iniciativaBase.map((e) => ({ ...e })),
-      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, indiceAtualTurno: 2 },
+      sessaoPublica: { ...s.sessaoPublica, modoCombate: true, turnoAtualId: 'e3' },
     }));
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // d20 = 11 → 11 + maior agilidade (4) = 15
     useStore.getState().rolarIniciativaGrupo(['g1', 'g2']);
     const s = useStore.getState();
     expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['a', 'g1', 'g2', 'b', 'c']);
-    expect(s.iniciativa[s.sessaoPublica.indiceAtualTurno].participanteId).toBe('c');
+    expect(s.iniciativa.find((e) => e.id === s.sessaoPublica.turnoAtualId)?.participanteId).toBe('c');
     vi.restoreAllMocks();
   });
 });
@@ -1323,6 +1324,26 @@ describe('migrate', () => {
   it('v30 → v31: não fabrica armas em ficha que nunca teve o campo', () => {
     const estado = migrate({ fichas: [{ id: 'f1', nome: 'Helena' }] }, 30);
     expect(estado.fichas[0]).not.toHaveProperty('armas');
+  });
+
+  it('v31 → v32: converte indiceAtualTurno num turnoAtualId achando a entrada na mesma posição', () => {
+    const estado = migrate(
+      {
+        sessaoPublica: { modoCombate: true, indiceAtualTurno: 1, rodada: 2 },
+        iniciativa: [
+          { id: 'e1', participanteId: 'a', tipo: 'npc', nome: 'A', valor: 20 },
+          { id: 'e2', participanteId: 'b', tipo: 'npc', nome: 'B', valor: 10 },
+        ],
+      },
+      31,
+    );
+    expect(estado.sessaoPublica.turnoAtualId).toBe('e2');
+    expect(estado.sessaoPublica).not.toHaveProperty('indiceAtualTurno');
+  });
+
+  it('v31 → v32: índice fora da lista (ou lista ausente) vira turnoAtualId null', () => {
+    const estado = migrate({ sessaoPublica: { modoCombate: false, indiceAtualTurno: 0, rodada: 1 } }, 31);
+    expect(estado.sessaoPublica.turnoAtualId).toBeNull();
   });
 });
 

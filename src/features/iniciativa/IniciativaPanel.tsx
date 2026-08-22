@@ -20,7 +20,7 @@ interface IniciativaPanelProps {
 
 export default function IniciativaPanel({ hook, header, banner, estiloItem, podeArrastar = true, ocultarBotaoProximo = false }: IniciativaPanelProps) {
   const {
-    iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
+    iniciativa, modoCombate, turnoAtualId, rodada, contadorCena,
     condicoesCombate, condicaoDuracao, fichas, npcs,
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
@@ -130,7 +130,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {iniciativa.map((e, i) => {
-            const naVez = modoCombate && i === indiceAtualTurno;
+            const naVez = modoCombate && e.id === turnoAtualId;
             const exp = expandidos.has(e.id) || naVez;
             const pv = pvDoCombatente(e.participanteId, e.tipo);
             const defesa = defesaDoCombatente(e.participanteId, e.tipo);
