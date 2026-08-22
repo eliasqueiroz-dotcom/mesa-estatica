@@ -111,7 +111,7 @@ export function criarSessaoPublica(): SessaoPublica {
     atmosfera: '',
     contadorCena: 1,
     modoCombate: false,
-    indiceAtualTurno: 0,
+    turnoAtualId: null,
     rodada: 1,
     condicoesCombate: {},
     condicaoDuracao: {},
@@ -152,7 +152,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

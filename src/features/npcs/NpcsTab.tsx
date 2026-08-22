@@ -488,7 +488,7 @@ export default function NpcsTab() {
               >
                 <span className="mono">
                   {iniciativa.modoCombate
-                    ? `combate · rodada ${iniciativa.rodada} · vez de ${iniciativa.iniciativa[iniciativa.indiceAtualTurno]?.nome ?? '?'}`
+                    ? `combate · rodada ${iniciativa.rodada} · vez de ${iniciativa.iniciativa.find((e) => e.id === iniciativa.turnoAtualId)?.nome ?? '?'}`
                     : 'fora de combate'}
                 </span>
               </div>

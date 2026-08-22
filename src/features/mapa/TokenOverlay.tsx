@@ -92,7 +92,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const turnoAtualId = useStore((s) => s.sessaoPublica.turnoAtualId);
   const iniciativa = useStore((s) => s.iniciativa);
   const condicoesAtivas = useStore((s) => s.sessaoPublica.condicoesCombate[id] ?? EMPTY_CONDICOES);
   const condicaoDuracao = useStore((s) => s.sessaoPublica.condicaoDuracao?.[id] ?? EMPTY_DURACAO);
@@ -116,7 +116,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
   const surtosVisiveis = surtosAtivosNaSessao(ficha?.surtosAtivos ?? [], { modoCombate, contadorCena, rodada });
   const emSurto = surtosVisiveis.length > 0;
-  const turnoAtivo = modoCombate && iniciativa[indiceAtualTurno]?.participanteId === id;
+  const turnoAtivo = modoCombate && iniciativa.find((e) => e.id === turnoAtualId)?.participanteId === id;
 
   return (
     <div

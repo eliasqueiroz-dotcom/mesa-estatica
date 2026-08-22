@@ -26,7 +26,7 @@ export function corPv(atual: number, maximo: number): string {
 export function useIniciativa() {
   const iniciativa = useStore((s) => s.iniciativa);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
-  const indiceAtualTurno = useStore((s) => s.sessaoPublica.indiceAtualTurno);
+  const turnoAtualId = useStore((s) => s.sessaoPublica.turnoAtualId);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
@@ -255,7 +255,7 @@ export function useIniciativa() {
   };
 
   return {
-    iniciativa, modoCombate, indiceAtualTurno, rodada, contadorCena,
+    iniciativa, modoCombate, turnoAtualId, rodada, contadorCena,
     condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs, basePV,
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,

@@ -8,7 +8,7 @@ import IniciativaPanel from '../iniciativa/IniciativaPanel';
 
 export default function CombatOverlay() {
   const iniciativa = useIniciativa();
-  const { modoCombate, indiceAtualTurno, avancarTurno } = iniciativa;
+  const { modoCombate, turnoAtualId, avancarTurno } = iniciativa;
   const numeroSessao = useStore((s) => s.sessaoPublica.numeroSessao);
 
   const [aberto, setAberto] = useState(false);
@@ -75,7 +75,7 @@ export default function CombatOverlay() {
     if (!aberto || !modoCombate) return;
     const el = painelRef.current?.querySelector('[data-ativo="true"]');
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [aberto, modoCombate, indiceAtualTurno]);
+  }, [aberto, modoCombate, turnoAtualId]);
 
   // espaço/n avançam o turno — o GM decide rápido sem precisar mirar o botão "próximo" com o
   // mouse; ignorado enquanto o foco está num campo de texto (mesmo remédio de App.tsx).
@@ -99,8 +99,10 @@ export default function CombatOverlay() {
     return () => window.removeEventListener('keydown', handler);
   }, [modoCombate, avancarTurno]);
 
-  const combatenteAtual = modoCombate ? iniciativa.iniciativa[indiceAtualTurno] ?? null : null;
-  const proximoIndice = iniciativa.iniciativa.length > 0 ? (indiceAtualTurno + 1) % iniciativa.iniciativa.length : -1;
+  const indiceAtual = iniciativa.iniciativa.findIndex((e) => e.id === turnoAtualId);
+  const combatenteAtual = modoCombate && indiceAtual >= 0 ? iniciativa.iniciativa[indiceAtual] : null;
+  const proximoIndice =
+    indiceAtual >= 0 && iniciativa.iniciativa.length > 0 ? (indiceAtual + 1) % iniciativa.iniciativa.length : -1;
   const proximoCombatente = modoCombate && proximoIndice >= 0 ? iniciativa.iniciativa[proximoIndice] ?? null : null;
 
   // resumo markdown só com o que o app sabe de verdade (iniciativa, PV, condições) — sem

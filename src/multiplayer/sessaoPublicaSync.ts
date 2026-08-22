@@ -29,7 +29,7 @@ export interface Linha {
   atmosfera: string;
   contador_cena: number;
   modo_combate: boolean;
-  indice_atual_turno: number;
+  turno_atual_id: string | null;
   rodada: number;
   condicoes_combate: SessaoPublica['condicoesCombate'];
   condicao_duracao: SessaoPublica['condicaoDuracao'] | null | undefined;
@@ -50,7 +50,7 @@ export const paraLinha = (s: SessaoPublica): Omit<Linha, 'id'> => ({
   atmosfera: s.atmosfera,
   contador_cena: s.contadorCena,
   modo_combate: s.modoCombate,
-  indice_atual_turno: s.indiceAtualTurno,
+  turno_atual_id: s.turnoAtualId,
   rodada: s.rodada,
   condicoes_combate: s.condicoesCombate,
   condicao_duracao: s.condicaoDuracao,
@@ -71,7 +71,7 @@ export const paraSessaoPublica = (r: Linha): SessaoPublica => ({
   atmosfera: r.atmosfera,
   contadorCena: r.contador_cena,
   modoCombate: r.modo_combate,
-  indiceAtualTurno: r.indice_atual_turno,
+  turnoAtualId: r.turno_atual_id,
   rodada: r.rodada,
   condicoesCombate: r.condicoes_combate,
   // fallback pro caso da migração 0015 (coluna condicao_duracao) ainda não ter rodado no banco
