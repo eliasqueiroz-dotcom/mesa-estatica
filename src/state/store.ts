@@ -592,10 +592,14 @@ export const useStore = create<Store>()(
           }),
         })),
       removerFicha: (id) =>
-        set((s) => ({
-          fichas: s.fichas.filter((f) => f.id !== id),
-          fichaAtivaId: s.fichaAtivaId === id ? null : s.fichaAtivaId,
-        })),
+        set((s) => {
+          const fichas = s.fichas.filter((f) => f.id !== id);
+          // reaponta pra primeira ficha restante em vez de deixar null — sem isso, telas que
+          // leem fichaAtivaId direto do store (QuickRollOverlay, DestaqueSuperior,
+          // MeuStatusSection, RuidoOverlay) ficam "cegas" até o mestre clicar manualmente na
+          // ficha que já aparece selecionada em FichasTab.tsx (que só disfarça com um fallback local).
+          return { fichas, fichaAtivaId: s.fichaAtivaId === id ? (fichas[0]?.id ?? null) : s.fichaAtivaId };
+        }),
       definirFichaAtiva: (id) => set({ fichaAtivaId: id }),
 
       ajustarPvAtual: (id, novoValor) => {

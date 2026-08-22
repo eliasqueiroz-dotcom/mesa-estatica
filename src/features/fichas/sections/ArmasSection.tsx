@@ -87,6 +87,9 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
       visibilidade: 'publica',
     });
     setResultados((prev) => ({ ...prev, [arma.id]: { texto, erro: false } }));
+    // "crít." é flag de "próxima rolagem" (comentário acima) — desarma sozinho depois de
+    // aplicado, senão fica "armado" e infla silenciosamente o próximo ataque normal.
+    setMargem10Mais((prev) => ({ ...prev, [arma.id]: false }));
   };
   const atualizar = (id: string, patch: Partial<ArmaFicha>) => {
     onChange({ armas: ficha.armas.map((a) => (a.id === id ? { ...a, ...patch } : a)) });

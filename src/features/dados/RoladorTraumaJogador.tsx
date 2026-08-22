@@ -76,13 +76,14 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
 
   const perderSanidade = () => {
     if (!trauma) return;
+    // trava os dois botões já no clique, antes do dado assentar — mesmo motivo de RoladorTrauma.tsx.
+    setResolvido(true);
     rolar(
       [{ sides: 4, qty: 1 }],
       (grupos) => {
         const perda = grupos[0].value;
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
         registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id, 'publica');
-        setResolvido(true);
       },
       'ruido',
       ficha.id,

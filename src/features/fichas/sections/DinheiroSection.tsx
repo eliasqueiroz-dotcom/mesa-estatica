@@ -14,7 +14,9 @@ export default function DinheiroSection({ ficha }: SecaoFichaProps) {
   const valor = Math.max(0, Math.floor(Number(valorTexto) || 0));
   const saldoOrigem = direcao === 'pontoParaReal' ? ficha.dinheiroPonto : ficha.dinheiroReal;
   const debitado = Math.min(valor, saldoOrigem);
-  const creditado = direcao === 'pontoParaReal' ? Math.floor(debitado * 0.7) : debitado;
+  // espelha exatamente converterDinheiro (store.ts) — Math.max(1, Math.round(...)), não floor,
+  // senão a prévia diverge do valor realmente creditado (ex: P$1 mostrava "R$0", creditava R$1).
+  const creditado = direcao === 'pontoParaReal' ? (debitado === 0 ? 0 : Math.max(1, Math.round(debitado * 0.7))) : debitado;
 
   const converter = () => {
     if (debitado === 0) return;

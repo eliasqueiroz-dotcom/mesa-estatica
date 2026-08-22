@@ -80,13 +80,16 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
 
   const perderSanidade = () => {
     if (!ficha || !trauma) return;
+    // trava os dois botões já no clique, antes do dado assentar — sem isso, um duplo clique (ou
+    // clicar "interpretar" enquanto o dado ainda anima) aplica as duas consequências, que
+    // deveriam ser mutuamente exclusivas (mesmo guard que RoladorSurto.tsx já usa, síncrono).
+    setResolvido(true);
     rolar(
       [{ sides: 4, qty: 1 }],
       (grupos) => {
         const perda = grupos[0].value;
         registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id);
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-        setResolvido(true);
       },
       'ruido',
       ficha.id,
@@ -126,7 +129,16 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
         </div>
         <div>
           <label htmlFor="rtr-trauma">Trauma</label>
-          <select id="rtr-trauma" value={traumaId} onChange={(e) => setTraumaId(e.target.value)} disabled={!ficha}>
+          <select
+            id="rtr-trauma"
+            value={traumaId}
+            onChange={(e) => {
+              setTraumaId(e.target.value);
+              setTeste(null);
+              setResolvido(false);
+            }}
+            disabled={!ficha}
+          >
             <option value="">— selecione —</option>
             {traumasAtivos.map((t) => (
               <option key={t.id} value={t.id}>
