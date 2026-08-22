@@ -63,10 +63,24 @@ describe('expirarAntigas', () => {
     expect(Object.keys(useReguasStore.getState().reguas)).toEqual(['ficha-1']);
   });
 
-  it('régua ATIVA nunca expira, mesmo muito além do limiar', () => {
+  it('régua ATIVA não expira pelo limiar normal, mesmo muito além dele (sem rede de segurança)', () => {
     const agora = 100_000;
     useReguasStore.getState().upsertRegua(criarRegua({ ativa: true, atualizadaEm: 0 }));
     useReguasStore.getState().expirarAntigas(agora, 4_000);
+    expect(Object.keys(useReguasStore.getState().reguas)).toEqual(['ficha-1']);
+  });
+
+  it('régua ATIVA expira pela rede de segurança quando ultrapassa limiarAtivaSemAtualizarMs', () => {
+    const agora = 100_000;
+    useReguasStore.getState().upsertRegua(criarRegua({ ativa: true, atualizadaEm: 0 }));
+    useReguasStore.getState().expirarAntigas(agora, 4_000, 6_000);
+    expect(useReguasStore.getState().reguas).toEqual({});
+  });
+
+  it('régua ATIVA recém-atualizada não expira pela rede de segurança', () => {
+    const agora = 10_000;
+    useReguasStore.getState().upsertRegua(criarRegua({ ativa: true, atualizadaEm: 9_000 }));
+    useReguasStore.getState().expirarAntigas(agora, 4_000, 6_000);
     expect(Object.keys(useReguasStore.getState().reguas)).toEqual(['ficha-1']);
   });
 

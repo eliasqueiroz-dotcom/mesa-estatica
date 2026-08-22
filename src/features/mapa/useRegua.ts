@@ -116,6 +116,29 @@ export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado 
     return () => window.removeEventListener('keydown', handler);
   }, [fixarWaypoint, cancelar]);
 
+  // minimizar/trocar de app no meio de um arrasto nunca dispara pointerup na página — sem
+  // isso, a régua fica "ativa" pra sempre nas telas de quem já a recebeu (expirarAntigas não
+  // toca em réguas ativas, de propósito — ver reguasStore.ts). Finaliza igual a um pointerup
+  // normal (mesmo fade), só que na hora em que a aba esconde, em vez de esperar a rede de
+  // segurança de reguasStore.ts (que cobre os casos que nem isto alcança: crash, notebook
+  // fechado abruptamente, rede caindo antes do evento disparar).
+  useEffect(() => {
+    const finalizarSeEscondido = () => {
+      if (!document.hidden) return;
+      if (medindoRef.current) {
+        medindoRef.current = false;
+        publicar(false);
+      }
+      origemRef.current = null;
+    };
+    document.addEventListener('visibilitychange', finalizarSeEscondido);
+    window.addEventListener('pagehide', finalizarSeEscondido);
+    return () => {
+      document.removeEventListener('visibilitychange', finalizarSeEscondido);
+      window.removeEventListener('pagehide', finalizarSeEscondido);
+    };
+  }, [publicar]);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (bloqueado || e.button !== 0) return;

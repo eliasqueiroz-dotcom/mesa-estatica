@@ -4,11 +4,17 @@ import type { GradeMapa } from '../../state/types';
 import { distanciaEmCelulas, distanciaTotal, formatarDistancia, type Ponto } from './mapaUtils';
 
 /** Uma régua fica plenamente visível por `MS_ATE_SUMIR` depois do último ponto (pointerup) e
- *  então se apaga em `MS_FADE`. Réguas ainda `ativa`
- *  (sendo arrastadas) nunca entram nessa contagem. */
+ *  então se apaga em `MS_FADE`. Réguas ainda `ativa` (sendo arrastadas) não entram nessa
+ *  contagem — só na rede de segurança de `MS_SEGURANCA_ATIVA`, bem mais generosa. */
 const MS_ATE_SUMIR = 4000;
 const MS_FADE = 600;
 const INTERVALO_VARREDURA_MS = 250;
+/** Régua `ativa` sem nenhuma atualização por esse tempo = autor sumiu sem avisar (minimizou,
+ *  caiu a rede, fechou o notebook — `useRegua.ts` já cobre o caminho feliz de minimizar via
+ *  `visibilitychange`, isto aqui é só a rede de segurança pros casos que ele não alcança).
+ *  Bem maior que o debounce de reenvio (80ms, `reguasSync.ts`) pra nunca cortar uma medição
+ *  real em andamento. */
+const MS_SEGURANCA_ATIVA = 6000;
 
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
@@ -31,7 +37,7 @@ export default function ReguaOverlay({ imgRenderRect, tamanho, grade }: Props) {
   const expirarAntigas = useReguasStore((s) => s.expirarAntigas);
 
   useEffect(() => {
-    const id = setInterval(() => expirarAntigas(Date.now(), MS_ATE_SUMIR), INTERVALO_VARREDURA_MS);
+    const id = setInterval(() => expirarAntigas(Date.now(), MS_ATE_SUMIR, MS_SEGURANCA_ATIVA), INTERVALO_VARREDURA_MS);
     return () => clearInterval(id);
   }, [expirarAntigas]);
 

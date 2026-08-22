@@ -14,7 +14,10 @@ export interface ReguaViva {
   /** `Date.now()` do relógio LOCAL de quem está exibindo — nunca o timestamp de quem mediu
    *  (relógios de máquinas diferentes não batem; ver `ReguaOverlay.tsx`). Base do fade. */
   atualizadaEm: number;
-  /** true enquanto o autor ainda está arrastando — réguas ativas nunca expiram. */
+  /** true enquanto o autor ainda está arrastando — réguas ativas não expiram pelo limiar normal
+   *  (não pode sumir no meio de uma medição real), só pela rede de segurança de
+   *  `limiarAtivaSemAtualizarMs` em `expirarAntigas` (autor sumiu sem avisar: minimizou,
+   *  caiu a rede, fechou o notebook — ver `useRegua.ts` pro caminho feliz, que evita isso). */
   ativa: boolean;
 }
 
@@ -23,8 +26,11 @@ interface ReguasState {
   upsertRegua: (regua: ReguaViva) => void;
   removerRegua: (id: string) => void;
   /** Remove réguas inativas cuja `atualizadaEm` já passou do limiar de fade — chamado por um
-   *  timer no `ReguaOverlay`, nunca direto por interação do usuário. */
-  expirarAntigas: (agora: number, limiarMs: number) => void;
+   *  timer no `ReguaOverlay`, nunca direto por interação do usuário. `limiarAtivaSemAtualizarMs`
+   *  (default `Infinity` = desligado) é a rede de segurança: uma régua `ativa` que nunca mais
+   *  se renovou (autor sumiu sem mandar o fim) expira mesmo assim, depois de um prazo bem mais
+   *  generoso que o de fade normal. */
+  expirarAntigas: (agora: number, limiarInativaMs: number, limiarAtivaSemAtualizarMs?: number) => void;
 }
 
 /**
@@ -41,12 +47,14 @@ export const useReguasStore = create<ReguasState>((set) => ({
       const { [id]: _removida, ...resto } = s.reguas;
       return { reguas: resto };
     }),
-  expirarAntigas: (agora, limiarMs) =>
+  expirarAntigas: (agora, limiarInativaMs, limiarAtivaSemAtualizarMs = Infinity) =>
     set((s) => {
       const restantes: Record<string, ReguaViva> = {};
       let mudou = false;
       for (const [id, regua] of Object.entries(s.reguas)) {
-        if (!regua.ativa && agora - regua.atualizadaEm > limiarMs) {
+        const expirouInativa = !regua.ativa && agora - regua.atualizadaEm > limiarInativaMs;
+        const expirouAtivaAbandonada = regua.ativa && agora - regua.atualizadaEm > limiarAtivaSemAtualizarMs;
+        if (expirouInativa || expirouAtivaAbandonada) {
           mudou = true;
           continue;
         }
