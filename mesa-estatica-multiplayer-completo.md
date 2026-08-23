@@ -38,7 +38,7 @@ Postgres RLS decide se uma **linha inteira** é visível/editável — não esco
 
 | Tabela | Leitura | Escrita | Conteúdo |
 |---|---|---|---|
-| `characters_publico` | todos os participantes | jogador: só a própria linha (`owner_token`) — cria exatamente 1 personagem no primeiro acesso, sem criar adicionais · GM: todas, sem limite | **superfície de mesa** de PC: nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido |
+| `characters_publico` | todos os participantes (a tabela existe pro dono conseguir ler a própria linha; a UI do jogador nunca expõe PV/surtos/Ferido de PC alheio — ver Parte II §1) | jogador: só a própria linha (`owner_token`) — cria exatamente 1 personagem no primeiro acesso, sem criar adicionais · GM: todas, sem limite | nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido — mas só **nome e cor do token** são de fato mostrados de PC alheio; PV/surtos/Ferido só aparecem pro próprio dono e pro GM (jogadores não devem ver PV/Sanidade uns dos outros) |
 | `characters_privado` | **só o dono** (via `owner_token`/`auth.uid()`) + GM | jogador: só a própria linha · GM: todas | resto da ficha: atributos, Sanidade, perícias, traumas, armas, Determinação, neuro-reguladores/Acessos, dinheiro, vínculos, antecedente/história, kit, anotações (ver Parte IV §3) |
 | `npcs` | todos | **insert/update/delete**: só GM — jogador nunca cria NPC | PV, Defesa, Agilidade, notas, `controlado_por` (nullable — delegação **de movimento**, nunca de criação ou edição de stats) |
 | `tokens` | todos (o tabuleiro é visível a todos) | posição: dono do `character_id` (PC) ou GM (qualquer token) ou jogador com `controlado_por` = ele (NPC delegado) · **insert/delete**: só do próprio `character_id` (jogador pode colocar/tirar o próprio token do mapa); NPC insert/delete: só GM | id, character_id, x, y, tipo (`pc`/`npc`) |
@@ -209,7 +209,7 @@ Clicar num token (PC ou NPC) no mapa abre um overlay (fecha por botão X, clique
 - NPC: PV atual/máx, Defesa, Agilidade, notas.
 - Escreve direto no Zustand/Supabase — não duplicar estado. Mudar aqui reflete na aba Personagens/NPCs e vice-versa.
 - Precisa de **distinção clique vs. arrasto** (limiar de poucos pixels) pra não abrir o overlay toda vez que o token é só reposicionado.
-- **Permissão (pós-multiplayer):** steppers de edição só ficam ativos se for a própria ficha (jogador) ou GM; outros PCs/NPCs abrem em modo leitura. De um PC alheio o jogador vê só a **superfície pública** (`characters_publico`: nome/cor/PV/estado — seção 4 e Parte IV §3); Sanidade, perícias, traumas e o resto de `characters_privado` só aparecem pro dono e pro GM. NPC visível abre sem `notasMestre`.
+- **Permissão (pós-multiplayer):** steppers de edição só ficam ativos se for a própria ficha (jogador) ou GM; outros PCs/NPCs abrem em modo leitura. De um PC alheio o jogador vê só **nome e cor do token** — o overlay mostra "informação restrita ao mestre" no lugar de PV/estado (jogadores não veem PV/Sanidade uns dos outros, de propósito); Sanidade, perícias, traumas e o resto de `characters_privado` só aparecem pro dono e pro GM. NPC visível abre sem `notasMestre`.
 
 ## 2. Surto: marcação até o fim da cena
 
@@ -421,7 +421,7 @@ O `PlayerApp` monta as `*View` + os controles restritos ao próprio jogador (edi
 
 **Divisão da ficha (`characters_publico` vs `characters_privado`, §4):**
 
-- **Público** (superfície de mesa): nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido.
+- **Público** (`characters_publico`, tabela lida por todos por simplicidade de RLS — linha inteira, não coluna): nome, cor do token, PV atual (+ máx derivado), surtos ativos, indicador Ferido. Da UI do jogador, porém, só **nome e cor** de um PC alheio chegam a aparecer — PV/surtos/Ferido de terceiros ficam de fora de propósito, jogadores não devem ver PV/Sanidade uns dos outros.
 - **Privado** (só dono + GM): atributos, Sanidade, perícias, traumas, armas, Determinação, neuro-reguladores/Acessos, dinheiro, vínculos, antecedente/história, kit, anotações. (`Acessos` é lido pelo dono mas escrito só pelo GM.)
 - **NPCs** já têm o *seam* pronto: `visivel` (default oculto) e `notasMestre`. Player só lê NPC `visivel = true`, nunca `notasMestre`, e não cria/edita (§8). Sem campo novo.
 - **Rolls**: `rolls_log` tem visibilidade por entrada (privada→pública via "revelar"). Player lê só as públicas.

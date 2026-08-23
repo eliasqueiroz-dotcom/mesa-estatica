@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStatusMesa } from '../lib/statusMesa';
 import {
   executarComRetentativa,
@@ -138,6 +138,52 @@ describe('filaPendencias', () => {
 
     it('sem pendências, não lança', () => {
       expect(() => tentarTodasPendencias()).not.toThrow();
+    });
+  });
+
+  describe('registro silencioso "em voo" (sobrevive a fechamento no meio da chamada de rede)', () => {
+    // ambiente de teste é `node` (sem jsdom, ver vite.config.ts) — `localStorage` global não
+    // existe de verdade; `obterStorage()` em filaPendencias.ts reavalia `typeof localStorage` a
+    // cada chamada só por causa disso, pra `vi.stubGlobal` conseguir injetar um fake aqui.
+    let storageFalso: ReturnType<typeof criarStorageFalso>;
+
+    beforeEach(() => {
+      storageFalso = criarStorageFalso();
+      vi.stubGlobal('localStorage', storageFalso);
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('marca em voo antes de chamar executar, e desmarca ao suceder — sem nunca aparecer na fila visível', async () => {
+      let resolver!: (r: { error: null }) => void;
+      const executar = vi.fn(() => new Promise<{ error: null }>((r) => (resolver = r)));
+
+      executarComRetentativa('tokens-sync', 'abc', executar);
+
+      // ainda em voo — a chamada de rede não resolveu ainda.
+      expect(JSON.parse(storageFalso.getItem('estatica-em-voo-v1')!)).toEqual(['tokens-sync:abc']);
+      expect(usePendenciasStore.getState().itens).toEqual([]); // indicador da UI não pisca
+
+      resolver({ error: null });
+      await vi.waitFor(() => expect(JSON.parse(storageFalso.getItem('estatica-em-voo-v1')!)).toEqual([]));
+    });
+
+    it('uma escrita em voo (nunca resolvida nesta "sessão") aparece em retomarPendenciasPersistidas mesmo sem nunca ter falhado', () => {
+      const executar = vi.fn(() => new Promise<{ error: null }>(() => {})); // nunca resolve — simula aba fechada no meio
+      executarComRetentativa('npcs-sync', 'npc-1', executar);
+
+      expect(usePendenciasStore.getState().itens).toEqual([]); // nunca "falhou" de verdade
+      expect(retomarPendenciasPersistidas('npcs-sync')).toEqual(['npc-1']); // mas o próximo boot sabe que precisa reenviar
+    });
+
+    it('desmarca em voo também quando a tentativa falha (a chave migra pra fila visível, não fica em dois lugares)', async () => {
+      const executar = vi.fn().mockResolvedValue({ error: new Error('falhou') });
+      executarComRetentativa('fichas-sync', 'f1', executar);
+
+      await vi.waitFor(() => expect(usePendenciasStore.getState().itens).toHaveLength(1));
+      expect(JSON.parse(storageFalso.getItem('estatica-em-voo-v1')!)).toEqual([]);
+      // mesmo assim continua reenviável — agora via fila visível, não mais via "em voo".
+      expect(retomarPendenciasPersistidas('fichas-sync')).toEqual(['f1']);
     });
   });
 

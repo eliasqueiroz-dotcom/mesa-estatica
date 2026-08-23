@@ -555,6 +555,39 @@ function comIniciativaInserida(s: Store, entradas: EntradaIniciativa[]): Pick<St
   return { iniciativa: inserirNaIniciativa(s.iniciativa, entradas) };
 }
 
+/** Limpa entradas de iniciativa (e condições associadas) de um participante que deixou de
+ *  existir — ficha ou NPC apagado enquanto ainda estava na ordem de turno. Sem isso, o
+ *  combatente vira um "fantasma": some de Personagens/NPCs mas continua na Iniciativa com
+ *  PV/Defesa em branco pra sempre (pvDoCombatente/defesaDoCombatente não acham mais o dono).
+ *  Mesma lógica de reancoragem de `turnoAtualId` e limpeza de condições de `removerDaIniciativa`,
+ *  generalizada pro caso de várias entradas com o mesmo participanteId. */
+function comParticipanteRemovidoDaIniciativa(s: Store, participanteId: string): Pick<Store, 'iniciativa' | 'sessaoPublica'> {
+  if (!s.iniciativa.some((e) => e.participanteId === participanteId)) {
+    return { iniciativa: s.iniciativa, sessaoPublica: s.sessaoPublica };
+  }
+
+  const idxTurnoAtual = s.iniciativa.findIndex((e) => e.id === s.sessaoPublica.turnoAtualId);
+  const turnoAtualEraDoParticipante = s.iniciativa[idxTurnoAtual]?.participanteId === participanteId;
+  const iniciativa = s.iniciativa.filter((e) => e.participanteId !== participanteId);
+
+  const turnoAtualId = !turnoAtualEraDoParticipante
+    ? s.sessaoPublica.turnoAtualId
+    : (iniciativa[Math.min(idxTurnoAtual, iniciativa.length - 1)]?.id ?? null);
+
+  let condicoesCombate = s.sessaoPublica.condicoesCombate ?? {};
+  let condicaoDuracao = s.sessaoPublica.condicaoDuracao;
+  if (condicoesCombate[participanteId]) {
+    condicoesCombate = { ...condicoesCombate };
+    delete condicoesCombate[participanteId];
+  }
+  if (condicaoDuracao?.[participanteId]) {
+    condicaoDuracao = { ...condicaoDuracao };
+    delete condicaoDuracao[participanteId];
+  }
+
+  return { iniciativa, sessaoPublica: { ...s.sessaoPublica, turnoAtualId, condicoesCombate, condicaoDuracao } };
+}
+
 export const useStore = create<Store>()(
   persist(
     (set, get) => ({
@@ -596,7 +629,11 @@ export const useStore = create<Store>()(
           // leem fichaAtivaId direto do store (QuickRollOverlay, DestaqueSuperior,
           // MeuStatusSection, RuidoOverlay) ficam "cegas" até o mestre clicar manualmente na
           // ficha que já aparece selecionada em FichasTab.tsx (que só disfarça com um fallback local).
-          return { fichas, fichaAtivaId: s.fichaAtivaId === id ? (fichas[0]?.id ?? null) : s.fichaAtivaId };
+          return {
+            fichas,
+            fichaAtivaId: s.fichaAtivaId === id ? (fichas[0]?.id ?? null) : s.fichaAtivaId,
+            ...comParticipanteRemovidoDaIniciativa(s, id),
+          };
         }),
       definirFichaAtiva: (id) => set({ fichaAtivaId: id }),
 
@@ -808,7 +845,8 @@ export const useStore = create<Store>()(
       },
       atualizarNpc: (id, patch) =>
         set((s) => ({ npcs: s.npcs.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
-      removerNpc: (id) => set((s) => ({ npcs: s.npcs.filter((n) => n.id !== id) })),
+      removerNpc: (id) =>
+        set((s) => ({ npcs: s.npcs.filter((n) => n.id !== id), ...comParticipanteRemovidoDaIniciativa(s, id) })),
       duplicarNpc: (id) =>
         set((s) => {
           const original = s.npcs.find((n) => n.id === id);

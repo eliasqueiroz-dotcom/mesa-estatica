@@ -56,24 +56,31 @@ export function gravarPendencias(bruto: Pick<Storage, 'setItem'>, itens: Pendenc
   }
 }
 
-const storageDisponivel: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null;
+/** Reavaliado a cada chamada (não congelado numa constante de módulo) — só pra permitir
+ *  `vi.stubGlobal('localStorage', ...)` nos testes deste arquivo; em produção `localStorage`
+ *  nunca muda durante a vida da página, então isso não tem efeito nenhum além de testabilidade. */
+function obterStorage(): Storage | null {
+  return typeof localStorage !== 'undefined' ? localStorage : null;
+}
 
 interface FilaPendenciasState {
   itens: PendenciaItem[];
 }
 
-export const usePendenciasStore = create<FilaPendenciasState>(() => ({
-  itens: storageDisponivel ? lerPendenciasPersistidas(storageDisponivel) : [],
-}));
+export const usePendenciasStore = create<FilaPendenciasState>(() => {
+  const storage = obterStorage();
+  return { itens: storage ? lerPendenciasPersistidas(storage) : [] };
+});
 
 let timerPersistencia: ReturnType<typeof setTimeout> | null = null;
 
 function persistirComAtraso(): void {
-  if (!storageDisponivel) return;
+  const storage = obterStorage();
+  if (!storage) return;
   if (timerPersistencia) clearTimeout(timerPersistencia);
   timerPersistencia = setTimeout(() => {
     timerPersistencia = null;
-    gravarPendencias(storageDisponivel, usePendenciasStore.getState().itens);
+    gravarPendencias(storage, usePendenciasStore.getState().itens);
   }, ATRASO_PERSISTENCIA_MS);
 }
 
@@ -81,7 +88,8 @@ if (typeof window !== 'undefined') {
   const flush = () => {
     if (timerPersistencia) clearTimeout(timerPersistencia);
     timerPersistencia = null;
-    if (storageDisponivel) gravarPendencias(storageDisponivel, usePendenciasStore.getState().itens);
+    const storage = obterStorage();
+    if (storage) gravarPendencias(storage, usePendenciasStore.getState().itens);
   };
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', () => {
@@ -113,10 +121,65 @@ export function resolverPendencia(modulo: string, chave: string): void {
 }
 
 /**
+ * Registro "silencioso" de escrita em voo — grava e apaga direto no `localStorage`, sem passar
+ * pelo `usePendenciasStore` (que alimenta o "⏳ N pendente" do `StatusIndicador.tsx`, reservado
+ * pra falha CONFIRMADA aguardando reconexão). Marcar toda escrita normal ali piscaria esse aviso
+ * a cada tecla digitada, mesmo em pushes que resolvem em milissegundos — leitura errada pro
+ * mestre no meio de uma sessão ao vivo.
+ *
+ * Único propósito: sobreviver a um fechamento abrupto da aba/servidor bem no meio da chamada de
+ * rede — sem isso, o único registro da intenção vivia solto numa Promise em memória, e um
+ * fechamento nesse meio-tempo perdia a escrita sem deixar rastro nenhum pro próximo boot
+ * reenviar (achado ao vivo em 23/08: apagar um NPC, ou criar uma ficha e recarregar logo em
+ * seguida, podia fazer o dado "voltar" — a marca de remoção explícita e o push agendado são só
+ * memória, `filaPendencias.ts` só grava metadado quando uma tentativa JÁ FALHOU).
+ */
+const CHAVE_EM_VOO = 'estatica-em-voo-v1';
+
+function lerEmVoo(): Set<string> {
+  const storage = obterStorage();
+  if (!storage) return new Set();
+  try {
+    const cru = storage.getItem(CHAVE_EM_VOO);
+    if (!cru) return new Set();
+    const parsed: unknown = JSON.parse(cru);
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function gravarEmVoo(itens: Set<string>): void {
+  const storage = obterStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(CHAVE_EM_VOO, JSON.stringify([...itens]));
+  } catch {
+    // melhor esforço — perder este metadado no pior caso volta ao comportamento de antes desta
+    // correção (janela sem rede de segurança), não a um estado pior.
+  }
+}
+
+function marcarEmVoo(modulo: string, chave: string): void {
+  const itens = lerEmVoo();
+  itens.add(idDe(modulo, chave));
+  gravarEmVoo(itens);
+}
+
+function desmarcarEmVoo(modulo: string, chave: string): void {
+  const itens = lerEmVoo();
+  if (!itens.delete(idDe(modulo, chave))) return;
+  gravarEmVoo(itens);
+}
+
+/**
  * Wrapper de conveniência pro padrão universal dos módulos de sync: `cliente.from(...).upsert
  * /delete(...).then(({error}) => ...)`. Sucesso resolve a pendência; erro (retornado como
  * `{error}` ou por rejeição da promise) registra com um callback que re-executa a mesma
  * `executar` — quem chama decide o que `executar` lê da store no momento em que roda de novo.
+ *
+ * Marca "em voo" (silencioso) ANTES de chamar `executar` e desmarca assim que ela resolve —
+ * ver `CHAVE_EM_VOO` acima. Falha confirmada some daqui e entra na fila visível de retry.
  */
 export function executarComRetentativa(
   modulo: string,
@@ -124,8 +187,10 @@ export function executarComRetentativa(
   executar: () => PromiseLike<{ error: unknown } | null | undefined>,
 ): void {
   const tentar = (): void => {
+    marcarEmVoo(modulo, chave);
     Promise.resolve(executar())
       .then((resultado) => {
+        desmarcarEmVoo(modulo, chave);
         if (resultado && resultado.error) {
           console.error(`[filaPendencias] ${modulo}:${chave} falhou, aguardando reconexão`, resultado.error);
           registrarPendencia(modulo, chave, tentar);
@@ -134,6 +199,7 @@ export function executarComRetentativa(
         }
       })
       .catch((erro: unknown) => {
+        desmarcarEmVoo(modulo, chave);
         console.error(`[filaPendencias] ${modulo}:${chave} falhou, aguardando reconexão`, erro);
         registrarPendencia(modulo, chave, tentar);
       });
@@ -143,12 +209,18 @@ export function executarComRetentativa(
 
 /** Leitura pura das chaves pendentes de um módulo (não remove nada) — cada `iniciarSyncX()`
  *  chama isso no boot pra saber o que reenviar; quem decide COMO reenviar (upsert vs delete,
- *  reler a store atual) é o próprio módulo. */
+ *  reler a store atual) é o próprio módulo. União da fila visível (falha confirmada) com o
+ *  registro silencioso "em voo" (achado ao vivo em 23/08, ver `CHAVE_EM_VOO`) — reenviar uma
+ *  chave que na verdade já tinha completado é sempre seguro (upsert/delete idempotentes, "não
+ *  existe mais localmente" já é tratado por cada `resolverReplayX`). */
 export function retomarPendenciasPersistidas(modulo: string): string[] {
-  return usePendenciasStore
+  const prefixo = `${modulo}:`;
+  const daFilaVisivel = usePendenciasStore
     .getState()
     .itens.filter((it) => it.modulo === modulo)
     .map((it) => it.chave);
+  const emVoo = [...lerEmVoo()].filter((id) => id.startsWith(prefixo)).map((id) => id.slice(prefixo.length));
+  return [...new Set([...daFilaVisivel, ...emVoo])];
 }
 
 export function usePendenciasCount(): number {

@@ -5,6 +5,7 @@ import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
+import { inserirOuAtualizarNaCorrida } from './insercaoConcorrente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 const PREFIXO_DELETE = 'delete:';
@@ -127,14 +128,21 @@ async function empurrarNpc(cliente: Cliente, npc: Npc) {
   const fotoPendente = ehDataUrl(linhaPublico.foto);
 
   if (!existente) {
-    const { error: erroPublico } = await cliente
-      .from('npcs_publico')
-      .insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico);
-    if (erroPublico) throw erroPublico;
-    const { error: erroPrivado } = await cliente
-      .from('npcs_privado')
-      .insert({ id: npc.id, notas_mestre: npc.notasMestre });
-    if (erroPrivado) throw erroPrivado;
+    // 23505 (chave duplicada) = outro push pra esse mesmo id novo venceu a corrida entre o
+    // SELECT acima e este INSERT — cai pra UPDATE em vez de propagar erro (`insercaoConcorrente.ts`,
+    // mesmo achado ao vivo em 23/08 que motivou o fix em `fichasSync.ts`).
+    await inserirOuAtualizarNaCorrida(
+      () => cliente.from('npcs_publico').insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico),
+      () =>
+        cliente
+          .from('npcs_publico')
+          .update(fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico)
+          .eq('id', npc.id),
+    );
+    await inserirOuAtualizarNaCorrida(
+      () => cliente.from('npcs_privado').insert({ id: npc.id, notas_mestre: npc.notasMestre }),
+      () => cliente.from('npcs_privado').upsert({ id: npc.id, notas_mestre: npc.notasMestre }),
+    );
   } else {
     const patchPublico = fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico;
     const { error: erroPublico } = await cliente.from('npcs_publico').update(patchPublico).eq('id', npc.id);

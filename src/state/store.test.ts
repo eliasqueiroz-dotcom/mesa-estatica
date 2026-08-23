@@ -821,6 +821,69 @@ describe('removerDaIniciativa', () => {
   });
 });
 
+describe('removerFicha/removerNpc limpam a iniciativa órfã', () => {
+  const criarNpc = (id: string, nome: string) => ({
+    id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade: 0,
+    notas: '', visivel: false, notasMestre: '', categoria: '', acoes: [],
+  });
+
+  it('removerFicha tira o PC da iniciativa em vez de deixar um combatente fantasma', () => {
+    const ficha = { ...criarFichaVazia(), id: 'pc1', nome: 'Iguinho' };
+    useStore.setState({
+      fichas: [ficha],
+      iniciativa: [{ id: 'e1', participanteId: 'pc1', tipo: 'pc' as const, nome: 'Iguinho', valor: 15 }],
+    });
+    useStore.getState().removerFicha('pc1');
+    expect(useStore.getState().iniciativa).toEqual([]);
+  });
+
+  it('removerNpc reancora turnoAtualId pro próximo combatente quando o removido estava na vez', () => {
+    useStore.setState((s) => ({
+      npcs: [criarNpc('n1', 'Fantasma')],
+      iniciativa: [
+        { id: 'e1', participanteId: 'n1', tipo: 'npc' as const, nome: 'Fantasma', valor: 20 },
+        { id: 'e2', participanteId: 'n2', tipo: 'npc' as const, nome: 'Sobrevivente', valor: 5 },
+      ],
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e1' },
+    }));
+    useStore.getState().removerNpc('n1');
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.participanteId)).toEqual(['n2']);
+    expect(s.sessaoPublica.turnoAtualId).toBe('e2');
+  });
+
+  it('removerNpc limpa condicoesCombate/condicaoDuracao órfãos junto com a entrada', () => {
+    useStore.setState((s) => ({
+      npcs: [criarNpc('n1', 'Fantasma')],
+      iniciativa: [{ id: 'e1', participanteId: 'n1', tipo: 'npc' as const, nome: 'Fantasma', valor: 20 }],
+      sessaoPublica: {
+        ...s.sessaoPublica,
+        condicoesCombate: { n1: ['atordoado'] },
+        condicaoDuracao: { n1: { atordoado: 2 } },
+      },
+    }));
+    useStore.getState().removerNpc('n1');
+    const s = useStore.getState();
+    expect(s.sessaoPublica.condicoesCombate.n1).toBeUndefined();
+    expect(s.sessaoPublica.condicaoDuracao.n1).toBeUndefined();
+  });
+
+  it('remover ficha/NPC fora de combate não mexe em iniciativa nem sessaoPublica', () => {
+    const ficha = { ...criarFichaVazia(), id: 'pc1' };
+    useStore.setState((s) => ({
+      fichas: [ficha],
+      npcs: [criarNpc('n1', 'Fora')],
+      iniciativa: [{ id: 'e1', participanteId: 'outro', tipo: 'npc' as const, nome: 'Outro', valor: 10 }],
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e1' },
+    }));
+    useStore.getState().removerFicha('pc1');
+    useStore.getState().removerNpc('n1');
+    const s = useStore.getState();
+    expect(s.iniciativa.map((e) => e.id)).toEqual(['e1']);
+    expect(s.sessaoPublica.turnoAtualId).toBe('e1');
+  });
+});
+
 describe('iniciativa respeita a fila de forçados', () => {
   const criarNpc = (id: string, nome: string, agilidade: number) => ({
     id, nome, corVisual: '#fff', silhueta: null, foto: null, pvAtual: 10, pvMaximo: 10, defesa: 10, agilidade,

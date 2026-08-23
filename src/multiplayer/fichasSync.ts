@@ -8,6 +8,7 @@ import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
 import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
+import { inserirOuAtualizarNaCorrida } from './insercaoConcorrente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 const PREFIXO_DELETE = 'delete:';
@@ -131,14 +132,21 @@ async function empurrarFicha(cliente: Cliente, ficha: Ficha) {
 
   if (!existente) {
     const ownerToken = crypto.randomUUID();
-    const { error: erroPrivado } = await cliente
-      .from('characters_privado')
-      .insert({ id: ficha.id, owner_token: ownerToken, dados: privado });
-    if (erroPrivado) throw erroPrivado;
-    const { error: erroPublico } = await cliente
-      .from('characters_publico')
-      .insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico);
-    if (erroPublico) throw erroPublico;
+    // 23505 (chave duplicada) aqui = outro push pra esse mesmo id novo venceu a corrida entre o
+    // SELECT acima e este INSERT — cai pra UPDATE em vez de propagar erro (`insercaoConcorrente.ts`).
+    // Nunca reescreve owner_token nesse fallback: a linha que já existe já tem o token certo.
+    await inserirOuAtualizarNaCorrida(
+      () => cliente.from('characters_privado').insert({ id: ficha.id, owner_token: ownerToken, dados: privado }),
+      () => cliente.from('characters_privado').update({ dados: privado }).eq('id', ficha.id),
+    );
+    await inserirOuAtualizarNaCorrida(
+      () => cliente.from('characters_publico').insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico),
+      () =>
+        cliente
+          .from('characters_publico')
+          .update(fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico)
+          .eq('id', ficha.id),
+    );
   } else {
     const { error: erroPrivado } = await cliente
       .from('characters_privado')

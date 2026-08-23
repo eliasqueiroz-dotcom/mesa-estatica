@@ -9,7 +9,11 @@ import tseslint from 'typescript-eslint';
 // imports por URL que não existem aqui) e `scripts/`/configs da raiz já são validados por
 // `tsconfig.node.json` no build — não vale a complexidade de mais um bloco de config pra isso.
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules', 'supabase/functions'] },
+  // `.claude/worktrees/<nome>/` é um checkout completo do repo — sem excluir, o glob
+  // `src/**/*.{ts,tsx}` (sem `/` na frente) casa em qualquer profundidade e pega o `src/` de
+  // dentro do worktree também, dois `tsconfigRootDir` candidatos pro parser de TS (mesmo achado
+  // que já forçou o exclude equivalente em `vite.config.ts` pro vitest).
+  { ignores: ['dist', 'node_modules', 'supabase/functions', '.claude/worktrees'] },
   {
     files: ['src/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
