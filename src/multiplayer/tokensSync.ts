@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 import { computarDiffTokens } from './tokensDiff';
 
@@ -107,7 +107,12 @@ export function iniciarSyncTokens(): () => void {
     const { upserts, removidos } = computarDiffTokens(tokensAnteriores, state.mapa.tokens);
     tokensAnteriores = state.mapa.tokens;
 
-    for (const token of upserts) agendarUpsert(token.id, token);
+    for (const token of upserts) {
+      // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+      // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+      marcarEmVoo('tokens-sync', token.id);
+      agendarUpsert(token.id, token);
+    }
     // só apaga no servidor se o botão "remover" marcou o id de propósito — ver
     // remocaoExplicita.ts.
     for (const id of removidos) {

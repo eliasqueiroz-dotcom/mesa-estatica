@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FaixaMidia } from '../state/types';
+import { criarEstadoInicial } from '../state/factories';
+import { useStore } from '../state/store';
 import { paraFaixa, paraLinha, resolverReplayFaixa } from './midiaFaixasSync';
 
 describe('paraLinha / paraFaixa', () => {
@@ -56,5 +58,87 @@ describe('resolverReplayFaixa', () => {
   it('chave "delete:<id>" sempre devolve \'apagar\'', () => {
     expect(resolverReplayFaixa('delete:x', [faixa])).toBe('apagar');
     expect(resolverReplayFaixa('delete:x', [])).toBe('apagar');
+  });
+});
+
+// ===== marcarEmVoo na janela do debounce (iniciarSyncMidiaFaixas) =====
+const h = vi.hoisted(() => ({ clienteAtual: null as unknown }));
+vi.mock('../lib/supabaseClient', () => ({
+  get supabase() {
+    return h.clienteAtual;
+  },
+}));
+vi.mock('../lib/statusMesa', () => ({
+  assinarStatusCanal: vi.fn(() => vi.fn()),
+  desconectarCanal: vi.fn(),
+  useStatusMesa: {
+    getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
+    setState: vi.fn(),
+    subscribe: vi.fn(),
+  },
+}));
+
+const { iniciarSyncMidiaFaixas } = await import('./midiaFaixasSync');
+const { retomarPendenciasPersistidas } = await import('./filaPendencias');
+
+/** Cliente mínimo — só o suficiente pra `iniciarSyncMidiaFaixas()` montar sem lançar. Não
+ *  precisa simular sucesso/falha de rede porque o teste abaixo nunca deixa o debounce disparar. */
+function criarClienteMinimo() {
+  const resolvido = { data: null, error: null };
+  const builder: any = {};
+  builder.select = () => builder;
+  builder.eq = () => builder;
+  builder.order = () => builder;
+  builder.then = (resolve: (r: typeof resolvido) => unknown) => Promise.resolve(resolvido).then(resolve);
+  builder.upsert = () => Promise.resolve({ error: null });
+  builder.delete = () => builder;
+
+  const channelObj: any = {};
+  channelObj.on = () => channelObj;
+  channelObj.subscribe = (cb?: (status: string) => void) => {
+    cb?.('SUBSCRIBED');
+    return channelObj;
+  };
+
+  return { from: () => builder, channel: () => channelObj, removeChannel: () => {} };
+}
+
+function criarStorageFalso() {
+  const dados = new Map<string, string>();
+  return {
+    getItem: (chave: string) => dados.get(chave) ?? null,
+    setItem: (chave: string, valor: string) => {
+      dados.set(chave, valor);
+    },
+  };
+}
+
+describe('iniciarSyncMidiaFaixas — marca "em voo" antes do debounce disparar', () => {
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+    h.clienteAtual = criarClienteMinimo();
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('marca "em voo" no momento em que agenda o upsert — antes do debounce (ATRASO_PUSH_MS) disparar', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+
+    cleanup = iniciarSyncMidiaFaixas();
+    const id = useStore.getState().adicionarFaixaMidia('Tema', 'midia/tema.mp3', 'https://x/tema.mp3');
+
+    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
+    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a faixa (achado de 23/08).
+    expect(retomarPendenciasPersistidas('midia-faixas-sync')).toContain(id);
   });
 });

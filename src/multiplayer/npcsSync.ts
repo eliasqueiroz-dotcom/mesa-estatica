@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { inserirOuAtualizarNaCorrida } from './insercaoConcorrente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -188,6 +188,9 @@ export function iniciarSyncNpcs(): () => void {
       const anterior = npcsAnteriores.find((n) => n.id === npc.id);
       if (anterior !== npc) {
           pendencias.add(npc.id);
+          // marca ANTES de agendar — sem isso, a janela do próprio debounce (ATRASO_PUSH_MS)
+          // fica sem rede de segurança (mesmo achado de 23/08 que motivou `marcarEmVoo`).
+          marcarEmVoo('npcs-sync', npc.id);
           agendarPush(npc.id, npc);
         }
     }
@@ -237,7 +240,10 @@ export function iniciarSyncNpcs(): () => void {
       const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
 
       if (npcLocalAgora !== npcLocalAntes || pendencias.has(id)) {
-        if (npcLocalAgora) agendarPush(id, npcLocalAgora);
+        if (npcLocalAgora) {
+          marcarEmVoo('npcs-sync', id);
+          agendarPush(id, npcLocalAgora);
+        }
         return;
       }
 

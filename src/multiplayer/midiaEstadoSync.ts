@@ -3,7 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EstadoMidia, ModoLoopMidia } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, retomarPendenciasPersistidas } from './filaPendencias';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -85,6 +85,9 @@ export function iniciarSyncMidiaEstado(): () => void {
     ) {
       return;
     }
+    // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+    // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    marcarEmVoo('midia-estado-sync', ID_MIDIA);
     agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume });
   });
 

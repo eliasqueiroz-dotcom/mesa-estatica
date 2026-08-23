@@ -6,7 +6,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
-import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { inserirOuAtualizarNaCorrida } from './insercaoConcorrente';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -211,6 +211,10 @@ export function iniciarSyncFichas(): () => void {
       const anterior = fichasAnteriores.find((f) => f.id === ficha.id);
       if (anterior !== ficha) {
           pendencias.add(ficha.id);
+          // marca ANTES de agendar — sem isso, a janela do próprio debounce (ATRASO_PUSH_MS)
+          // fica sem rede de segurança nenhuma: um fechamento de aba nesse meio-tempo perde a
+          // edição sem deixar rastro (mesmo achado de 23/08 que motivou `marcarEmVoo`).
+          marcarEmVoo('fichas-sync', ficha.id);
           agendarPush(ficha.id, ficha);
         }
     }
@@ -265,7 +269,10 @@ export function iniciarSyncFichas(): () => void {
         // agenda o push que o guard engoliu; `fichaLocalAgora` undefined = o mestre removeu a
         // ficha nesse meio-tempo, então nem re-adiciona `fichaRemota` (evitaria ressuscitar uma
         // ficha recém-apagada).
-        if (fichaLocalAgora) agendarPush(id, fichaLocalAgora);
+        if (fichaLocalAgora) {
+          marcarEmVoo('fichas-sync', id);
+          agendarPush(id, fichaLocalAgora);
+        }
         return;
       }
 

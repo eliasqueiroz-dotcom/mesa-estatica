@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { computarDiffFaixas } from './midiaFaixasDiff';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
@@ -93,6 +93,9 @@ export function iniciarSyncMidiaFaixas(): () => void {
 
     for (const faixa of upserts) {
       pendencias.add(faixa.id);
+      // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+      // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+      marcarEmVoo('midia-faixas-sync', faixa.id);
       agendarUpsert(faixa.id, faixa);
     }
     // só apaga no servidor se o botão "excluir" marcou o id de propósito — ver

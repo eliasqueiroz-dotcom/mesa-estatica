@@ -1,42 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { criarEstadoInicial, criarEstadoMidia } from '../state/factories';
+import { criarEstadoInicial } from '../state/factories';
 import { useStore } from '../state/store';
-import { paraEstadoMidia, paraLinha, type PatchEstadoMidia } from './midiaEstadoSync';
 
-describe('paraLinha / paraEstadoMidia', () => {
-  it('round-trip preserva o estado de playback', () => {
-    const { atualizadoEm } = criarEstadoMidia();
-    const midia: PatchEstadoMidia = {
-      faixaAtualId: 'faixa-1',
-      tocando: true,
-      posicaoSegundos: 42.5,
-      modoLoop: 'faixa',
-      atualizadoEm,
-      volume: 0.6,
-    };
-    const linha = paraLinha(midia);
-    expect(linha).toEqual({
-      faixa_atual_id: 'faixa-1',
-      tocando: true,
-      posicao_segundos: 42.5,
-      modo_loop: 'faixa',
-      atualizado_em: midia.atualizadoEm,
-      volume: 0.6,
-    });
-
-    const reconstruido = paraEstadoMidia({ id: 'midia', ...linha });
-    expect(reconstruido).toEqual(midia);
-  });
-
-  it('faixaAtualId null (nenhuma faixa tocando) sobrevive ao round-trip', () => {
-    const midia: PatchEstadoMidia = { ...criarEstadoMidia(), faixaAtualId: null };
-    const linha = paraLinha(midia);
-    expect(linha.faixa_atual_id).toBeNull();
-    expect(paraEstadoMidia({ id: 'midia', ...linha }).faixaAtualId).toBeNull();
-  });
-});
-
-// ===== marcarEmVoo na janela do debounce (iniciarSyncMidiaEstado) =====
+// ===== marcarEmVoo na janela do debounce (iniciarSyncMapaPublico) =====
+// Sem cobertura geral do módulo aqui de propósito — só o comportamento de durabilidade
+// (mesmo achado de 23/08 que motivou `marcarEmVoo` em filaPendencias.ts). Módulo não tinha
+// nenhum teste antes disto.
 const h = vi.hoisted(() => ({ clienteAtual: null as unknown }));
 vi.mock('../lib/supabaseClient', () => ({
   get supabase() {
@@ -53,10 +22,10 @@ vi.mock('../lib/statusMesa', () => ({
   },
 }));
 
-const { iniciarSyncMidiaEstado } = await import('./midiaEstadoSync');
+const { iniciarSyncMapaPublico } = await import('./mapaPublicoSync');
 const { retomarPendenciasPersistidas } = await import('./filaPendencias');
 
-/** Cliente mínimo — só o suficiente pra `iniciarSyncMidiaEstado()` montar sem lançar. Não
+/** Cliente mínimo — só o suficiente pra `iniciarSyncMapaPublico()` montar sem lançar. Não
  *  precisa simular sucesso/falha de rede porque o teste abaixo nunca deixa o debounce disparar. */
 function criarClienteMinimo() {
   const resolvido = { data: null, error: null };
@@ -86,7 +55,7 @@ function criarStorageFalso() {
   };
 }
 
-describe('iniciarSyncMidiaEstado — marca "em voo" antes do debounce disparar', () => {
+describe('iniciarSyncMapaPublico — marca "em voo" antes do debounce disparar', () => {
   let cleanup: (() => void) | undefined;
 
   beforeEach(() => {
@@ -103,15 +72,15 @@ describe('iniciarSyncMidiaEstado — marca "em voo" antes do debounce disparar',
     vi.useRealTimers();
   });
 
-  it('marca "em voo" (chave fixa "midia") no momento em que agenda o push — antes do debounce disparar', () => {
+  it('marca "em voo" (chave fixa "mapa") no momento em que agenda o push — antes do debounce disparar', () => {
     vi.useFakeTimers();
     vi.stubGlobal('localStorage', criarStorageFalso());
 
-    cleanup = iniciarSyncMidiaEstado();
-    useStore.setState((s) => ({ midia: { ...s.midia, tocando: true } }));
+    cleanup = iniciarSyncMapaPublico();
+    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ativa: true } } }));
 
     // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
-    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde o estado (achado de 23/08).
-    expect(retomarPendenciasPersistidas('midia-estado-sync')).toContain('midia');
+    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde o ajuste (achado de 23/08).
+    expect(retomarPendenciasPersistidas('mapa-publico-sync')).toContain('mapa');
   });
 });

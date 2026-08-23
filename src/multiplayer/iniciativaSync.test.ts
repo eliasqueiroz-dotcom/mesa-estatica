@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial } from '../state/factories';
 import { useStore } from '../state/store';
 import type { EntradaIniciativa } from '../state/types';
+import { retomarPendenciasPersistidas } from './filaPendencias';
 import { paraEntrada, paraLinha } from './iniciativaSync';
+
+const criarStorageFalso = () => {
+  const dados = new Map<string, string>();
+  return {
+    getItem: (chave: string) => dados.get(chave) ?? null,
+    setItem: (chave: string, valor: string) => {
+      dados.set(chave, valor);
+    },
+  };
+};
 
 describe('paraLinha / paraEntrada', () => {
   it('round-trip preserva os campos da entrada de iniciativa', () => {
@@ -114,6 +125,8 @@ describe('iniciarSyncIniciativa — busca inicial', () => {
     cleanup = undefined;
     h.clienteAtual = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('popula a iniciativa local a partir do Supabase quando ela está vazia (reload em combate)', async () => {
@@ -155,5 +168,19 @@ describe('iniciarSyncIniciativa — busca inicial', () => {
 
     await new Promise((r) => setTimeout(r, 0));
     expect(useStore.getState().iniciativa).toEqual([]);
+  });
+
+  it('marca "em voo" (chave fixa "iniciativa") no momento em que agenda o push — antes do debounce disparar', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+
+    cleanup = iniciarSyncIniciativa();
+    useStore.setState({ iniciativa: [{ id: 'e1', participanteId: 'pc-1', tipo: 'pc', nome: 'Helena', valor: 17 }] });
+
+    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
+    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a ordem de turno (achado de
+    // 23/08). Diferente dos outros módulos, a busca inicial daqui só incrementa
+    // `aplicandoRemotoContagem` DEPOIS do `.then()` resolver — não precisa liberar nada antes.
+    expect(retomarPendenciasPersistidas('iniciativa-sync')).toContain('iniciativa');
   });
 });

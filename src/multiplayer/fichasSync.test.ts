@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial, criarFichaVazia } from '../state/factories';
 import { useStore } from '../state/store';
+import { retomarPendenciasPersistidas } from './filaPendencias';
 import { paraFichaPublica, paraLinhaPublico, resolverReplayFicha } from './fichasSync';
+
+const criarStorageFalso = () => {
+  const dados = new Map<string, string>();
+  return {
+    getItem: (chave: string) => dados.get(chave) ?? null,
+    setItem: (chave: string, valor: string) => {
+      dados.set(chave, valor);
+    },
+  };
+};
 
 describe('resolverReplayFicha', () => {
   it('chave normal (id de ficha) que ainda existe localmente devolve a ficha pra reenviar', () => {
@@ -197,6 +208,8 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     cleanup = undefined;
     h.clienteAtual = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('edição local concorrente vence o dado remoto obtido antes da edição', async () => {
@@ -302,5 +315,20 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     const ficha = useStore.getState().fichas.find((f) => f.id === fichaId);
     expect(ficha?.nome).toBe('Helena da Busca Inicial');
     expect(ficha?.atributos.vigor).toBe(2);
+  });
+
+  it('marca "em voo" no momento em que agenda o push — antes do debounce (ATRASO_PUSH_MS) disparar', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+
+    useStore.getState().adicionarFicha();
+    const localId = useStore.getState().fichas[0].id;
+    cleanup = iniciarSyncFichas();
+
+    useStore.getState().atualizarFicha(localId, { nome: 'Helena' });
+
+    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
+    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a edição (achado de 23/08).
+    expect(retomarPendenciasPersistidas('fichas-sync')).toContain(localId);
   });
 });

@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import type { GradeMapa } from '../state/types';
 
@@ -66,6 +66,9 @@ export function iniciarSyncMapaPublico(): () => void {
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0) return;
     if (state.mapa.imagemDataUrl === prevState.mapa.imagemDataUrl && state.mapa.grade === prevState.mapa.grade) return;
+    // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+    // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    marcarEmVoo('mapa-publico-sync', ID_MAPA);
     agendarPush(ID_MAPA, { imagemDataUrl: state.mapa.imagemDataUrl, grade: state.mapa.grade });
   });
 

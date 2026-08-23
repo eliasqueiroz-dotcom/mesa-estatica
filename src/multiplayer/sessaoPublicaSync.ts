@@ -3,7 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { SessaoPublica } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, retomarPendenciasPersistidas } from './filaPendencias';
 
 type Cliente = NonNullable<typeof supabase>;
 
@@ -113,6 +113,9 @@ export function iniciarSyncSessaoPublica(): () => void {
     // então uma rajada de teclas junta tudo num push só (mesmo princípio de fichasSync.ts, só
     // que por objeto inteiro em vez de por id de coleção).
     pendente.valor = true;
+    // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+    // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    marcarEmVoo('sessao-publica-sync', ID_SESSAO);
     agendarPush(ID_SESSAO, state.sessaoPublica);
   });
 
@@ -129,6 +132,7 @@ export function iniciarSyncSessaoPublica(): () => void {
       const sessaoPublicaAgora = useStore.getState().sessaoPublica;
 
       if (sessaoPublicaAgora !== sessaoPublicaAntes || pendente.valor) {
+        marcarEmVoo('sessao-publica-sync', ID_SESSAO);
         agendarPush(ID_SESSAO, sessaoPublicaAgora);
         return;
       }

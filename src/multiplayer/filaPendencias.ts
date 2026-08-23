@@ -160,7 +160,12 @@ function gravarEmVoo(itens: Set<string>): void {
   }
 }
 
-function marcarEmVoo(modulo: string, chave: string): void {
+/** Exportada pra cada `iniciarSyncX()` poder marcar "em voo" já no momento em que agenda um
+ *  push debounçado (`agendarPush`/`agendarUpsert`), não só quando `executarComRetentativa`
+ *  finalmente dispara a chamada de rede — sem isso, a janela do próprio timer de debounce
+ *  (~500ms entre a edição e o disparo) continua sem rede de segurança nenhuma. Idempotente e
+ *  segura de chamar de novo no momento em que o push dispara de fato (mesma chave). */
+export function marcarEmVoo(modulo: string, chave: string): void {
   const itens = lerEmVoo();
   itens.add(idDe(modulo, chave));
   gravarEmVoo(itens);

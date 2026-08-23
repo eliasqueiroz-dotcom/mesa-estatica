@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 const PREFIXO_DELETE = 'delete:';
@@ -146,6 +146,9 @@ export function iniciarSyncSoundpad(): () => void {
       sonsAnteriores = state.soundpad.sons;
       for (const som of upserts) {
         pendencias.add(String(som.slot));
+        // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+        // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+        marcarEmVoo('soundpad-sync', String(som.slot));
         agendarUpsert(String(som.slot), som);
       }
       for (const som of removidos) {

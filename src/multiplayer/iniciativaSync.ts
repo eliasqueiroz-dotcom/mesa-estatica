@@ -3,7 +3,7 @@ import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EntradaIniciativa } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
+import { executarComRetentativa, marcarEmVoo, retomarPendenciasPersistidas } from './filaPendencias';
 
 /** Mesmo valor de `fichasSync.ts`/`npcsSync.ts` — junta a rajada de reordenar/rolar/remover
  *  numa escrita só, em vez de um upsert do array inteiro a cada mudança individual. */
@@ -126,6 +126,9 @@ export function iniciarSyncIniciativa(): () => void {
 
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0 || state.iniciativa === prevState.iniciativa) return;
+    // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
+    // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    marcarEmVoo('iniciativa-sync', CHAVE_PUSH);
     agendarPush(CHAVE_PUSH, state.iniciativa);
   });
 

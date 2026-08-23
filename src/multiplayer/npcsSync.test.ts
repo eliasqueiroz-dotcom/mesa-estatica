@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial, criarNpcVazio } from '../state/factories';
 import { useStore } from '../state/store';
+import { retomarPendenciasPersistidas } from './filaPendencias';
 import { paraLinhaPublico, paraNpcPublico, paraNpcSemNotasMestre, resolverReplayNpc } from './npcsSync';
+
+const criarStorageFalso = () => {
+  const dados = new Map<string, string>();
+  return {
+    getItem: (chave: string) => dados.get(chave) ?? null,
+    setItem: (chave: string, valor: string) => {
+      dados.set(chave, valor);
+    },
+  };
+};
 
 describe('resolverReplayNpc', () => {
   it('chave normal (id de npc) que ainda existe localmente devolve o npc pra reenviar', () => {
@@ -184,6 +195,8 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     cleanup = undefined;
     h.clienteAtual = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('edição local concorrente vence o dado remoto obtido antes da edição', async () => {
@@ -252,5 +265,20 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     await vi.waitFor(() => {
       expect(useStore.getState().npcs.some((n) => n.id === npcId && n.nome === 'Guarda do Servidor')).toBe(true);
     });
+  });
+
+  it('marca "em voo" no momento em que agenda o push — antes do debounce (ATRASO_PUSH_MS) disparar', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+
+    useStore.getState().adicionarNpc();
+    const localId = useStore.getState().npcs[0].id;
+    cleanup = iniciarSyncNpcs();
+
+    useStore.getState().atualizarNpc(localId, { nome: 'Guarda' });
+
+    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
+    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a edição (achado de 23/08).
+    expect(retomarPendenciasPersistidas('npcs-sync')).toContain(localId);
   });
 });
