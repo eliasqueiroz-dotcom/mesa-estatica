@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
-import type { EntradaLog, TipoLog } from '../state/types';
+import type { EntradaLog, EntradaRoll, TipoLog } from '../state/types';
 
 const LABELS_TIPO: Record<TipoLog | 'todos', string> = {
   todos: 'todos',
@@ -17,50 +17,88 @@ const LABELS_TIPO: Record<TipoLog | 'todos', string> = {
   iniciativa: 'iniciativa',
 };
 
-/** `podeLimpar` = "é a visão do mestre": também gate quem vê/revela rolagens privadas — só
- *  o mestre revela (doc), então os dois concerns andam juntos numa prop só. */
-function RolsSection({ podeLimpar }: { podeLimpar: boolean }) {
-  const todasRolls = useStore((s) => s.rollsLog);
-  const revelarRoll = useStore((s) => s.revelarRoll);
-  // defesa em profundidade — RLS de rolls_publicas já deveria impedir uma rolagem privada
-  // alheia de chegar aqui, mas filtra de novo no client por garantia.
-  const rollsLog = podeLimpar ? todasRolls : todasRolls.filter((r) => r.visibilidade === 'publica');
+/** Tipos que ganham o acento --ruido (arte.md: "vermelho sujo = só dano, Sanidade crítica e
+ *  Surto — nunca as 3 cores no mesmo componente"). Só esse acento entra aqui; o resto do log
+ *  fica sem cor. */
+const TIPOS_RUIDO = new Set<TipoLog>(['dano', 'sanidade', 'surto']);
 
+type ItemFeed = { tipo: 'log'; entrada: EntradaLog } | { tipo: 'roll'; entrada: EntradaRoll };
+
+function inicioDoDia(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function chaveDia(iso: string): number {
+  return inicioDoDia(new Date(iso)).getTime();
+}
+
+/** "hoje"/"ontem" ou "23 de agosto" (com ano só se for de outro ano) — separador entre
+ *  entradas de dias civis diferentes, pro log não virar uma lista indistinta numa mesa que
+ *  roda há meses. */
+function formatarSeparadorDia(iso: string): string {
+  const data = new Date(iso);
+  const hoje = new Date();
+  const diffDias = Math.round((inicioDoDia(hoje).getTime() - inicioDoDia(data).getTime()) / 86_400_000);
+  if (diffDias === 0) return 'hoje';
+  if (diffDias === 1) return 'ontem';
+  return data.toLocaleDateString('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: data.getFullYear() !== hoje.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
+function LinhaLog({ entrada: e, renderAcao }: { entrada: EntradaLog; renderAcao?: (e: EntradaLog) => ReactNode }) {
+  const destaque = TIPOS_RUIDO.has(e.tipo);
   return (
-    <div style={{ marginTop: '2rem' }}>
-      <h3 className="label">Rolagens</h3>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.4rem',
+        color: destaque ? 'var(--ruido)' : undefined,
+        borderLeft: destaque ? '2px solid var(--ruido)' : undefined,
+        paddingLeft: destaque ? '0.4rem' : undefined,
+      }}
+    >
+      <span>
+        [{new Date(e.timestamp).toLocaleTimeString()}] {LABELS_TIPO[e.tipo]} · {e.texto}
+      </span>
+      {renderAcao?.(e)}
+    </div>
+  );
+}
 
-      {rollsLog.length === 0 ? (
-        <p className="vazio" style={{ marginTop: '0.75rem' }}>
-          nenhuma rolagem ainda.
-        </p>
+function LinhaRoll({
+  entrada: r,
+  podeLimpar,
+  revelarRoll,
+}: {
+  entrada: EntradaRoll;
+  podeLimpar: boolean;
+  revelarRoll: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span style={{ opacity: r.visibilidade === 'privada' ? 0.6 : 1 }}>
+        [{new Date(r.timestamp).toLocaleTimeString()}] [{r.origem}] rolou {r.formula}: {r.total} (bruto: {r.bruto})
+      </span>
+      {r.visibilidade === 'privada' ? (
+        <>
+          <span style={{ fontSize: '11px', opacity: 0.5 }}>privado</span>
+          {podeLimpar && (
+            <button
+              className="icone-botao"
+              onClick={() => revelarRoll(r.id)}
+              title="revelar rolagem"
+              style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
+            >
+              revelar
+            </button>
+          )}
+        </>
       ) : (
-        <div className="mono" style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.75rem' }}>
-          {rollsLog.map((r) => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ opacity: r.visibilidade === 'privada' ? 0.6 : 1 }}>
-                [{new Date(r.timestamp).toLocaleTimeString()}] [{r.origem}] rolou {r.formula}: {r.total} (bruto: {r.bruto})
-              </span>
-              {r.visibilidade === 'privada' ? (
-                <>
-                  <span style={{ fontSize: '11px', opacity: 0.5 }}>privado</span>
-                  {podeLimpar && (
-                    <button
-                      className="icone-botao"
-                      onClick={() => revelarRoll(r.id)}
-                      title="revelar rolagem"
-                      style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
-                    >
-                      revelar
-                    </button>
-                  )}
-                </>
-              ) : (
-                <span style={{ fontSize: '11px', opacity: 0.5 }}>público</span>
-              )}
-            </div>
-          ))}
-        </div>
+        <span style={{ fontSize: '11px', opacity: 0.5 }}>público</span>
       )}
     </div>
   );
@@ -77,6 +115,12 @@ function RolsSection({ podeLimpar }: { podeLimpar: boolean }) {
  *
  * `renderAcaoEntrada` é o mesmo idioma de slot, só que por-linha em vez de por-tela — hoje usado
  * por `LogTabJogador.tsx` pra oferecer "rolar" ao lado do lembrete de teste de Sanidade.
+ *
+ * Log narrativo e rolagens brutas (`rollsLog`) continuam dois canais paralelos no estado/sync
+ * (visibilidade de cada um existe independente — ver `ROADMAP.md` sobre isso ser intencional),
+ * mas aqui na tela são intercalados por timestamp num feed só, em vez de duas listas
+ * empilhadas — `registrarLog`/`registrarRoll` já são chamados juntos na mesma ação, então isso
+ * não duplica informação nova, só aproxima na tela o que já acontece junto no tempo.
  */
 export default function LogView({
   podeLimpar,
@@ -88,23 +132,48 @@ export default function LogView({
   renderAcaoEntrada?: (e: EntradaLog) => ReactNode;
 }) {
   const log = useStore((s) => s.log);
+  const rollsLog = useStore((s) => s.rollsLog);
   const fichas = useStore((s) => s.fichas);
   const limparLog = useStore((s) => s.limparLog);
+  const revelarRoll = useStore((s) => s.revelarRoll);
   const [filtroPersonagem, setFiltroPersonagem] = useState<string>('todos');
   const [filtroTipo, setFiltroTipo] = useState<TipoLog | 'todos'>('todos');
   const [filtroTexto, setFiltroTexto] = useState('');
 
-  const logFiltrado = useMemo(() => {
-    return log.filter((e) => {
-      // defesa em profundidade — igual RolsSection: rolagem privada só aparece pra quem pode limpar
-      // (mestre). registrarLog embute o resultado no texto livre, então filtra aqui também.
-      const passaPrivacidade = podeLimpar || e.visibilidade !== 'privada';
-      const passaPersonagem = filtroPersonagem === 'todos' || e.personagemId === filtroPersonagem;
-      const passaTipo = filtroTipo === 'todos' || e.tipo === filtroTipo;
-      const passaTexto = filtroTexto.trim() === '' || e.texto.toLowerCase().includes(filtroTexto.toLowerCase());
-      return passaPrivacidade && passaPersonagem && passaTipo && passaTexto;
-    });
-  }, [filtroPersonagem, filtroTexto, filtroTipo, log, podeLimpar]);
+  const feed = useMemo(() => {
+    const texto = filtroTexto.trim().toLowerCase();
+
+    const itensLog: ItemFeed[] = log
+      .filter((e) => {
+        // defesa em profundidade — RLS já deveria impedir uma entrada privada alheia de
+        // chegar aqui, mas filtra de novo no client por garantia.
+        const passaPrivacidade = podeLimpar || e.visibilidade !== 'privada';
+        const passaPersonagem = filtroPersonagem === 'todos' || e.personagemId === filtroPersonagem;
+        const passaTipo = filtroTipo === 'todos' || e.tipo === filtroTipo;
+        const passaTexto = texto === '' || e.texto.toLowerCase().includes(texto);
+        return passaPrivacidade && passaPersonagem && passaTipo && passaTexto;
+      })
+      .map((entrada) => ({ tipo: 'log' as const, entrada }));
+
+    // rolagens não têm `tipo` — um filtro de tipo específico (≠ "todos") as esconde do feed,
+    // comportamento natural do filtro, sem precisar de caso especial.
+    const itensRoll: ItemFeed[] =
+      filtroTipo !== 'todos'
+        ? []
+        : rollsLog
+            .filter((r) => {
+              const passaPrivacidade = podeLimpar || r.visibilidade !== 'privada';
+              const passaPersonagem = filtroPersonagem === 'todos' || r.personagemId === filtroPersonagem;
+              const passaTexto =
+                texto === '' || r.origem.toLowerCase().includes(texto) || r.formula.toLowerCase().includes(texto);
+              return passaPrivacidade && passaPersonagem && passaTexto;
+            })
+            .map((entrada) => ({ tipo: 'roll' as const, entrada }));
+
+    return [...itensLog, ...itensRoll].sort(
+      (a, b) => new Date(b.entrada.timestamp).getTime() - new Date(a.entrada.timestamp).getTime(),
+    );
+  }, [filtroPersonagem, filtroTexto, filtroTipo, log, rollsLog, podeLimpar]);
 
   return (
     <div style={{ padding: '1.5rem' }}>
@@ -156,24 +225,40 @@ export default function LogView({
         </div>
       </div>
 
-      {log.length === 0 ? (
+      {log.length === 0 && rollsLog.length === 0 ? (
         <p className="vazio">sem registros. sinal limpo.</p>
-      ) : logFiltrado.length === 0 ? (
+      ) : feed.length === 0 ? (
         <p className="vazio">nenhum registro bate com os filtros atuais.</p>
       ) : (
         <div className="mono" style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          {logFiltrado.map((e) => (
-            <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <span>
-                [{new Date(e.timestamp).toLocaleTimeString()}] {LABELS_TIPO[e.tipo]} · {e.texto}
-              </span>
-              {renderAcaoEntrada?.(e)}
-            </div>
-          ))}
+          {feed.map((item, i) => {
+            const diaAnterior = i > 0 ? chaveDia(feed[i - 1].entrada.timestamp) : null;
+            const mostrarSeparador = chaveDia(item.entrada.timestamp) !== diaAnterior;
+            return (
+              <div key={`${item.tipo}-${item.entrada.id}`}>
+                {mostrarSeparador && (
+                  <div
+                    className="label"
+                    style={{
+                      borderBottom: '1px solid var(--concrete-2)',
+                      paddingBottom: '0.2rem',
+                      marginTop: i === 0 ? 0 : '0.6rem',
+                      marginBottom: '0.3rem',
+                    }}
+                  >
+                    {formatarSeparadorDia(item.entrada.timestamp)}
+                  </div>
+                )}
+                {item.tipo === 'log' ? (
+                  <LinhaLog entrada={item.entrada} renderAcao={renderAcaoEntrada} />
+                ) : (
+                  <LinhaRoll entrada={item.entrada} podeLimpar={podeLimpar} revelarRoll={revelarRoll} />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
-
-      <RolsSection podeLimpar={podeLimpar} />
     </div>
   );
 }
