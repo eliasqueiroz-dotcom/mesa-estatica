@@ -263,6 +263,10 @@ export interface Pista {
   ligadoA: string;
   status: StatusPista;
   criadoEm: string; // ISO
+  /** Timestamp de quando foi postada no log público via "revelar no log" — ausente = nunca
+   *  revelada dessa forma (mestre pode ter contado por fora). Campo aditivo opcional, mesmo
+   *  espírito de `EntradaLog.visibilidade`/`rodada`. */
+  reveladoEm?: string;
 }
 
 export interface Lembrete {

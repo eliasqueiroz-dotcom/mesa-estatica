@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore } from '../../state/store';
 import type { Pista, StatusPista } from '../../state/types';
 import './pistas.css';
@@ -8,13 +9,30 @@ const COLUNAS: { status: StatusPista; titulo: string; cor: string; vazio: string
   { status: 'compartilhada', titulo: 'compartilhadas com jogadores', cor: 'var(--rede)', vazio: 'nada revelado à mesa ainda.' },
 ];
 
+function formatarPista(pista: Pista): string {
+  return pista.ligadoA ? `pista: ${pista.texto}\nligado a: ${pista.ligadoA}` : `pista: ${pista.texto}`;
+}
+
 function PistaCard({ pista }: { pista: Pista }) {
   const atualizarPista = useStore((s) => s.atualizarPista);
   const removerPista = useStore((s) => s.removerPista);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const [copiado, setCopiado] = useState(false);
 
   const indiceAtual = COLUNAS.findIndex((c) => c.status === pista.status);
   const anterior = COLUNAS[indiceAtual - 1];
   const proxima = COLUNAS[indiceAtual + 1];
+
+  const revelarNoLog = () => {
+    registrarLog('anotacao', `pista revelada: ${pista.texto}${pista.ligadoA ? ` — ligado a: ${pista.ligadoA}` : ''}`, null, 'publica');
+    atualizarPista(pista.id, { reveladoEm: new Date().toISOString() });
+  };
+
+  const copiar = async () => {
+    await navigator.clipboard.writeText(formatarPista(pista));
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1800);
+  };
 
   return (
     <div className="pista-card" style={{ ['--coluna-cor' as string]: COLUNAS[indiceAtual].cor }}>
@@ -49,6 +67,30 @@ function PistaCard({ pista }: { pista: Pista }) {
             ›
           </button>
         </div>
+        <div className="pista-card__acoes">
+          <button
+            className="icone-botao"
+            disabled={pista.status !== 'compartilhada' || !!pista.reveladoEm}
+            title={
+              pista.status !== 'compartilhada'
+                ? 'mova pra "compartilhadas" antes de revelar no log'
+                : pista.reveladoEm
+                  ? 'já revelado no log'
+                  : 'revelar no log público (aparece pro jogador)'
+            }
+            onClick={revelarNoLog}
+          >
+            {pista.reveladoEm ? '✓' : '📣'}
+          </button>
+          <button
+            className="icone-botao"
+            title={copiado ? 'copiado' : 'copiar pista formatada'}
+            style={{ color: copiado ? 'var(--rede)' : undefined }}
+            onClick={() => void copiar()}
+          >
+            {copiado ? '✓' : '⧉'}
+          </button>
+        </div>
         <button className="icone-botao perigo" onClick={() => removerPista(pista.id)}>
           ×
         </button>
@@ -60,26 +102,41 @@ function PistaCard({ pista }: { pista: Pista }) {
 export default function PistasTab() {
   const pistas = useStore((s) => s.pistas);
   const adicionarPista = useStore((s) => s.adicionarPista);
+  const [filtro, setFiltro] = useState('');
+
+  const filtroNormalizado = filtro.trim().toLowerCase();
+  const pistasFiltradas = filtroNormalizado
+    ? pistas.filter(
+        (p) => p.texto.toLowerCase().includes(filtroNormalizado) || p.ligadoA.toLowerCase().includes(filtroNormalizado),
+      )
+    : pistas;
 
   return (
     <section>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', gap: '0.6rem' }}>
         <h3 className="label" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Quadro de pistas
           <span className="badge">privado — só o mestre</span>
         </h3>
+        <input
+          type="text"
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          placeholder="buscar por texto ou ligado a…"
+          style={{ fontSize: 12, flex: '1 1 200px', maxWidth: 260 }}
+        />
         <button className="acento" onClick={() => adicionarPista()}>
           + pista
         </button>
       </div>
       <p className="vazio" style={{ marginBottom: '1rem' }}>
         esta aba não existe no app do jogador — mesmo publicado no site, ninguém além do mestre a vê. marcar uma pista como
-        "compartilhada" não revela nada sozinho; é só o seu lembrete de que já contou pros jogadores.
+        "compartilhada" não revela nada sozinho; use "revelar no log" pra postar como anotação pública, visível ao jogador.
       </p>
 
       <div className="pista-quadro">
         {COLUNAS.map((coluna) => {
-          const itens = pistas.filter((p) => p.status === coluna.status);
+          const itens = pistasFiltradas.filter((p) => p.status === coluna.status);
           return (
             <div key={coluna.status} className="pista-coluna">
               <div className="pista-coluna__titulo" style={{ ['--coluna-cor' as string]: coluna.cor }}>

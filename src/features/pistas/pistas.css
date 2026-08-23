@@ -44,7 +44,8 @@
   gap: 0.4rem;
 }
 
-.pista-card__mover {
+.pista-card__mover,
+.pista-card__acoes {
   display: flex;
   gap: 0.3rem;
 }
