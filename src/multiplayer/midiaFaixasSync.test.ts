@@ -20,8 +20,24 @@ describe('paraLinha / paraFaixa', () => {
       url: faixa.url,
       ordem: 3,
       criado_em: '2026-07-20T10:00:00.000Z',
+      tag: null,
     });
 
+    expect(paraFaixa(linha)).toEqual(faixa);
+  });
+
+  it('round-trip preserva a tag quando definida', () => {
+    const faixa: FaixaMidia = {
+      id: 'f2',
+      nome: 'Tensão',
+      path: 'midia/tensao.mp3',
+      url: 'https://exemplo.supabase.co/storage/v1/object/public/midia/tensao.mp3',
+      ordem: 0,
+      criadoEm: '2026-07-20T10:00:00.000Z',
+      tag: 'tensão',
+    };
+    const linha = paraLinha(faixa);
+    expect(linha.tag).toBe('tensão');
     expect(paraFaixa(linha)).toEqual(faixa);
   });
 });

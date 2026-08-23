@@ -49,4 +49,10 @@ describe('computarDiffFaixas', () => {
     const atuais = [faixa({ nome: 'nova' })];
     expect(computarDiffFaixas(anteriores, atuais).upserts).toEqual(atuais);
   });
+
+  it('mudança só de tag também conta como upsert', () => {
+    const anteriores = [faixa({ tag: undefined })];
+    const atuais = [faixa({ tag: 'tensão' })];
+    expect(computarDiffFaixas(anteriores, atuais).upserts).toEqual(atuais);
+  });
 });

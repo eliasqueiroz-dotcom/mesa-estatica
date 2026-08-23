@@ -381,6 +381,10 @@ export interface FaixaMidia {
   url: string;
   ordem: number;
   criadoEm: string; // ISO
+  /** Tag livre pro mestre organizar/buscar a playlist ("tensão", "combate"...). Aditivo
+   *  opcional — ausente = sem tag. Sincronizada (coluna `tag` em `midia_faixas`, migração
+   *  0035) igual ao resto da faixa. */
+  tag?: string;
 }
 
 export interface EstadoMidia {

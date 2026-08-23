@@ -26,6 +26,7 @@ export interface LinhaFaixa {
   url: string;
   ordem: number;
   criado_em: string;
+  tag: string | null;
 }
 
 export const paraLinha = (f: FaixaMidia): LinhaFaixa => ({
@@ -35,6 +36,7 @@ export const paraLinha = (f: FaixaMidia): LinhaFaixa => ({
   url: f.url,
   ordem: f.ordem,
   criado_em: f.criadoEm,
+  tag: f.tag ?? null,
 });
 
 export const paraFaixa = (r: LinhaFaixa): FaixaMidia => ({
@@ -44,6 +46,7 @@ export const paraFaixa = (r: LinhaFaixa): FaixaMidia => ({
   url: r.url,
   ordem: r.ordem,
   criadoEm: r.criado_em,
+  tag: r.tag ?? undefined,
 });
 
 /**

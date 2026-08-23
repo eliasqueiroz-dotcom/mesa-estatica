@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { fadeVolume } from '../../lib/audioFade';
 import { calcularPosicaoEsperada, precisaResincronizar } from '../../multiplayer/posicaoMidia';
+import { useSoundpadUiStore } from '../../state/soundpadUiStore';
 import { useStore } from '../../state/store';
+
+const FATOR_DUCK = 0.35;
+const FADE_TROCA_MS = 700;
+const FADE_DUCK_MS = 250;
 
 /**
  * Motor de playback do lado do jogador — renderizado dentro do `<header>` do `PlayerApp.tsx`
@@ -18,9 +24,16 @@ import { useStore } from '../../state/store';
  */
 export default function MidiaPlayerJogador() {
   const midia = useStore((s) => s.midia);
+  const efeitoTocando = useSoundpadUiStore((s) => s.slotsTocando.size > 0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [desbloqueado, setDesbloqueado] = useState(false);
   const [mudo, setMudo] = useState(false);
+
+  const fadeTokenRef = useRef(0);
+  const prevFaixaIdRef = useRef<string | null>(null);
+  const prevTocandoRef = useRef(false);
+  const efeitoTocandoRef = useRef(efeitoTocando);
+  efeitoTocandoRef.current = efeitoTocando;
 
   const faixaAtual = midia.faixas.find((f) => f.id === midia.faixaAtualId) ?? null;
 
@@ -34,16 +47,36 @@ export default function MidiaPlayerJogador() {
     const esperado = calcularPosicaoEsperada(midia);
     if (precisaResincronizar(audio.currentTime, esperado)) audio.currentTime = esperado;
 
+    // fade só entra numa troca de faixa/início/fim de verdade — não num resync puro de posição.
+    const trocou = prevFaixaIdRef.current !== midia.faixaAtualId || prevTocandoRef.current !== midia.tocando;
+    prevFaixaIdRef.current = midia.faixaAtualId;
+    prevTocandoRef.current = midia.tocando;
+
     if (!desbloqueado) return; // sem gesto do usuário ainda — só prepara, não toca
 
-    if (midia.tocando) audio.play().catch(() => {});
-    else audio.pause();
+    const volumeAlvo = midia.volume * (efeitoTocandoRef.current ? FATOR_DUCK : 1);
+    if (midia.tocando) {
+      if (trocou) audio.volume = 0;
+      audio
+        .play()
+        .then(() => {
+          if (trocou) fadeVolume(audio, volumeAlvo, FADE_TROCA_MS, fadeTokenRef);
+        })
+        .catch(() => {});
+    } else if (trocou) {
+      fadeVolume(audio, 0, FADE_TROCA_MS, fadeTokenRef, () => audio.pause());
+    } else {
+      audio.pause();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [midia.faixaAtualId, midia.tocando, midia.atualizadoEm, desbloqueado]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = midia.volume;
-  }, [midia.volume]);
+    const audio = audioRef.current;
+    if (!audio) return;
+    const volumeAlvo = midia.volume * (efeitoTocando ? FATOR_DUCK : 1);
+    fadeVolume(audio, volumeAlvo, efeitoTocando ? FADE_DUCK_MS : 0, fadeTokenRef);
+  }, [midia.volume, efeitoTocando]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.muted = mudo;

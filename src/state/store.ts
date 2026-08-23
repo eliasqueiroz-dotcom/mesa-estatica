@@ -187,6 +187,7 @@ interface Acoes {
   atualizarEstadoMidia: (patch: Partial<Pick<EstadoMidia, 'faixaAtualId' | 'tocando' | 'posicaoSegundos'>>) => void;
   definirVolumeMidia: (volume: number) => void;
   definirModoLoopMidia: (modoLoop: EstadoMidia['modoLoop']) => void;
+  definirTagFaixaMidia: (id: string, tag: string) => void;
 
   /** Grava o som no slot (0–5), sobrescrevendo o que estiver lá — é o "substituir" da UI. */
   definirSomSoundpad: (slot: number, nome: string, path: string, url: string) => string;
@@ -1216,6 +1217,10 @@ export const useStore = create<Store>()(
           );
           return { midia: { ...s.midia, faixas } };
         }),
+      definirTagFaixaMidia: (id, tag) =>
+        set((s) => ({
+          midia: { ...s.midia, faixas: s.midia.faixas.map((f) => (f.id === id ? { ...f, tag } : f)) },
+        })),
       atualizarEstadoMidia: (patch) =>
         set((s) => ({ midia: { ...s.midia, ...patch, atualizadoEm: new Date().toISOString() } })),
       definirVolumeMidia: (volume) =>

@@ -18,7 +18,8 @@ export function computarDiffFaixas(anteriores: FaixaMidia[], atuais: FaixaMidia[
       anterior.nome !== faixa.nome ||
       anterior.path !== faixa.path ||
       anterior.url !== faixa.url ||
-      anterior.ordem !== faixa.ordem
+      anterior.ordem !== faixa.ordem ||
+      anterior.tag !== faixa.tag
     );
   });
 

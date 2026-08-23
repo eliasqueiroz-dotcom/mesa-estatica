@@ -31,13 +31,22 @@ export default function MidiaTab() {
   const atualizarEstadoMidia = useStore((s) => s.atualizarEstadoMidia);
   const definirVolumeMidia = useStore((s) => s.definirVolumeMidia);
   const definirModoLoopMidia = useStore((s) => s.definirModoLoopMidia);
+  const definirTagFaixaMidia = useStore((s) => s.definirTagFaixaMidia);
 
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [posicaoExibida, setPosicaoExibida] = useState(midia.posicaoSegundos);
+  const [filtro, setFiltro] = useState('');
 
   const ordenadas = [...midia.faixas].sort((a, b) => a.ordem - b.ordem);
   const faixaAtual = midia.faixas.find((f) => f.id === midia.faixaAtualId) ?? null;
+
+  const filtroNormalizado = filtro.trim().toLowerCase();
+  const ordenadasFiltradas = filtroNormalizado
+    ? ordenadas.filter(
+        (f) => f.nome.toLowerCase().includes(filtroNormalizado) || (f.tag ?? '').toLowerCase().includes(filtroNormalizado),
+      )
+    : ordenadas;
 
   // relógio local só pra exibição do tempo decorrido — a posição real vive em midia.posicaoSegundos.
   useEffect(() => {
@@ -199,67 +208,89 @@ export default function MidiaTab() {
       <SoundpadGrid />
 
       <div className="secao" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        <h3 className="label" style={{ margin: 0 }}>
-          playlist
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <h3 className="label" style={{ margin: 0 }}>
+            playlist
+          </h3>
+          <input
+            type="text"
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+            placeholder="buscar por nome ou tag…"
+            style={{ fontSize: 12, flex: '1 1 200px', maxWidth: 260 }}
+          />
+        </div>
         {ordenadas.length === 0 ? (
           <p className="vazio">nenhuma faixa ainda — envie um áudio acima.</p>
+        ) : ordenadasFiltradas.length === 0 ? (
+          <p className="vazio">nenhuma faixa bate com a busca.</p>
         ) : (
-          ordenadas.map((faixa, idx) => (
-            <div
-              key={faixa.id}
-              onClick={() => selecionar(faixa.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.4rem 0.5rem',
-                background: faixa.id === midia.faixaAtualId ? 'var(--concrete-1)' : undefined,
-                border: '1px solid var(--concrete-2)',
-                borderRadius: '2px',
-                cursor: 'pointer',
-              }}
-            >
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {faixa.id === midia.faixaAtualId && (midia.tocando ? '▶ ' : '❚❚ ')}
-                {faixa.nome}
-              </span>
-              <button
-                className="icone-botao"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moverFaixaMidia(faixa.id, 'cima');
+          ordenadasFiltradas.map((faixa) => {
+            const idx = ordenadas.findIndex((f) => f.id === faixa.id);
+            return (
+              <div
+                key={faixa.id}
+                onClick={() => selecionar(faixa.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.4rem 0.5rem',
+                  background: faixa.id === midia.faixaAtualId ? 'var(--concrete-1)' : undefined,
+                  border: '1px solid var(--concrete-2)',
+                  borderRadius: '2px',
+                  cursor: 'pointer',
                 }}
-                disabled={idx === 0}
-                title="mover pra cima"
               >
-                ↑
-              </button>
-              <button
-                className="icone-botao"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moverFaixaMidia(faixa.id, 'baixo');
-                }}
-                disabled={idx === ordenadas.length - 1}
-                title="mover pra baixo"
-              >
-                ↓
-              </button>
-              <span
-                className="icone-botao"
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void excluir(faixa);
-                }}
-                style={{ color: 'var(--ruido)' }}
-              >
-                ×
-              </span>
-            </div>
-          ))
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {faixa.id === midia.faixaAtualId && (midia.tocando ? '▶ ' : '❚❚ ')}
+                  {faixa.nome}
+                </span>
+                <input
+                  type="text"
+                  value={faixa.tag ?? ''}
+                  placeholder="tag"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => definirTagFaixaMidia(faixa.id, e.target.value)}
+                  style={{ fontSize: 11, width: 90, flexShrink: 0 }}
+                />
+                <button
+                  className="icone-botao"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    moverFaixaMidia(faixa.id, 'cima');
+                  }}
+                  disabled={idx === 0}
+                  title="mover pra cima"
+                >
+                  ↑
+                </button>
+                <button
+                  className="icone-botao"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    moverFaixaMidia(faixa.id, 'baixo');
+                  }}
+                  disabled={idx === ordenadas.length - 1}
+                  title="mover pra baixo"
+                >
+                  ↓
+                </button>
+                <span
+                  className="icone-botao"
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void excluir(faixa);
+                  }}
+                  style={{ color: 'var(--ruido)' }}
+                >
+                  ×
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

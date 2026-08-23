@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { fadeVolume } from '../../lib/audioFade';
 import { estaAplicandoRemotoMidia } from '../../multiplayer/midiaEstadoSync';
 import { calcularPosicaoEsperada, precisaResincronizar } from '../../multiplayer/posicaoMidia';
 import { useMidiaUiStore } from '../../state/midiaUiStore';
+import { useSoundpadUiStore } from '../../state/soundpadUiStore';
 import { useStore } from '../../state/store';
+
+const FATOR_DUCK = 0.35;
+const FADE_TROCA_MS = 700;
+const FADE_DUCK_MS = 250;
 
 /**
  * Motor de playback do lado do mestre — renderizado dentro do `<header>` do `App.tsx` (não
@@ -18,9 +24,18 @@ import { useStore } from '../../state/store';
 export default function MidiaPlayerGM() {
   const midia = useStore((s) => s.midia);
   const definirDuracao = useMidiaUiStore((s) => s.definirDuracao);
+  const efeitoTocando = useSoundpadUiStore((s) => s.slotsTocando.size > 0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [bloqueado, setBloqueado] = useState(false);
   const [erroAudio, setErroAudio] = useState<string | null>(null);
+
+  // refs (não deps de efeito) — usados só pra decidir se um fade deve disparar, sem forçar o
+  // efeito de troca de faixa a reagir a `efeitoTocando` (esse é assunto do outro efeito, do duck).
+  const fadeTokenRef = useRef(0);
+  const prevFaixaIdRef = useRef<string | null>(null);
+  const prevTocandoRef = useRef(false);
+  const efeitoTocandoRef = useRef(efeitoTocando);
+  efeitoTocandoRef.current = efeitoTocando;
 
   const faixaAtual = midia.faixas.find((f) => f.id === midia.faixaAtualId) ?? null;
 
@@ -43,22 +58,41 @@ export default function MidiaPlayerGM() {
       audio.currentTime = midia.posicaoSegundos;
     }
 
+    // fade só entra numa troca de faixa/início/fim de verdade — não num resync puro de posição
+    // (que também passa por aqui, via `atualizadoEm` nas deps).
+    const trocou = prevFaixaIdRef.current !== midia.faixaAtualId || prevTocandoRef.current !== midia.tocando;
+    prevFaixaIdRef.current = midia.faixaAtualId;
+    prevTocandoRef.current = midia.tocando;
+    const volumeAlvo = midia.volume * (efeitoTocandoRef.current ? FATOR_DUCK : 1);
+
     if (midia.tocando) {
+      if (trocou) audio.volume = 0;
       audio.play().then(
-        () => setBloqueado(false),
+        () => {
+          setBloqueado(false);
+          if (trocou) fadeVolume(audio, volumeAlvo, FADE_TROCA_MS, fadeTokenRef);
+        },
         (erro) => {
           if (erro?.name === 'NotAllowedError') setBloqueado(true);
         },
       );
+    } else if (trocou) {
+      fadeVolume(audio, 0, FADE_TROCA_MS, fadeTokenRef, () => audio.pause());
     } else {
       audio.pause();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [midia.faixaAtualId, midia.tocando, midia.atualizadoEm]);
 
+  // volume "de verdade" (slider do mestre) e duck automático (soundpad tocando) — os dois
+  // convergem pro mesmo alvo, animado só quando é o duck entrando/saindo (o slider já dispara
+  // muitos eventos sozinho ao arrastar; fade aí ficaria atrasado em vez de suave).
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = midia.volume;
-  }, [midia.volume]);
+    const audio = audioRef.current;
+    if (!audio) return;
+    const volumeAlvo = midia.volume * (efeitoTocando ? FATOR_DUCK : 1);
+    fadeVolume(audio, volumeAlvo, efeitoTocando ? FADE_DUCK_MS : 0, fadeTokenRef);
+  }, [midia.volume, efeitoTocando]);
 
   const aoTerminar = () => {
     const s = useStore.getState();
