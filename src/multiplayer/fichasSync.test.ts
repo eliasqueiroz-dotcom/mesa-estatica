@@ -71,6 +71,19 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 vi.mock('../lib/statusMesa', () => ({
   assinarStatusCanal: vi.fn(() => vi.fn()),
+  // mesma lógica de edge-detection do real (statusMesa.ts), reimplementada aqui como nos
+  // outros mocks deste projeto — evita depender do módulo de verdade.
+  assinarStatusCanalComRefetch: vi.fn((_nome: string, refetch: () => void | Promise<void>) => {
+    let viuErro = false;
+    return (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        if (viuErro) void refetch();
+        viuErro = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        viuErro = true;
+      }
+    };
+  }),
   desconectarCanal: vi.fn(),
   useStatusMesa: {
     getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
@@ -84,6 +97,7 @@ const { iniciarSyncFichas } = await import('./fichasSync');
 function criarClienteComControle() {
   const resolvers: Array<(data: any) => void> = [];
   const handlers: Array<(payload: any) => void> = [];
+  const subscribeCallbacks: Array<(status: string) => void> = [];
 
   function criarBuilder(): any {
     const builder: any = {};
@@ -129,13 +143,14 @@ function criarClienteComControle() {
     return channelObj;
   });
   channelObj.subscribe = vi.fn((cb: (status: string) => void) => {
+    subscribeCallbacks.push(cb);
     cb('SUBSCRIBED');
     return channelObj;
   });
   const channel = vi.fn(() => channelObj);
   const removeChannel = vi.fn();
 
-  return { from, channel, channelObj, handlers, resolvers, removeChannel };
+  return { from, channel, channelObj, handlers, resolvers, removeChannel, subscribeCallbacks };
 }
 
 function fichaRemotaPublica(id: string, nome: string) {
@@ -330,5 +345,56 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
     // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a edição (achado de 23/08).
     expect(retomarPendenciasPersistidas('fichas-sync')).toContain(localId);
+  });
+
+  it('canal cai e reconecta atualiza ficha JÁ carregada localmente (não só a que falta)', async () => {
+    const fichaId = 'ficha-reconexao';
+    cleanup = iniciarSyncFichas();
+
+    // busca inicial já traz a ficha (simula um mount que já achou ela na primeira carga)
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([fichaRemotaPublica(fichaId, 'Helena')]);
+    mock.resolvers[1]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+    await vi.waitFor(() => expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true));
+    expect(useStore.getState().fichas.find((f) => f.id === fichaId)?.pvAtual).toBe(20);
+
+    // canal cai e reconecta — SEM nenhum evento `postgres_changes` (o cenário que o Realtime
+    // não cobre: o mestre baixou o PV dela enquanto este cliente estava desconectado).
+    mock.subscribeCallbacks[0]('CHANNEL_ERROR');
+    mock.subscribeCallbacks[0]('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    mock.resolvers[2]([{ ...fichaRemotaPublica(fichaId, 'Helena'), pv_atual: 3 }]);
+    mock.resolvers[3]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().fichas.find((f) => f.id === fichaId)?.pvAtual).toBe(3);
+    });
+  });
+
+  it('refetch de reconexão nunca sobrescreve uma edição local ainda pendente de push', async () => {
+    vi.stubGlobal('localStorage', criarStorageFalso());
+    const fichaId = 'ficha-pendente';
+    cleanup = iniciarSyncFichas();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([fichaRemotaPublica(fichaId, 'Helena')]);
+    mock.resolvers[1]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+    await vi.waitFor(() => expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true));
+
+    // edição local ainda não confirmada no servidor (marcada em `pendencias` pelo subscriber,
+    // debounce nem disparou)
+    useStore.getState().atualizarFicha(fichaId, { nome: 'Helena Editando Agora' });
+    expect(retomarPendenciasPersistidas('fichas-sync')).toContain(fichaId);
+
+    mock.subscribeCallbacks[0]('CHANNEL_ERROR');
+    mock.subscribeCallbacks[0]('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    mock.resolvers[2]([fichaRemotaPublica(fichaId, 'Helena (dado velho do servidor)')]);
+    mock.resolvers[3]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useStore.getState().fichas.find((f) => f.id === fichaId)?.nome).toBe('Helena Editando Agora');
   });
 });

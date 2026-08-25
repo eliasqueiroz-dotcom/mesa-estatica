@@ -35,6 +35,17 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 vi.mock('../lib/statusMesa', () => ({
   assinarStatusCanal: vi.fn(() => vi.fn()),
+  assinarStatusCanalComRefetch: vi.fn((_nome: string, refetch: () => void | Promise<void>) => {
+    let viuErro = false;
+    return (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        if (viuErro) void refetch();
+        viuErro = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        viuErro = true;
+      }
+    };
+  }),
   desconectarCanal: vi.fn(),
   useStatusMesa: {
     getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
@@ -109,3 +120,76 @@ function criarStorageFalso() {
     },
   };
 }
+
+// ===== refetch de reconexão =====
+function criarClienteComControle() {
+  const resolvers: Array<(data: unknown) => void> = [];
+  let statusCb: ((status: string) => void) | undefined;
+
+  const builder: any = {};
+  builder.select = () => builder;
+  builder.then = (onFulfilled: (result: { data: unknown; error: null }) => void) => {
+    return new Promise((resolve) => {
+      resolvers.push((data: unknown) => resolve(onFulfilled({ data, error: null })));
+    });
+  };
+  builder.upsert = () => Promise.resolve({ error: null });
+  builder.delete = () => builder;
+  builder.eq = () => Promise.resolve({ error: null });
+
+  const channelObj: any = {};
+  channelObj.on = () => channelObj;
+  channelObj.subscribe = (cb: (status: string) => void) => {
+    statusCb = cb;
+    cb('SUBSCRIBED');
+    return channelObj;
+  };
+
+  return {
+    from: () => builder,
+    channel: () => channelObj,
+    removeChannel: () => {},
+    resolvers,
+    get statusCb() {
+      return statusCb;
+    },
+  };
+}
+
+describe('iniciarSyncTokens — refetch de reconexão', () => {
+  let mock: ReturnType<typeof criarClienteComControle>;
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+    mock = criarClienteComControle();
+    h.clienteAtual = mock;
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+  });
+
+  it('canal cai e reconecta rebusca os tokens, mesmo sem evento Realtime durante a queda', async () => {
+    cleanup = iniciarSyncTokens();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([]); // busca inicial: mapa vazio
+
+    // canal cai e reconecta — um token foi movido em outra aba enquanto este cliente estava
+    // desconectado, sem nenhum evento `postgres_changes` chegar aqui
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1]([{ id: 'tok-1', participante_id: 'pc-1', tipo: 'pc', x: 42, y: 7 }]);
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().mapa.tokens.map((t) => t.id)).toEqual(['tok-1']);
+    });
+    expect(useStore.getState().mapa.tokens[0].x).toBe(42);
+  });
+});

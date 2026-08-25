@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { SessaoPublica } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
@@ -159,7 +159,9 @@ export function iniciarSyncSessaoPublica(): () => void {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'sessao_publica' }, () => {
       void aplicarRemoto();
     })
-    .subscribe(assinarStatusCanal('sessao-publica-sync'));
+    // refetch na reconexão (canal caiu e voltou) — Realtime não reenvia evento perdido durante
+    // a queda; sem isso, quem cai e volta fica com cena/rodada/ameaça desatualizada até reload.
+    .subscribe(assinarStatusCanalComRefetch('sessao-publica-sync', aplicarRemoto));
 
   return () => {
     unsubscribeLocal();

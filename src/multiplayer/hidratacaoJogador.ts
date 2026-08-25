@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EntradaIniciativa, GradeMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { paraFichaPublica, type LinhaPublico as LinhaFichaPublico } from './fichasSync';
 import type { FichaPublica } from './fichaSplit';
@@ -33,16 +33,21 @@ export function useHidratarSessaoPublica(): void {
 
     let cancelado = false;
 
-    cliente
-      .from('sessao_publica')
-      .select('*')
-      .eq('id', 'sessao')
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) console.error('[hidratacaoJogador] busca inicial de sessao_publica falhou', error);
-        else if (data) useStore.setState({ sessaoPublica: paraSessaoPublica(data as LinhaSessaoPublica) });
-      });
+    // busca inicial E refetch de reconexão (canal caiu e voltou) — o Realtime não reenvia o
+    // evento perdido durante a queda, então sem isso quem reconecta fica com cena/rodada/
+    // ameaça desatualizada até um reload manual (achado em 24/08, auditoria pré-sessão).
+    const refetch = () =>
+      cliente
+        .from('sessao_publica')
+        .select('*')
+        .eq('id', 'sessao')
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) console.error('[hidratacaoJogador] busca de sessao_publica falhou', error);
+          else if (data) useStore.setState({ sessaoPublica: paraSessaoPublica(data as LinhaSessaoPublica) });
+        });
+    void refetch();
 
     const canal = cliente
       .channel('jogador-sessao-publica')
@@ -51,7 +56,7 @@ export function useHidratarSessaoPublica(): void {
           useStore.setState({ sessaoPublica: paraSessaoPublica(payload.new as LinhaSessaoPublica) });
         }
       })
-      .subscribe(assinarStatusCanal('jogador-sessao-publica'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-sessao-publica', refetch));
 
     return () => {
       cancelado = true;
@@ -74,20 +79,23 @@ export function useHidratarMapaPublico(): void {
 
     let cancelado = false;
 
-    cliente
-      .from('mapa_publico')
-      .select('*')
-      .eq('id', 'mapa')
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) return console.error('[hidratacaoJogador] busca inicial de mapa_publico falhou', error);
-        if (!data) return;
-        const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
-        // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
-        // existirem em GradeMapa) não pode apagar os defaults locais desses campos.
-        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
-      });
+    // busca inicial E refetch de reconexão — mesmo motivo de `useHidratarSessaoPublica`.
+    const refetch = () =>
+      cliente
+        .from('mapa_publico')
+        .select('*')
+        .eq('id', 'mapa')
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) return console.error('[hidratacaoJogador] busca de mapa_publico falhou', error);
+          if (!data) return;
+          const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
+          // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
+          // existirem em GradeMapa) não pode apagar os defaults locais desses campos.
+          useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
+        });
+    void refetch();
 
     const canal = cliente
       .channel('jogador-mapa-publico')
@@ -96,7 +104,7 @@ export function useHidratarMapaPublico(): void {
         const linha = payload.new as { imagem_data_url: string | null; grade: GradeMapa };
         useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
       })
-      .subscribe(assinarStatusCanal('jogador-mapa-publico'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-mapa-publico', refetch));
 
     return () => {
       cancelado = true;
@@ -120,26 +128,31 @@ export function useHidratarMidia(): void {
 
     let cancelado = false;
 
-    cliente
-      .from('midia_faixas')
-      .select('*')
-      .order('ordem', { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) return console.error('[hidratacaoJogador] busca inicial de midia_faixas falhou', error);
-        if (data) useStore.setState((s) => ({ midia: { ...s.midia, faixas: (data as LinhaFaixa[]).map(paraFaixa) } }));
-      });
+    // busca inicial E refetch de reconexão — mesmo motivo de `useHidratarSessaoPublica`.
+    const refetchFaixas = () =>
+      cliente
+        .from('midia_faixas')
+        .select('*')
+        .order('ordem', { ascending: true })
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) return console.error('[hidratacaoJogador] busca de midia_faixas falhou', error);
+          if (data) useStore.setState((s) => ({ midia: { ...s.midia, faixas: (data as LinhaFaixa[]).map(paraFaixa) } }));
+        });
+    void refetchFaixas();
 
-    cliente
-      .from('midia_estado')
-      .select('*')
-      .eq('id', 'midia')
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) return console.error('[hidratacaoJogador] busca inicial de midia_estado falhou', error);
-        if (data) useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(data as LinhaMidiaEstado) } }));
-      });
+    const refetchEstado = () =>
+      cliente
+        .from('midia_estado')
+        .select('*')
+        .eq('id', 'midia')
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) return console.error('[hidratacaoJogador] busca de midia_estado falhou', error);
+          if (data) useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(data as LinhaMidiaEstado) } }));
+        });
+    void refetchEstado();
 
     const canalFaixas = cliente
       .channel('jogador-midia-faixas')
@@ -157,7 +170,7 @@ export function useHidratarMidia(): void {
           useStore.setState({ midia: { ...s.midia, faixas } });
         }
       })
-      .subscribe(assinarStatusCanal('jogador-midia-faixas'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-midia-faixas', refetchFaixas));
 
     const canalEstado = cliente
       .channel('jogador-midia-estado')
@@ -166,7 +179,7 @@ export function useHidratarMidia(): void {
         const patch = paraEstadoMidia(payload.new as LinhaMidiaEstado);
         useStore.setState((s) => ({ midia: { ...s.midia, ...patch } }));
       })
-      .subscribe(assinarStatusCanal('jogador-midia-estado'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-midia-estado', refetchEstado));
 
     return () => {
       cancelado = true;
@@ -187,14 +200,19 @@ export function useFichasPublicas(): FichaPublica[] {
 
     let cancelado = false;
 
-    cliente
-      .from('characters_publico')
-      .select('*')
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) console.error('[hidratacaoJogador] busca inicial de characters_publico falhou', error);
-        else if (data) setFichas((data as LinhaFichaPublico[]).map(paraFichaPublica));
-      });
+    // busca inicial E refetch de reconexão — substituição total (mesmo padrão de
+    // `tokensSync.ts`): read-only, sem push local pra proteger, então não precisa de merge
+    // fino, só refazer a busca de novo. Mesmo motivo de `useHidratarSessaoPublica`.
+    const refetch = () =>
+      cliente
+        .from('characters_publico')
+        .select('*')
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) console.error('[hidratacaoJogador] busca de characters_publico falhou', error);
+          else if (data) setFichas((data as LinhaFichaPublico[]).map(paraFichaPublica));
+        });
+    void refetch();
 
     const canal = cliente
       .channel('jogador-fichas-publico')
@@ -207,7 +225,7 @@ export function useFichasPublicas(): FichaPublica[] {
           setFichas((atual) => (atual.some((f) => f.id === ficha.id) ? atual.map((f) => (f.id === ficha.id ? ficha : f)) : [...atual, ficha]));
         }
       })
-      .subscribe(assinarStatusCanal('jogador-fichas-publico'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-fichas-publico', refetch));
 
     return () => {
       cancelado = true;
@@ -228,16 +246,19 @@ export function useNpcsPublicos(): NpcPublico[] {
 
     let cancelado = false;
 
-    // RLS da migração 0003 já filtra visivel = true pro jogador — o que chega aqui é
-    // exatamente o que ele pode ver, sem filtro extra no client.
-    cliente
-      .from('npcs_publico')
-      .select('*')
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) console.error('[hidratacaoJogador] busca inicial de npcs_publico falhou', error);
-        else if (data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcPublico));
-      });
+    // busca inicial E refetch de reconexão — mesmo motivo de `useHidratarSessaoPublica`. RLS
+    // da migração 0003 já filtra visivel = true pro jogador — o que chega aqui é exatamente o
+    // que ele pode ver, sem filtro extra no client.
+    const refetch = () =>
+      cliente
+        .from('npcs_publico')
+        .select('*')
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) console.error('[hidratacaoJogador] busca de npcs_publico falhou', error);
+          else if (data) setNpcs((data as LinhaNpcPublico[]).map(paraNpcPublico));
+        });
+    void refetch();
 
     const canal = cliente
       .channel('jogador-npcs-publico')
@@ -250,7 +271,7 @@ export function useNpcsPublicos(): NpcPublico[] {
           setNpcs((atual) => (atual.some((n) => n.id === npc.id) ? atual.map((n) => (n.id === npc.id ? npc : n)) : [...atual, npc]));
         }
       })
-      .subscribe(assinarStatusCanal('jogador-npcs-publico'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-npcs-publico', refetch));
 
     return () => {
       cancelado = true;
@@ -278,18 +299,23 @@ export function useIniciativaPublica(): EntradaIniciativa[] {
     const ordenarPorPosicao = (entradas: EntradaIniciativa[]): EntradaIniciativa[] =>
       [...entradas].sort((a, b) => (posicoesConhecidas.get(a.id) ?? 0) - (posicoesConhecidas.get(b.id) ?? 0));
 
-    cliente
-      .from('iniciativa')
-      .select('*')
-      .order('posicao', { ascending: true })
-      .then(({ data, error }) => {
-        if (cancelado) return;
-        if (error) return console.error('[hidratacaoJogador] busca inicial de iniciativa falhou', error);
-        if (!data) return;
-        const linhas = data as LinhaIniciativa[];
-        for (const linha of linhas) posicoesConhecidas.set(linha.id, linha.posicao);
-        setIniciativa(linhas.map(paraEntrada));
-      });
+    // busca inicial E refetch de reconexão — a ordem de turno é exatamente o caso que motivou
+    // esta auditoria (mesmo motivo de `useHidratarSessaoPublica`): sem isso, um jogador que
+    // reconecta no meio do combate fica com o turno parado até um reload manual.
+    const refetch = () =>
+      cliente
+        .from('iniciativa')
+        .select('*')
+        .order('posicao', { ascending: true })
+        .then(({ data, error }) => {
+          if (cancelado) return;
+          if (error) return console.error('[hidratacaoJogador] busca de iniciativa falhou', error);
+          if (!data) return;
+          const linhas = data as LinhaIniciativa[];
+          for (const linha of linhas) posicoesConhecidas.set(linha.id, linha.posicao);
+          setIniciativa(linhas.map(paraEntrada));
+        });
+    void refetch();
 
     const canal = cliente
       .channel('jogador-iniciativa')
@@ -311,7 +337,7 @@ export function useIniciativaPublica(): EntradaIniciativa[] {
           });
         }
       })
-      .subscribe(assinarStatusCanal('jogador-iniciativa'));
+      .subscribe(assinarStatusCanalComRefetch('jogador-iniciativa', refetch));
 
     return () => {
       cancelado = true;

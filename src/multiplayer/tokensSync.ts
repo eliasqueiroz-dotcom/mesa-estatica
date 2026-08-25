@@ -1,6 +1,6 @@
 import type { TokenMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
@@ -78,22 +78,28 @@ export function iniciarSyncTokens(): () => void {
   let aplicandoRemoto = false;
   let tokensAnteriores = useStore.getState().mapa.tokens;
 
-  // busca inicial — sem isso, uma sessão sem localStorage (bundle do jogador; ou o GM numa
-  // máquina limpa, ver CLAUDE.md "portabilidade") só veria tokens a partir da próxima
-  // mudança, nunca os que já existiam. `aplicandoRemoto` evita ecoar de volta pro servidor.
-  cliente
-    .from('tokens')
-    .select('*')
-    .then(({ data, error }) => {
-      if (error || !data) return;
-      aplicandoRemoto = true;
-      try {
-        useStore.setState((s) => ({ mapa: { ...s.mapa, tokens: (data as LinhaTokenSupabase[]).map(paraToken) } }));
-      } finally {
-        tokensAnteriores = useStore.getState().mapa.tokens;
-        aplicandoRemoto = false;
-      }
-    });
+  /** Busca inicial E refetch de reconexão (canal caiu e voltou) — substituição total, sem
+   *  merge fino: já era assim na busca de boot (sem isso, uma sessão sem localStorage — bundle
+   *  do jogador, ou o GM numa máquina limpa, ver CLAUDE.md "portabilidade" — só veria tokens a
+   *  partir da próxima mudança, nunca os que já existiam), e serve igual pra reconexão porque
+   *  posição de token não tem edição "parcial" pra perder — o Realtime não reenvia eventos
+   *  perdidos durante a queda, então sem isso um token movido enquanto este cliente estava
+   *  desconectado ficaria preso na posição antiga até reload. */
+  const refetchTokens = () =>
+    cliente
+      .from('tokens')
+      .select('*')
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        aplicandoRemoto = true;
+        try {
+          useStore.setState((s) => ({ mapa: { ...s.mapa, tokens: (data as LinhaTokenSupabase[]).map(paraToken) } }));
+        } finally {
+          tokensAnteriores = useStore.getState().mapa.tokens;
+          aplicandoRemoto = false;
+        }
+      });
+  void refetchTokens();
 
   const agendarUpsert = criarDebouncePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
     executarComRetentativa('tokens-sync', token.id, () =>
@@ -159,7 +165,7 @@ export function iniciarSyncTokens(): () => void {
         aplicandoRemoto = false;
       }
     })
-    .subscribe(assinarStatusCanal('tokens-sync'));
+    .subscribe(assinarStatusCanalComRefetch('tokens-sync', refetchTokens));
 
   return () => {
     unsubscribeLocal();

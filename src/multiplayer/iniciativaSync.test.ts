@@ -61,6 +61,17 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 vi.mock('../lib/statusMesa', () => ({
   assinarStatusCanal: vi.fn(() => vi.fn()),
+  assinarStatusCanalComRefetch: vi.fn((_nome: string, refetch: () => void | Promise<void>) => {
+    let viuErro = false;
+    return (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        if (viuErro) void refetch();
+        viuErro = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        viuErro = true;
+      }
+    };
+  }),
   desconectarCanal: vi.fn(),
   useStatusMesa: {
     getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
@@ -73,6 +84,7 @@ const { iniciarSyncIniciativa } = await import('./iniciativaSync');
 
 function criarClienteComControle() {
   const resolvers: Array<(data: unknown) => void> = [];
+  let statusCb: ((status: string) => void) | undefined;
 
   function criarBuilder(): any {
     const builder: any = {};
@@ -97,13 +109,14 @@ function criarClienteComControle() {
   const channelObj: any = {};
   channelObj.on = vi.fn(() => channelObj);
   channelObj.subscribe = vi.fn((cb: (status: string) => void) => {
+    statusCb = cb;
     cb('SUBSCRIBED');
     return channelObj;
   });
   const channel = vi.fn(() => channelObj);
   const removeChannel = vi.fn();
 
-  return { from, channel, removeChannel, resolvers };
+  return { from, channel, removeChannel, resolvers, get statusCb() { return statusCb; } };
 }
 
 function linhaRemota(id: string, participanteId: string, posicao: number) {
@@ -182,5 +195,49 @@ describe('iniciarSyncIniciativa — busca inicial', () => {
     // 23/08). Diferente dos outros módulos, a busca inicial daqui só incrementa
     // `aplicandoRemotoContagem` DEPOIS do `.then()` resolver — não precisa liberar nada antes.
     expect(retomarPendenciasPersistidas('iniciativa-sync')).toContain('iniciativa');
+  });
+
+  it('canal cai e reconecta busca a ordem atual MESMO com combate já em andamento (busca inicial sozinha é no-op nesse caso)', async () => {
+    cleanup = iniciarSyncIniciativa();
+
+    // busca inicial: combate já em andamento localmente antes de qualquer resposta chegar
+    useStore.setState({
+      iniciativa: [{ id: 'local-1', participanteId: 'pc-3', tipo: 'pc', nome: 'Local', valor: 5 }],
+    });
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([]); // não aplica (iniciativa local não está vazia) — comportamento existente
+
+    // canal cai e reconecta — o mestre reordenou/rolou iniciativa em outra aba enquanto este
+    // cliente estava desconectado, sem nenhum evento `postgres_changes` chegar aqui
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1]([linhaRemota('e1', 'pc-1', 0), linhaRemota('e2', 'pc-2', 1)]);
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().iniciativa.map((e) => e.id)).toEqual(['e1', 'e2']);
+    });
+  });
+
+  it('refetch de reconexão não sobrescreve edição local concorrente feita durante o fetch', async () => {
+    cleanup = iniciarSyncIniciativa();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([]);
+
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+
+    // edita localmente ANTES do fetch de reconexão resolver
+    useStore.setState({
+      iniciativa: [{ id: 'editado-durante-fetch', participanteId: 'pc-9', tipo: 'pc', nome: 'Editado', valor: 20 }],
+    });
+
+    mock.resolvers[1]([linhaRemota('e1', 'pc-1', 0)]); // dado remoto desatualizado
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useStore.getState().iniciativa.map((e) => e.id)).toEqual(['editado-durante-fetch']);
   });
 });

@@ -36,6 +36,7 @@ import { useRolagemRapidaSanidadeStore } from '../state/rolagemRapidaSanidadeSto
 import { useStore } from '../state/store';
 import { COR_NPC_PADRAO } from '../state/factories';
 import AvisoSupabaseAusente from './AvisoSupabaseAusente';
+import DesyncIndicadorJogador from './DesyncIndicadorJogador';
 import LogTabJogador from './LogTabJogador';
 import '../features/fichas/ficha.css';
 
@@ -186,6 +187,7 @@ export default function PlayerApp() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <h1 style={{ fontSize: '18px', margin: 0 }}>Estática — Mesa</h1>
+          <DesyncIndicadorJogador />
           <nav style={{ display: 'flex', gap: '0.4rem' }}>
             {ABAS.map((a) => {
               const ativa = aba === a.id;

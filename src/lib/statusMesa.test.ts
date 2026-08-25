@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assinarStatusCanal,
+  assinarStatusCanalComRefetch,
   desconectarCanal,
   instalarDetectorConectividade,
   limparErroRuntime,
@@ -80,6 +81,63 @@ describe('statusMesa', () => {
     expect(useStatusMesa.getState().erroRuntime).toBe('Cannot read properties of undefined');
     limparErroRuntime();
     expect(useStatusMesa.getState().erroRuntime).toBeNull();
+  });
+
+  describe('assinarStatusCanalComRefetch', () => {
+    it('primeiro SUBSCRIBED não dispara refetch (já coberto pela busca inicial)', () => {
+      const refetch = vi.fn();
+      assinarStatusCanalComRefetch('tokens-sync', refetch)('SUBSCRIBED');
+      expect(refetch).not.toHaveBeenCalled();
+    });
+
+    it('erro seguido de SUBSCRIBED dispara refetch exatamente uma vez', () => {
+      const refetch = vi.fn();
+      const cb = assinarStatusCanalComRefetch('tokens-sync', refetch);
+      cb('CHANNEL_ERROR');
+      cb('SUBSCRIBED');
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('TIMED_OUT e CLOSED também contam como erro pro refetch', () => {
+      const refetchA = vi.fn();
+      const cbA = assinarStatusCanalComRefetch('a', refetchA);
+      cbA('TIMED_OUT');
+      cbA('SUBSCRIBED');
+      expect(refetchA).toHaveBeenCalledTimes(1);
+
+      const refetchB = vi.fn();
+      const cbB = assinarStatusCanalComRefetch('b', refetchB);
+      cbB('CLOSED');
+      cbB('SUBSCRIBED');
+      expect(refetchB).toHaveBeenCalledTimes(1);
+    });
+
+    it('SUBSCRIBED repetido sem erro no meio não redispara', () => {
+      const refetch = vi.fn();
+      const cb = assinarStatusCanalComRefetch('tokens-sync', refetch);
+      cb('CHANNEL_ERROR');
+      cb('SUBSCRIBED');
+      cb('SUBSCRIBED');
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('dois ciclos erro→conectado disparam refetch duas vezes', () => {
+      const refetch = vi.fn();
+      const cb = assinarStatusCanalComRefetch('tokens-sync', refetch);
+      cb('CHANNEL_ERROR');
+      cb('SUBSCRIBED');
+      cb('CHANNEL_ERROR');
+      cb('SUBSCRIBED');
+      expect(refetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('continua atualizando canaisConectados/canaisComErro como assinarStatusCanal puro', () => {
+      const cb = assinarStatusCanalComRefetch('tokens-sync', () => {});
+      cb('CHANNEL_ERROR');
+      expect(statusSincronizacao(useStatusMesa.getState())).toBe('erro');
+      cb('SUBSCRIBED');
+      expect(statusSincronizacao(useStatusMesa.getState())).toBe('conectado');
+    });
   });
 
   describe('instalarDetectorConectividade', () => {

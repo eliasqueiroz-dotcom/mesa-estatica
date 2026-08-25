@@ -1,6 +1,6 @@
 import type { Npc } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
@@ -261,6 +261,7 @@ export function iniciarSyncNpcs(): () => void {
   const idDoPayload = (payload: { new: object; old: object }) =>
     (payload.new as { id?: string }).id ?? (payload.old as { id?: string }).id;
 
+  // busca inicial — só adiciona o que falta (comentário da função `iniciarSyncNpcs`).
   (async () => {
     const remotos = await buscarTodos(cliente);
     if (remotos.length === 0) return;
@@ -276,13 +277,44 @@ export function iniciarSyncNpcs(): () => void {
     }
   })();
 
+  /** Refetch de RECONEXÃO — mesmo motivo/forma de `refetchFichas` em `fichasSync.ts`: a busca
+   *  inicial só adiciona o que falta, nunca atualiza um NPC já carregado (PV alterado em
+   *  combate enquanto este cliente estava desconectado, por exemplo). Edição local em voo
+   *  (`pendencias`) sempre vence; ausente no lote remoto e sem push pendente é removido de
+   *  verdade. */
+  const refetchNpcs = async () => {
+    const remotos = await buscarTodos(cliente);
+    if (remotos.length === 0) return;
+    aplicandoRemotoContagem++;
+    try {
+      const s = useStore.getState();
+      const remotosPorId = new Map(remotos.map((n) => [n.id, n]));
+      const npcs: Npc[] = [];
+      for (const local of s.npcs) {
+        if (pendencias.has(local.id)) {
+          npcs.push(local);
+          continue;
+        }
+        const remoto = remotosPorId.get(local.id);
+        if (remoto) npcs.push(remoto);
+      }
+      for (const remoto of remotos) {
+        if (!s.npcs.some((n) => n.id === remoto.id)) npcs.push(remoto);
+      }
+      useStore.setState({ npcs });
+    } finally {
+      npcsAnteriores = useStore.getState().npcs;
+      aplicandoRemotoContagem--;
+    }
+  };
+
   const canalPublico = cliente
     .channel('npcs-publico-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'npcs_publico' }, (payload) => {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe(assinarStatusCanal('npcs-publico-sync'));
+    .subscribe(assinarStatusCanalComRefetch('npcs-publico-sync', refetchNpcs));
 
   const canalPrivado = cliente
     .channel('npcs-privado-sync')
@@ -290,7 +322,7 @@ export function iniciarSyncNpcs(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe(assinarStatusCanal('npcs-privado-sync'));
+    .subscribe(assinarStatusCanalComRefetch('npcs-privado-sync', refetchNpcs));
 
   return () => {
     unsubscribeLocal();

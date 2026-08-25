@@ -2,7 +2,7 @@ import type { BasePV } from '../rules/data/dificuldades';
 import { calcularDefesa, calcularPvMaximo } from '../rules/derivados';
 import type { Ficha } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { dividirFicha, montarFicha, type FichaPrivadaDados, type FichaPublica } from './fichaSplit';
@@ -290,6 +290,7 @@ export function iniciarSyncFichas(): () => void {
   const idDoPayload = (payload: { new: object; old: object }) =>
     (payload.new as { id?: string }).id ?? (payload.old as { id?: string }).id;
 
+  // busca inicial — só adiciona o que falta (comentário da função `iniciarSyncFichas`).
   (async () => {
     const remotas = await buscarTodas(cliente);
     if (remotas.length === 0) return;
@@ -305,13 +306,50 @@ export function iniciarSyncFichas(): () => void {
     }
   })();
 
+  /**
+   * Refetch de RECONEXÃO (canal caiu e voltou) — diferente da busca inicial acima: o Realtime
+   * não reenvia os eventos perdidos durante a queda, então uma ficha já carregada localmente
+   * (PV editado pelo mestre nesse meio-tempo, por exemplo) também precisa ser atualizada, não
+   * só a que falta. `remotas.length === 0` continua tratado como "não confiar" (mesmo motivo
+   * da busca inicial: não dá pra distinguir "zero fichas de verdade" de "erro na query" a
+   * partir do retorno de `buscarTodas`) — nunca varre a lista local a zero por isso. Edição
+   * local em voo (`pendencias`) sempre vence; ficha ausente no lote remoto E sem push pendente
+   * é removida (foi apagada de verdade, por outra aba ou pelo próprio mestre, enquanto este
+   * cliente estava desconectado).
+   */
+  const refetchFichas = async () => {
+    const remotas = await buscarTodas(cliente);
+    if (remotas.length === 0) return;
+    aplicandoRemotoContagem++;
+    try {
+      const s = useStore.getState();
+      const remotasPorId = new Map(remotas.map((f) => [f.id, f]));
+      const fichas: Ficha[] = [];
+      for (const local of s.fichas) {
+        if (pendencias.has(local.id)) {
+          fichas.push(local);
+          continue;
+        }
+        const remota = remotasPorId.get(local.id);
+        if (remota) fichas.push(remota);
+      }
+      for (const remota of remotas) {
+        if (!s.fichas.some((f) => f.id === remota.id)) fichas.push(remota);
+      }
+      useStore.setState({ fichas });
+    } finally {
+      fichasAnteriores = useStore.getState().fichas;
+      aplicandoRemotoContagem--;
+    }
+  };
+
   const canalPublico = cliente
     .channel('fichas-publico-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'characters_publico' }, (payload) => {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe(assinarStatusCanal('fichas-publico-sync'));
+    .subscribe(assinarStatusCanalComRefetch('fichas-publico-sync', refetchFichas));
 
   const canalPrivado = cliente
     .channel('fichas-privado-sync')
@@ -319,7 +357,7 @@ export function iniciarSyncFichas(): () => void {
       const id = idDoPayload(payload);
       if (id) void aplicarRemoto(id);
     })
-    .subscribe(assinarStatusCanal('fichas-privado-sync'));
+    .subscribe(assinarStatusCanalComRefetch('fichas-privado-sync', refetchFichas));
 
   return () => {
     unsubscribeLocal();

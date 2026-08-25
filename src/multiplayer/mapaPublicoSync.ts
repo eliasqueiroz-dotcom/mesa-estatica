@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
 import { executarComRetentativa, marcarEmVoo, retomarPendenciasPersistidas } from './filaPendencias';
@@ -77,16 +77,20 @@ export function iniciarSyncMapaPublico(): () => void {
     executarComRetentativa('mapa-publico-sync', ID_MAPA, push);
   }
 
-  // busca inicial (mesmo motivo do fix em tokensSync.ts/fichasSync.ts) — sem linha ainda é no-op.
-  cliente
-    .from('mapa_publico')
-    .select('*')
-    .eq('id', ID_MAPA)
-    .maybeSingle()
-    .then(({ data, error }) => {
-      if (error || !data) return;
-      aplicarLinha(data as Linha);
-    });
+  // busca inicial E refetch de reconexão (canal caiu e voltou, mesmo motivo do fix em
+  // tokensSync.ts/fichasSync.ts) — sem linha ainda é no-op. Reconexão precisa refazer esse
+  // fetch porque o Realtime não reenvia o evento perdido durante a queda.
+  const refetchMapaPublico = () =>
+    cliente
+      .from('mapa_publico')
+      .select('*')
+      .eq('id', ID_MAPA)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        aplicarLinha(data as Linha);
+      });
+  void refetchMapaPublico();
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('mapa-publico-sync')
@@ -98,7 +102,7 @@ export function iniciarSyncMapaPublico(): () => void {
       if (!linha) return;
       aplicarLinha(linha);
     })
-    .subscribe(assinarStatusCanal('mapa-publico-sync'));
+    .subscribe(assinarStatusCanalComRefetch('mapa-publico-sync', refetchMapaPublico));
 
   return () => {
     unsubscribeLocal();

@@ -74,6 +74,27 @@ export function assinarStatusCanal(nomeCanal: string) {
   };
 }
 
+/**
+ * Como `assinarStatusCanal`, mas também dispara `refetch` quando o canal SAI de erro
+ * (`CHANNEL_ERROR`/`TIMED_OUT`/`CLOSED`) e VOLTA a `SUBSCRIBED` — nunca no primeiro
+ * `SUBSCRIBED` (isso já é coberto pela busca inicial de cada módulo). O Realtime não reenvia
+ * eventos perdidos durante a queda de um canal — sem isso, ficha/iniciativa/mapa de quem caiu
+ * fica desatualizado até um reload manual (achado em 24/08, auditoria pré-sessão).
+ */
+export function assinarStatusCanalComRefetch(nomeCanal: string, refetch: () => void | PromiseLike<void>) {
+  const base = assinarStatusCanal(nomeCanal);
+  let viuErro = false;
+  return (status: string) => {
+    base(status);
+    if (status === 'SUBSCRIBED') {
+      if (viuErro) void refetch();
+      viuErro = false;
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      viuErro = true;
+    }
+  };
+}
+
 /** Chamar no cleanup do módulo de sync, antes de `removeChannel` — desmontagem intencional
  *  (troca de aba, fim de sessão) não deve acender o aviso de erro pro resto da mesa. */
 export function desconectarCanal(nomeCanal: string): void {

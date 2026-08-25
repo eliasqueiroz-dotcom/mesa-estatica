@@ -39,6 +39,19 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 vi.mock('../lib/statusMesa', () => ({
   assinarStatusCanal: vi.fn(() => vi.fn()),
+  // mesma lógica de edge-detection do real (statusMesa.ts) — reimplementada aqui pra não
+  // depender do módulo de verdade, mesmo espírito do resto deste mock.
+  assinarStatusCanalComRefetch: vi.fn((_nome: string, refetch: () => void | Promise<void>) => {
+    let viuErro = false;
+    return (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        if (viuErro) void refetch();
+        viuErro = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        viuErro = true;
+      }
+    };
+  }),
   desconectarCanal: vi.fn(),
   useStatusMesa: {
     getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
@@ -52,6 +65,7 @@ const { iniciarSyncSessaoPublica } = await import('./sessaoPublicaSync');
 function criarClienteComControle() {
   const resolvers: Array<(data: any) => void> = [];
   const handlers: Array<() => void> = [];
+  const controleCanal: { cb?: (status: string) => void } = {};
 
   function criarBuilder(): any {
     const builder: any = {};
@@ -81,13 +95,14 @@ function criarClienteComControle() {
     return channelObj;
   });
   channelObj.subscribe = vi.fn((cb: (status: string) => void) => {
+    controleCanal.cb = cb;
     cb('SUBSCRIBED');
     return channelObj;
   });
   const channel = vi.fn(() => channelObj);
   const removeChannel = vi.fn();
 
-  return { from, channel, channelObj, handlers, resolvers, removeChannel };
+  return { from, channel, channelObj, handlers, resolvers, removeChannel, controleCanal };
 }
 
 function linhaRemota(override: Partial<ReturnType<typeof paraLinha>> = {}) {
@@ -206,5 +221,27 @@ describe('iniciarSyncSessaoPublica — guard de corrida', () => {
     // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
     // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a edição (achado de 23/08).
     expect(retomarPendenciasPersistidas('sessao-publica-sync')).toContain('sessao');
+  });
+
+  it('canal cai e reconecta busca o estado atual, mesmo sem evento Realtime chegar durante a queda', async () => {
+    cleanup = iniciarSyncSessaoPublica();
+
+    // resolve busca inicial
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0](linhaRemota());
+    await vi.waitFor(() => expect(useStore.getState().sessaoPublica.cenaAtual).toBe('beco'));
+
+    // canal cai e volta — sem NENHUM evento `postgres_changes` (o cenário que o Realtime não
+    // cobre sozinho: uma mudança feita pelo mestre enquanto este cliente estava desconectado).
+    mock.controleCanal.cb?.('CHANNEL_ERROR');
+    mock.controleCanal.cb?.('SUBSCRIBED');
+
+    // reconexão deve ter disparado um novo fetch (refetch de `aplicarRemoto`)
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1](linhaRemota({ cena_atual: 'mudou enquanto eu estava fora' }));
+
+    await vi.waitFor(() => {
+      return useStore.getState().sessaoPublica.cenaAtual === 'mudou enquanto eu estava fora';
+    });
   });
 });

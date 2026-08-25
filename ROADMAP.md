@@ -35,6 +35,11 @@ Cada uma custou um bug real em produção ou ao vivo numa sessão.
 - **Canvas WebGL é criado via `document.createElement` e destruído no cleanup**, nunca um `<canvas>` fixo do JSX — um canvas aceita um contexto WebGL por vida inteira, e StrictMode/remount quebram nisso.
 - **Token em arrasto ignora eco remoto** (`tokensEmArrasto` em `tokensSync.ts`), senão a posição pula durante o arrasto.
 - **HMR longo corrompe o React**: "Invalid hook call" numa aba antiga depois de editar hook não é bug — abrir aba nova.
+- **Reconexão precisa rebuscar, não só reassinar.** O Realtime não reenvia evento perdido durante uma queda de canal — sem um refetch explícito na transição erro→`SUBSCRIBED` (`assinarStatusCanalComRefetch` em `statusMesa.ts`), quem cai e volta fica com dado desatualizado até um reload manual. Todo módulo de sync novo com tabela própria precisa ligar isso (24/08).
+
+### Pendência conhecida — reconexão nos módulos de mídia/log (24/08)
+
+`assinarStatusCanalComRefetch` (ver invariante acima) foi ligado nos módulos combat-críticos (fichas, npcs, iniciativa, sessão pública, tokens, FoW, mapa) e nos 6 hooks de hidratação do jogador — não nos módulos de baixa prioridade (`midiaFaixasSync`, `soundpadSync`, `midiaEstadoSync`, `logRollsSync`): autocorrigem no próximo evento (trilha/efeito/log não são bloqueantes pra jogar), decisão consciente de escopo, não esquecimento. Retomar se sobrar tempo antes do 29/08.
 
 ## Próximos passos — confiabilidade pós-publicação
 

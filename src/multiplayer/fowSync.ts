@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EstadoFoW, RegiaoFoW, ZonaFoW } from '../state/types';
 import { executarComRetentativa, retomarPendenciasPersistidas } from './filaPendencias';
@@ -64,16 +64,21 @@ export function iniciarSyncFoW(): () => void {
     }
   };
 
-  // busca inicial — sem linha ainda é no-op (mesa sem FoW configurado).
-  cliente
-    .from('fow_estado')
-    .select('*')
-    .eq('id', ID_FOW)
-    .maybeSingle()
-    .then(({ data, error }) => {
-      if (error || !data) return;
-      aplicarLinha(data as LinhaFow);
-    });
+  // busca inicial E refetch de reconexão (canal caiu e voltou) — sem linha ainda é no-op (mesa
+  // sem FoW configurado). Reconexão precisa do mesmo fetch: o Realtime não reenvia o evento
+  // perdido durante a queda, e o payload de evento (usado abaixo, pra não reconsultar arrays
+  // que só crescem) não existe fora de um evento de verdade.
+  const refetchFoW = () =>
+    cliente
+      .from('fow_estado')
+      .select('*')
+      .eq('id', ID_FOW)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        aplicarLinha(data as LinhaFow);
+      });
+  void refetchFoW();
 
   const canal: ReturnType<Cliente['channel']> = cliente
     .channel('fow-sync')
@@ -85,7 +90,7 @@ export function iniciarSyncFoW(): () => void {
       if (!linha) return;
       aplicarLinha(linha);
     })
-    .subscribe(assinarStatusCanal('fow-sync'));
+    .subscribe(assinarStatusCanalComRefetch('fow-sync', refetchFoW));
 
   // Push local → remoto. Compara por referência de objeto (imutável por troca — ver acima).
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {

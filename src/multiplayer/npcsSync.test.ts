@@ -99,6 +99,17 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 vi.mock('../lib/statusMesa', () => ({
   assinarStatusCanal: vi.fn(() => vi.fn()),
+  assinarStatusCanalComRefetch: vi.fn((_nome: string, refetch: () => void | Promise<void>) => {
+    let viuErro = false;
+    return (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        if (viuErro) void refetch();
+        viuErro = false;
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        viuErro = true;
+      }
+    };
+  }),
   desconectarCanal: vi.fn(),
   useStatusMesa: {
     getState: vi.fn(() => ({ canaisConectados: new Set(), canaisComErro: new Set() })),
@@ -112,6 +123,7 @@ const { iniciarSyncNpcs } = await import('./npcsSync');
 function criarClienteComControle() {
   const resolvers: Array<(data: any) => void> = [];
   const handlers: Array<(payload: any) => void> = [];
+  const subscribeCallbacks: Array<(status: string) => void> = [];
 
   function criarBuilder(): any {
     const builder: any = {};
@@ -155,13 +167,14 @@ function criarClienteComControle() {
     return channelObj;
   });
   channelObj.subscribe = vi.fn((cb: (status: string) => void) => {
+    subscribeCallbacks.push(cb);
     cb('SUBSCRIBED');
     return channelObj;
   });
   const channel = vi.fn(() => channelObj);
   const removeChannel = vi.fn();
 
-  return { from, channel, channelObj, handlers, resolvers, removeChannel };
+  return { from, channel, channelObj, handlers, resolvers, removeChannel, subscribeCallbacks };
 }
 
 function npcRemoto(id: string, nome: string) {
@@ -280,5 +293,29 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
     // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a edição (achado de 23/08).
     expect(retomarPendenciasPersistidas('npcs-sync')).toContain(localId);
+  });
+
+  it('canal cai e reconecta atualiza NPC JÁ carregado localmente (não só o que falta)', async () => {
+    const npcId = 'npc-reconexao';
+    cleanup = iniciarSyncNpcs();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([npcRemoto(npcId, 'Guarda')]);
+    mock.resolvers[1]([linhasPrivadasVazias(npcId)]);
+    await vi.waitFor(() => expect(useStore.getState().npcs.some((n) => n.id === npcId)).toBe(true));
+    expect(useStore.getState().npcs.find((n) => n.id === npcId)?.pvAtual).toBe(10);
+
+    // canal cai e reconecta — o mestre baixou o PV dele enquanto este cliente estava
+    // desconectado, sem nenhum evento `postgres_changes` chegar aqui.
+    mock.subscribeCallbacks[0]('CHANNEL_ERROR');
+    mock.subscribeCallbacks[0]('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    mock.resolvers[2]([{ ...npcRemoto(npcId, 'Guarda'), pv_atual: 2 }]);
+    mock.resolvers[3]([linhasPrivadasVazias(npcId)]);
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().npcs.find((n) => n.id === npcId)?.pvAtual).toBe(2);
+    });
   });
 });

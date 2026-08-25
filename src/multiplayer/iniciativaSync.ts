@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { assinarStatusCanal, desconectarCanal } from '../lib/statusMesa';
+import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import type { EntradaIniciativa } from '../state/types';
 import { criarDebouncePorChave } from './debounce';
@@ -170,12 +170,45 @@ export function iniciarSyncIniciativa(): () => void {
     }
   };
 
+  /**
+   * Refetch de RECONEXÃO (canal caiu e voltou) — a busca inicial acima só aplica se
+   * `iniciativa` local ainda estiver vazia, o que é sempre falso nesse cenário (combate quase
+   * certamente já em andamento quando alguém reconecta), então a busca inicial sozinha vira
+   * no-op aqui. Snapshot antes/depois do fetch, mesmo padrão de `sessaoPublicaSync.aplicarRemoto`:
+   * se `iniciativa` mudou enquanto o `select` estava em voo (guard acima trava o subscriber
+   * nesse meio-tempo), a edição local vence e reagenda o push que o guard engoliu — nunca
+   * mexe em `iniciativaAnterior` nesse ramo, pra `executarPush` seguir comparando contra o
+   * baseline certo quando o debounce disparar.
+   */
+  const refetchIniciativa = async () => {
+    aplicandoRemotoContagem++;
+    try {
+      const iniciativaAntes = useStore.getState().iniciativa;
+      const { data, error } = await cliente.from('iniciativa').select('*').order('posicao', { ascending: true });
+      const iniciativaAgora = useStore.getState().iniciativa;
+
+      if (iniciativaAgora !== iniciativaAntes) {
+        marcarEmVoo('iniciativa-sync', CHAVE_PUSH);
+        agendarPush(CHAVE_PUSH, iniciativaAgora);
+        return;
+      }
+
+      if (error || !data) return;
+      const linhas = data as LinhaIniciativa[];
+      for (const linha of linhas) posicoesConhecidas.set(linha.id, linha.posicao);
+      useStore.setState({ iniciativa: linhas.map(paraEntrada) });
+      iniciativaAnterior = useStore.getState().iniciativa;
+    } finally {
+      aplicandoRemotoContagem--;
+    }
+  };
+
   const canal = cliente
     .channel('iniciativa-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'iniciativa' }, (payload) => {
       aplicarRemoto(payload as { eventType: string; new: object; old: object });
     })
-    .subscribe(assinarStatusCanal('iniciativa-sync'));
+    .subscribe(assinarStatusCanalComRefetch('iniciativa-sync', refetchIniciativa));
 
   return () => {
     unsubscribeLocal();
