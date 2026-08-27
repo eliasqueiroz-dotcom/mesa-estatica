@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Avatar from '../components/Avatar';
 import DadosTabJogador from '../features/dados/DadosTabJogador';
 import QuickRollOverlayJogador from '../features/dados/QuickRollOverlayJogador';
 import RolagemAoVivoPlayer from '../features/dados/RolagemAoVivoPlayer';
@@ -262,7 +263,7 @@ export default function PlayerApp() {
             )}
             {outrasFichas.map((f) => (
               <div key={f.id} className="secao" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span aria-hidden style={{ background: f.corVisual, width: 14, height: 14, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />
+                <Avatar nome={f.nome} cor={f.corVisual} foto={f.foto} bordaCor={f.corVisual} tamanho={40} />
                 <span className="label">{f.nome || 'sem nome'}</span>
               </div>
             ))}
@@ -337,7 +338,9 @@ export default function PlayerApp() {
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>
             ) : (
-              npcs.map((n) => <NpcPublicaView key={n.id} nome={n.nome} corVisual={n.corVisual} visivel={n.visivel} />)
+              npcs.map((n) => (
+                <NpcPublicaView key={n.id} nome={n.nome} corVisual={n.corVisual} visivel={n.visivel} foto={n.foto} silhueta={n.silhueta} />
+              ))
             )}
           </div>
         </div>
