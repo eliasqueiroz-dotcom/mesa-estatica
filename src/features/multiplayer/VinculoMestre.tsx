@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { consultarIsGm, iniciarAuthMultiplayer, trocarTokenMestre, vincularComoMestre } from '../../multiplayer/auth';
+import { CHAVE_TOKEN_MESTRE, consultarIsGm, iniciarAuthMultiplayer, trocarTokenMestre, vincularComoMestre } from '../../multiplayer/auth';
 
-const CHAVE_TOKEN = 'estatica-gm-token';
+const CHAVE_TOKEN = CHAVE_TOKEN_MESTRE;
 
 type Vinculo = 'checando' | 'vinculado' | 'nao-vinculado';
 type StatusModal = 'idle' | 'vinculando' | 'sucesso';

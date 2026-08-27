@@ -7,6 +7,7 @@ import MapaTab from '../features/mapa/MapaTab';
 import MidiaPlayerGM from '../features/midia/MidiaPlayerGM';
 import MidiaTab from '../features/midia/MidiaTab';
 import SoundpadPlayer from '../features/midia/SoundpadPlayer';
+import GateOverlay from '../features/multiplayer/GateOverlay';
 import VinculoMestre from '../features/multiplayer/VinculoMestre';
 import NpcsTab from '../features/npcs/NpcsTab';
 import PistasTab from '../features/pistas/PistasTab';
@@ -388,6 +389,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <GateOverlay />
       <AvisoSupabaseAusente />
       <RuidoOverlay />
       <AlertaOverlay />

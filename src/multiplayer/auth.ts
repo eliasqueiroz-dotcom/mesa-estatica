@@ -1,6 +1,10 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
+// Chave de localStorage do token de mestre — compartilhada por `VinculoMestre.tsx` (vínculo
+// RLS) e `GateOverlay.tsx` (barreira visual da tela do mestre), que reaproveita o mesmo token.
+export const CHAVE_TOKEN_MESTRE = 'estatica-gm-token';
+
 // Memoiza a execução em voo — `PlayerApp` chama `iniciarAuthMultiplayer()` de mais de um
 // efeito (`useMinhaFicha` + sync de tokens do mapa), ambos disparando no mount. Sem isso,
 // dois `signInAnonymously()` concorrentes podem criar DUAS identidades anônimas diferentes
