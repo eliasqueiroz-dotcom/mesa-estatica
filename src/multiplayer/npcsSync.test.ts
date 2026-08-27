@@ -318,4 +318,28 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
       expect(useStore.getState().npcs.find((n) => n.id === npcId)?.pvAtual).toBe(2);
     });
   });
+
+  it('refetch de reconexão aplica uma mesa genuinamente vazia (reset-mesa), não só "não achei esse NPC"', async () => {
+    const npcId = 'npc-que-sera-resetado';
+    cleanup = iniciarSyncNpcs();
+
+    // busca inicial já traz o NPC (mount anterior ao reset)
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([npcRemoto(npcId, 'Guarda')]);
+    mock.resolvers[1]([linhasPrivadasVazias(npcId)]);
+    await vi.waitFor(() => expect(useStore.getState().npcs.some((n) => n.id === npcId)).toBe(true));
+
+    // canal cai e reconecta — nesse meio-tempo o mestre rodou "sessão limpa" (reset-mesa),
+    // então o servidor agora responde 0 linhas de verdade, não um erro de query.
+    mock.subscribeCallbacks[0]('CHANNEL_ERROR');
+    mock.subscribeCallbacks[0]('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    mock.resolvers[2]([]); // npcs_publico genuinamente vazio
+    mock.resolvers[3]([]); // npcs_privado genuinamente vazio
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().npcs.some((n) => n.id === npcId)).toBe(false);
+    });
+  });
 });

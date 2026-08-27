@@ -89,12 +89,16 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Ficha | null
 /** Busca inicial (ver comentário em `iniciarSyncFichas`) — só monta fichas que existirem nas
  *  duas tabelas (mesmo critério de `buscarEMontar`); a RLS de `characters_privado` já decide
  *  quantas linhas voltam (dono só a própria, GM todas). */
-async function buscarTodas(cliente: Cliente): Promise<Ficha[]> {
+/** `null` = a query falhou de verdade (não dá pra confiar no resultado); `[]` = consultou
+ *  certinho e a mesa está genuinamente vazia (ex.: acabou de rodar `reset-mesa`) — só o
+ *  chamador sabe se essa distinção importa (busca inicial trata os dois igual; refetch de
+ *  reconexão não pode, ver comentário em `refetchFichas` abaixo). */
+async function buscarTodas(cliente: Cliente): Promise<Ficha[] | null> {
   const [{ data: publicos }, { data: privados }] = await Promise.all([
     cliente.from('characters_publico').select('*'),
     cliente.from('characters_privado').select('id, dados'),
   ]);
-  if (!publicos || !privados) return [];
+  if (!publicos || !privados) return null;
   const privadosPorId = new Map((privados as (LinhaPrivadoDados & { id: string })[]).map((p) => [p.id, p]));
   const fichas: Ficha[] = [];
   for (const publico of publicos as LinhaPublico[]) {
@@ -293,7 +297,7 @@ export function iniciarSyncFichas(): () => void {
   // busca inicial — só adiciona o que falta (comentário da função `iniciarSyncFichas`).
   (async () => {
     const remotas = await buscarTodas(cliente);
-    if (remotas.length === 0) return;
+    if (remotas === null) return;
     aplicandoRemotoContagem++;
     try {
       const s = useStore.getState();
@@ -310,16 +314,18 @@ export function iniciarSyncFichas(): () => void {
    * Refetch de RECONEXÃO (canal caiu e voltou) — diferente da busca inicial acima: o Realtime
    * não reenvia os eventos perdidos durante a queda, então uma ficha já carregada localmente
    * (PV editado pelo mestre nesse meio-tempo, por exemplo) também precisa ser atualizada, não
-   * só a que falta. `remotas.length === 0` continua tratado como "não confiar" (mesmo motivo
-   * da busca inicial: não dá pra distinguir "zero fichas de verdade" de "erro na query" a
-   * partir do retorno de `buscarTodas`) — nunca varre a lista local a zero por isso. Edição
-   * local em voo (`pendencias`) sempre vence; ficha ausente no lote remoto E sem push pendente
-   * é removida (foi apagada de verdade, por outra aba ou pelo próprio mestre, enquanto este
-   * cliente estava desconectado).
+   * só a que falta. `buscarTodas` devolvendo `null` (erro de query — não dá pra confiar) segue
+   * abortando sem tocar em nada; `[]` genuíno (ex.: `reset-mesa` rodou enquanto este cliente
+   * estava caído) PRECISA ser aplicado, senão quem reconecta bem nesse instante fica com a
+   * mesa antiga na tela pra sempre, sem nenhum aviso de dessincronia (achado em 27/08 — antes
+   * de separar `null`/`[]`, os dois caíam no mesmo early-return e o reset nunca chegava em quem
+   * tinha acabado de reconectar). Edição local em voo (`pendencias`) sempre vence; ficha
+   * ausente no lote remoto E sem push pendente é removida (foi apagada de verdade, por outra
+   * aba, pelo próprio mestre ou pelo reset, enquanto este cliente estava desconectado).
    */
   const refetchFichas = async () => {
     const remotas = await buscarTodas(cliente);
-    if (remotas.length === 0) return;
+    if (remotas === null) return;
     aplicandoRemotoContagem++;
     try {
       const s = useStore.getState();

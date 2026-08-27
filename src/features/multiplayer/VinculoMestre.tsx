@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CHAVE_TOKEN_MESTRE, consultarIsGm, iniciarAuthMultiplayer, trocarTokenMestre, vincularComoMestre } from '../../multiplayer/auth';
+import { CHAVE_TOKEN_MESTRE, trocarTokenMestre, verificarVinculoMestre, vincularComoMestre } from '../../multiplayer/auth';
 
 const CHAVE_TOKEN = CHAVE_TOKEN_MESTRE;
 
@@ -30,29 +30,17 @@ export default function VinculoMestre() {
   const [statusTroca, setStatusTroca] = useState<StatusTroca>('idle');
   const [erroTroca, setErroTroca] = useState<string | null>(null);
 
+  // Autocura (já tinha um token salvo nesta máquina mas a sessão atual não está vinculada —
+  // cenário de 24/07, origem nova/sessão anônima nova/vínculo antigo órfão) e a checagem de
+  // token revogado vivem em `verificarVinculoMestre()`, compartilhada com `GateOverlay.tsx`
+  // (mesmo mount, mesma pergunta — evita gastar duas tentativas contra o rate limit de
+  // `vincular-mestre` só pra confirmar o mesmo fato duas vezes).
   useEffect(() => {
     let cancelado = false;
-
     (async () => {
-      await iniciarAuthMultiplayer();
-      if (cancelado) return;
-      let vinculado = await consultarIsGm();
-
-      // autocura: já tinha um token salvo nesta máquina mas a sessão atual não está
-      // vinculada (cenário exato de 24/07 — origem nova, sessão anônima nova, vínculo
-      // antigo órfão) — revincula sozinho antes de mostrar "não vinculado".
-      if (!vinculado) {
-        const tokenSalvo = localStorage.getItem(CHAVE_TOKEN);
-        if (tokenSalvo) {
-          const resultado = await vincularComoMestre(tokenSalvo);
-          if (cancelado) return;
-          if (resultado.ok) vinculado = await consultarIsGm();
-        }
-      }
-
+      const vinculado = await verificarVinculoMestre();
       if (!cancelado) setVinculo(vinculado ? 'vinculado' : 'nao-vinculado');
     })();
-
     return () => {
       cancelado = true;
     };

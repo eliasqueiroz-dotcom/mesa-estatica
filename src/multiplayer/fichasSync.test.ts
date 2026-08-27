@@ -397,4 +397,28 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(useStore.getState().fichas.find((f) => f.id === fichaId)?.nome).toBe('Helena Editando Agora');
   });
+
+  it('refetch de reconexão aplica uma mesa genuinamente vazia (reset-mesa), não só "não achei essa ficha"', async () => {
+    const fichaId = 'ficha-que-sera-resetada';
+    cleanup = iniciarSyncFichas();
+
+    // busca inicial já traz a ficha (mount anterior ao reset)
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([fichaRemotaPublica(fichaId, 'Helena')]);
+    mock.resolvers[1]([{ id: fichaId, ...fichaRemotaPrivadaEstreita(fichaId) }]);
+    await vi.waitFor(() => expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(true));
+
+    // canal cai e reconecta — nesse meio-tempo o mestre rodou "sessão limpa" (reset-mesa),
+    // então o servidor agora responde 0 linhas de verdade, não um erro de query.
+    mock.subscribeCallbacks[0]('CHANNEL_ERROR');
+    mock.subscribeCallbacks[0]('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    mock.resolvers[2]([]); // characters_publico genuinamente vazio
+    mock.resolvers[3]([]); // characters_privado genuinamente vazio
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId)).toBe(false);
+    });
+  });
 });

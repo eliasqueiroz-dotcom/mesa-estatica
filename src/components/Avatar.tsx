@@ -24,6 +24,7 @@ interface Props {
 /** Avatar reutilizável: foto > silhueta pré-instalada > iniciais+cor (fallback atual, preservado). */
 export default function Avatar({ nome, foto, silhueta, tamanho = 32, bordaCor, ampliavel, style }: Props) {
   const [aberta, setAberta] = useState(false);
+  const [fotoFalhou, setFotoFalhou] = useState(false);
 
   useEffect(() => {
     if (!aberta) return;
@@ -33,6 +34,11 @@ export default function Avatar({ nome, foto, silhueta, tamanho = 32, bordaCor, a
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [aberta]);
+
+  // URL nova (foto trocada) merece uma nova tentativa — só desiste de novo se ela também falhar.
+  useEffect(() => {
+    setFotoFalhou(false);
+  }, [foto]);
 
   const base: React.CSSProperties = {
     width: tamanho,
@@ -47,14 +53,19 @@ export default function Avatar({ nome, foto, silhueta, tamanho = 32, bordaCor, a
     ...style,
   };
 
-  if (foto) {
+  if (foto && !fotoFalhou) {
     return (
       <>
         <span
           style={{ ...base, cursor: ampliavel ? 'zoom-in' : undefined }}
           onClick={ampliavel ? () => setAberta(true) : undefined}
         >
-          <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img
+            src={foto}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={() => setFotoFalhou(true)}
+          />
         </span>
         {aberta && (
           <div

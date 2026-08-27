@@ -66,12 +66,17 @@ async function extrairErroFuncao(error: unknown): Promise<string> {
   return 'falha de rede — confira a conexão';
 }
 
-export type ResultadoVinculo = { ok: true } | { ok: false; erro: string };
+export type ResultadoVinculo = { ok: true } | { ok: false; erro: string; tokenInvalido?: boolean };
 
 /**
  * Vínculo de mestre disparado pela UI (`VinculoMestre.tsx`), não pela URL — mesma Edge
  * Function que `?gm=` já usa dentro de `executar()` acima, sem duplicar o bootstrap de
  * sessão anônima (reusa `iniciarAuthMultiplayer()`, já memoizado).
+ *
+ * `tokenInvalido` distingue o único "não" definitivo do servidor (403 — hash não bate,
+ * ver `vincular-mestre/index.ts`) de falha ambígua (rede, 429 de rate limit, sessão) —
+ * `GateOverlay.tsx` só tranca de novo um token já salvo nesse caso, nunca por um erro
+ * transitório que derrubaria quem já estava jogando.
  */
 export async function vincularComoMestre(gmToken: string): Promise<ResultadoVinculo> {
   const cliente = supabase;
@@ -79,7 +84,11 @@ export async function vincularComoMestre(gmToken: string): Promise<ResultadoVinc
   await iniciarAuthMultiplayer();
   const { error } = await cliente.functions.invoke('vincular-mestre', { body: { gm_token: gmToken } });
   if (!error) return { ok: true };
-  return { ok: false, erro: await extrairErroFuncao(error) };
+  return {
+    ok: false,
+    erro: await extrairErroFuncao(error),
+    tokenInvalido: error instanceof FunctionsHttpError && error.context.status === 403,
+  };
 }
 
 /**
@@ -106,4 +115,50 @@ export async function consultarIsGm(): Promise<boolean> {
   if (!cliente) return false;
   const { data, error } = await cliente.rpc('is_gm');
   return !error && data === true;
+}
+
+// Memoiza por boot (mesmo padrão de `promessaEmVoo` acima) — `GateOverlay.tsx` e
+// `VinculoMestre.tsx` fazem essa MESMA pergunta ("esta sessão está vinculada como mestre?")
+// no mount, em paralelo. Sem compartilhar a promise, os dois disparavam a sequência
+// consultarIsGm→autocura (que pode incluir uma chamada a `vincular-mestre`) por conta
+// própria — duas tentativas gastas contra o rate limit da function pra confirmar o mesmo
+// fato uma vez só. Com isso, o segundo chamador só espera o resultado do primeiro.
+let promessaVinculoMestre: Promise<boolean> | null = null;
+
+/**
+ * Confirma se esta sessão já está vinculada como mestre — com autocura se `is_gm()` disser
+ * "não" mas houver um token salvo neste navegador (sessão anônima nova, ex.: troca de origem,
+ * ou storage limpo à parte — mesmo cenário de 24/07 que motivou o pill de `VinculoMestre.tsx`).
+ * Se a autocura falhar com um 403 definitivo (token realmente rotacionado/inválido, não erro
+ * de rede/rate-limit), o token salvo é descartado — sem isso, quem ficou com um token antigo
+ * continuaria "vinculado" localmente pra sempre, mesmo depois de revogado de propósito.
+ */
+export function verificarVinculoMestre(): Promise<boolean> {
+  if (!promessaVinculoMestre) promessaVinculoMestre = executarVerificacaoVinculo();
+  return promessaVinculoMestre;
+}
+
+async function executarVerificacaoVinculo(): Promise<boolean> {
+  await iniciarAuthMultiplayer();
+  if (await consultarIsGm()) return true;
+
+  let tokenSalvo: string | null;
+  try {
+    tokenSalvo = localStorage.getItem(CHAVE_TOKEN_MESTRE);
+  } catch {
+    return false; // sem acesso a storage — não dá pra confirmar nada
+  }
+  if (!tokenSalvo) return false;
+
+  const resultado = await vincularComoMestre(tokenSalvo);
+  if (resultado.ok) return true;
+
+  if (resultado.tokenInvalido) {
+    try {
+      localStorage.removeItem(CHAVE_TOKEN_MESTRE);
+    } catch {
+      // sem acesso a storage — nada a limpar
+    }
+  }
+  return false;
 }

@@ -102,13 +102,15 @@ async function buscarEMontar(cliente: Cliente, id: string): Promise<Npc | null> 
   return { ...paraNpcSemNotasMestre(publico as LinhaPublico), notasMestre: (privado as LinhaPrivado | null)?.notas_mestre ?? '' };
 }
 
-/** Busca inicial (ver comentário em `iniciarSyncNpcs`/`fichasSync.ts`). */
-async function buscarTodos(cliente: Cliente): Promise<Npc[]> {
+/** Busca inicial (ver comentário em `iniciarSyncNpcs`/`fichasSync.ts`). `null` = query falhou
+ *  de verdade; `[]` = consultou certinho e está genuinamente vazio (mesma distinção de
+ *  `buscarTodas` em `fichasSync.ts`, mesmo motivo). */
+async function buscarTodos(cliente: Cliente): Promise<Npc[] | null> {
   const [{ data: publicos }, { data: privados }] = await Promise.all([
     cliente.from('npcs_publico').select('*'),
     cliente.from('npcs_privado').select('*'),
   ]);
-  if (!publicos) return [];
+  if (!publicos) return null;
   const privadosPorId = new Map(((privados ?? []) as LinhaPrivado[]).map((p) => [p.id, p]));
   return (publicos as LinhaPublico[]).map((publico) => ({
     ...paraNpcSemNotasMestre(publico),
@@ -264,7 +266,7 @@ export function iniciarSyncNpcs(): () => void {
   // busca inicial — só adiciona o que falta (comentário da função `iniciarSyncNpcs`).
   (async () => {
     const remotos = await buscarTodos(cliente);
-    if (remotos.length === 0) return;
+    if (remotos === null) return;
     aplicandoRemotoContagem++;
     try {
       const s = useStore.getState();
@@ -279,12 +281,14 @@ export function iniciarSyncNpcs(): () => void {
 
   /** Refetch de RECONEXÃO — mesmo motivo/forma de `refetchFichas` em `fichasSync.ts`: a busca
    *  inicial só adiciona o que falta, nunca atualiza um NPC já carregado (PV alterado em
-   *  combate enquanto este cliente estava desconectado, por exemplo). Edição local em voo
-   *  (`pendencias`) sempre vence; ausente no lote remoto e sem push pendente é removido de
-   *  verdade. */
+   *  combate enquanto este cliente estava desconectado, por exemplo). `null` (erro de query)
+   *  aborta sem tocar em nada; `[]` genuíno (ex.: `reset-mesa`) precisa ser aplicado, senão
+   *  quem reconecta bem nesse instante fica com NPCs fantasmas na tela pra sempre (mesmo
+   *  achado de `fichasSync.ts`, 27/08). Edição local em voo (`pendencias`) sempre vence;
+   *  ausente no lote remoto e sem push pendente é removido de verdade. */
   const refetchNpcs = async () => {
     const remotos = await buscarTodos(cliente);
-    if (remotos.length === 0) return;
+    if (remotos === null) return;
     aplicandoRemotoContagem++;
     try {
       const s = useStore.getState();

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { CHAVE_TOKEN_MESTRE, vincularComoMestre } from '../../multiplayer/auth';
+import { useEffect, useState } from 'react';
+import { CHAVE_TOKEN_MESTRE, verificarVinculoMestre, vincularComoMestre } from '../../multiplayer/auth';
 import { supabase } from '../../lib/supabaseClient';
 
 type Status = 'idle' | 'verificando';
@@ -16,10 +16,36 @@ type Status = 'idle' | 'verificando';
  * GM-only por construção — mesma pasta de `VinculoMestre.tsx`, só `App.tsx` importa daqui.
  */
 export default function GateOverlay() {
-  const [desbloqueado, setDesbloqueado] = useState(() => !!localStorage.getItem(CHAVE_TOKEN_MESTRE));
+  const [desbloqueado, setDesbloqueado] = useState(() => {
+    try {
+      return !!localStorage.getItem(CHAVE_TOKEN_MESTRE);
+    } catch (erro) {
+      console.error('[gate] leitura local falhou', erro);
+      return false;
+    }
+  });
   const [token, setToken] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [erro, setErro] = useState<string | null>(null);
+
+  // Token salvo pode ter sido trocado/revogado (`trocar-token-mestre`) desde a última vez
+  // que este navegador abriu a tela — sem isso, quem ficou com o token antigo (ex.: alguém
+  // que o vínculo foi rotacionado justamente pra cortar) continua vendo tudo pra sempre
+  // localmente. `verificarVinculoMestre()` só tranca de novo com um 403 definitivo — erro de
+  // rede/rate-limit não conta, pra não derrubar o mestre no meio de uma sessão por causa de
+  // uma falha transitória. Memoizada e compartilhada com `VinculoMestre.tsx` (mesmo mount,
+  // mesma pergunta) — os dois não gastam duas tentativas contra o rate limit da function.
+  useEffect(() => {
+    if (!supabase || !desbloqueado) return;
+    let cancelado = false;
+    (async () => {
+      const vinculado = await verificarVinculoMestre();
+      if (!cancelado && !vinculado) setDesbloqueado(false);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [desbloqueado]);
 
   if (!supabase || desbloqueado) return null;
 
@@ -33,7 +59,14 @@ export default function GateOverlay() {
       setStatus('idle');
       return;
     }
-    localStorage.setItem(CHAVE_TOKEN_MESTRE, token.trim());
+    // token já validado pelo servidor — libera a sessão mesmo se a gravação local falhar
+    // (modo privado, quota); sem isso, um `setItem` que lança deixava "entrando…" travado
+    // pra sempre apesar do vínculo ter dado certo.
+    try {
+      localStorage.setItem(CHAVE_TOKEN_MESTRE, token.trim());
+    } catch (erro) {
+      console.error('[gate] gravação local falhou — vai pedir o token de novo ao recarregar', erro);
+    }
     setDesbloqueado(true);
   };
 
