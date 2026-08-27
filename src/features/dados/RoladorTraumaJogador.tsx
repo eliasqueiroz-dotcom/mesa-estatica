@@ -7,9 +7,9 @@ import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 
-/** DT fixa (não useDtDaCena) — trauma é contra o próprio passado, não contra a dificuldade
- *  externa da cena. Intencional — e é exatamente por isso que este rolador (diferente do de
- *  Sanidade) pode aplicar a consequência sozinho: a DT não é segredo do mestre. */
+/** DT fixa — trauma é contra o próprio passado, não contra a dificuldade externa da cena.
+ *  Intencional — e é exatamente por isso que este rolador (diferente do de Sanidade) pode
+ *  aplicar a consequência sozinho: a DT é conhecida, não depende de julgamento do mestre. */
 const DT_GATILHO = 12;
 
 interface Props {

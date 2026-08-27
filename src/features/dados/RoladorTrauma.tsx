@@ -6,8 +6,9 @@ import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
 
-/** DT fixa (não useDtDaCena) — trauma é contra o próprio passado,
- *  não contra a dificuldade externa da cena. Intencional. */
+/** DT fixa — trauma é contra o próprio passado, não contra a dificuldade externa da
+ *  cena (que, aliás, não é mais lida automaticamente por nenhum rolador — ver
+ *  `RoladorSanidade.tsx`). Intencional. */
 const DT_GATILHO = 12;
 
 interface RoladorTraumaProps {

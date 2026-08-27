@@ -2,12 +2,9 @@ import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
-import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { calcularPerdaSanidade } from '../../rules/sanidade';
 import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
-import { resolverTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
-import { useDtDaCena } from './useDtDaCena';
 
 export function parseDado(dado: string): RollTermo {
   const [qty, sides] = dado.split('d').map(Number);
@@ -50,19 +47,17 @@ interface RoladorSanidadeProps {
 
 export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) {
   const fichas = useStore((s) => s.fichas);
-  const basePV = useStore((s) => s.config.basePV);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
 
   const [fichaId, setFichaId] = useState('');
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
   const [rolando, setRolando] = useState(false);
-  const [resultado, setResultado] = useState<{ sucesso: boolean; d20: number; perdaRolada: number; perda: number } | null>(
+  const [resultado, setResultado] = useState<{ d20: number; perdaRolada: number; aplicado: { sucesso: boolean; perda: number } | null } | null>(
     null,
   );
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const gatilho = PERDA_SANIDADE.find((g) => g.id === gatilhoId)!;
-  const dt = useDtDaCena();
 
   const rolarSanidade = () => {
     if (!ficha) return;
@@ -70,24 +65,20 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
     const perdaTermo = parseDado(gatilho.dado);
     rolar([{ sides: 20, qty: 1 }, perdaTermo], (grupos) => {
       const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
-
-      const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-      const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-      const teste = resolverTeste({
-        d20,
-        atributoId: 'vontade',
-        valorAtributo: ficha.atributos.vontade,
-        grauPericia: 0,
-        personagemFerido: ferido,
-        dt,
-      });
-      const perda = calcularPerdaSanidade(perdaRolada, teste.sucesso);
-
-      setResultado({ sucesso: teste.sucesso, d20, perdaRolada, perda });
+      setResultado({ d20, perdaRolada, aplicado: null });
       setRolando(false);
-
-      ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
     }, 'ruido', ficha.id, 'sanidade');
+  };
+
+  // O app não decide mais sucesso/falha sozinho (regras.md: teste de Vontade vs. DT da
+  // cena) — mostra só os dados brutos, o mestre compara com a DT que tiver em mente e
+  // clica o resultado. Mesmo padrão de `RoladorSanidadeJogador.tsx` já usava do lado do
+  // jogador ("aguarde o mestre confirmar quanto perde de verdade").
+  const confirmarResultado = (sucesso: boolean) => {
+    if (!ficha || !resultado || resultado.aplicado) return;
+    const perda = calcularPerdaSanidade(resultado.perdaRolada, sucesso);
+    setResultado({ ...resultado, aplicado: { sucesso, perda } });
+    ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
   };
 
   return (
@@ -122,18 +113,30 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
         rolar Vontade + {gatilho.dado}
       </button>
 
-      {resultado && (
+      {resultado && !resultado.aplicado && (
+        <div className="alerta-banner mono" style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <span>
+            d20={resultado.d20} · rolou {resultado.perdaRolada} de Sanidade — compare com a DT que tiver em mente e confirme
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={() => confirmarResultado(true)}>sucesso — perde {Math.floor(resultado.perdaRolada / 2)}</button>
+            <button onClick={() => confirmarResultado(false)}>falha — perde {resultado.perdaRolada}</button>
+          </div>
+        </div>
+      )}
+
+      {resultado?.aplicado && (
         <div
           className="alerta-banner mono"
           style={{
             marginTop: '0.75rem',
-            borderColor: resultado.sucesso ? 'var(--rede)' : 'var(--ruido)',
-            color: resultado.sucesso ? 'var(--rede)' : 'var(--ruido)',
+            borderColor: resultado.aplicado.sucesso ? 'var(--rede)' : 'var(--ruido)',
+            color: resultado.aplicado.sucesso ? 'var(--rede)' : 'var(--ruido)',
           }}
         >
           <span>
-            d20={resultado.d20} — {resultado.sucesso ? 'sucesso' : 'falha'} · rolou {resultado.perdaRolada} de Sanidade,
-            perdeu {resultado.perda}
+            d20={resultado.d20} — {resultado.aplicado.sucesso ? 'sucesso' : 'falha'} · rolou {resultado.perdaRolada} de
+            Sanidade, perdeu {resultado.aplicado.perda}
           </span>
         </div>
       )}

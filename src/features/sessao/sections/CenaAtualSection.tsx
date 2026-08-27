@@ -90,6 +90,9 @@ export default function CenaAtualSection() {
                 </option>
               ))}
             </select>
+            <p className="vazio" style={{ marginTop: '0.3rem' }}>
+              só uma nota sua — não afeta nenhuma rolagem sozinha.
+            </p>
           </div>
           {sessaoPrivada.dificuldadeCena === 'custom' && (
             <div>

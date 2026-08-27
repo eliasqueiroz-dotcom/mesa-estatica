@@ -44,10 +44,10 @@ interface Props {
 /**
  * Rolador de Sanidade do jogador — diferente de Surto/Trauma, este NÃO aplica a perda
  * sozinho. `calcularPerdaSanidade` decide o valor final (metade ou cheio) a partir do
- * SUCESSO do teste de Vontade vs a DT da cena — e a DT da cena mora em `sessaoPrivada`,
- * que nunca chega no bundle do jogador (`useDtDaCena` leria o valor padrão da fábrica, não
- * o real). Mostra só os dados brutos (d20 + perda rolada); o mestre aplica a perda de
- * verdade na própria tela, com a DT real.
+ * SUCESSO do teste de Vontade vs. DT da cena (regras.md) — mas quem julga sucesso/falha é
+ * o mestre, à mão, comparando o total com a DT que tiver em mente (o app não resolve isso
+ * sozinho nem no rolador do próprio mestre, ver `RoladorSanidade.tsx`). Mostra só os dados
+ * brutos (d20 + perda rolada); o mestre confirma o resultado e aplica a perda na própria tela.
  */
 export default function RoladorSanidadeJogador({ ficha, ready, rolar, pedidoRapido }: Props) {
   const registrarLog = useStore((s) => s.registrarLog);
