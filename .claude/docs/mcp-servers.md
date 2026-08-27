@@ -38,6 +38,14 @@ real, escrita acidental por engano não é risco que vale correr por padrão) e
 Sem o `project_ref`, o servidor expõe ferramentas de conta inteira (todos os projetos Supabase
 da sua conta) em vez de só este — mais superfície do que precisa.
 
+**Desde 27/08 existem dois projetos** (produção `ahhzgxcafoaodetwkyti` e dev `mjzgkszckwcnbzrltrww`,
+ver `.claude/docs/deploy.md`) — o `.mcp.json` aponta só pra um por vez (hoje, produção). Pra
+inspecionar o de dev via MCP, trocaria o `project_ref` na URL (não foi feito — não houve
+necessidade ainda). **Isto é diferente da CLI `supabase` usada em `deploy.md`**: a CLI aceita
+`--project-ref` por comando (não precisa reconfigurar nada), e foi ela (não este MCP, que é
+`read_only`) que criou o projeto de dev, aplicou migrações e deployou functions — o MCP aqui serve
+só pra leitura/inspeção assistida durante a conversa, não pra automação de deploy.
+
 **Tirar o `read_only` só quando for de propósito** (ex.: aplicar uma migration nova direto): edita
 a URL pra remover `read_only=true&`, faz a operação, bota de volta. Não deixar ligado por padrão.
 

@@ -829,6 +829,13 @@ dev (o valor é local a cada máquina).
 
 ## Passo 3 — bucket R2 de dev
 
+**Pegadinha confirmada em 27/08**: `R2_BUCKET_NAME` precisa ser o nome **exato** que a pessoa deu
+ao bucket — não assumir um nome "padrão" (o real acabou sendo `estatica-dev`, não
+`estatica-audio-dev` como estava aqui). Nome errado não dá erro claro na hora de setar o secret;
+a falha só aparece depois, na 1ª chamada de `presign-r2-upload` (`ListObjectsV2` contra um bucket
+que não existe → 502 "falha ao checar cota do R2"). **Sempre perguntar/confirmar o nome real**
+antes de setar `R2_BUCKET_NAME`, nunca inferir.
+
 1. Criar um bucket novo no Cloudflare R2 (ex.: `estatica-audio-dev`).
 2. Gerar um token de API R2 (Account API Token, permissão Object Read & Write, escopo só nesse
    bucket) — não reaproveitar as credenciais de produção.

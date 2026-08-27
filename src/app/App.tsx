@@ -281,7 +281,7 @@ function ExportarImportar({ abrirControle }: { abrirControle: () => void }) {
 }
 
 export default function App() {
-  const [aba, setAba] = useState<AbaId>('personagens');
+  const [aba, setAba] = useState<AbaId>('sessao');
   const [overlayAberto, setOverlayAberto] = useState(false);
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);

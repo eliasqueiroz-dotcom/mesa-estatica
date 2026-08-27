@@ -11,13 +11,16 @@ Painel de mestre do RPG "Estática" (investigação/horror, São Paulo distópic
 - [mesa-estatica-multiplayer-completo.md](mesa-estatica-multiplayer-completo.md) — spec do multiplayer (Supabase, RLS, Edge Functions); comentários no código citam suas seções (§11, Parte IV…).
 - [.claude/docs/storage-r2.md](.claude/docs/storage-r2.md) — guia operacional de mídia: Cloudflare R2 (egress), Freesound (soundpad), migração do site pro Cloudflare Pages.
 - [.claude/docs/mcp-servers.md](.claude/docs/mcp-servers.md) — setup dos MCP servers conectados (Supabase, Cloudflare, Context7) — ferramenta do Claude Code, não arquitetura do app.
+- [.claude/docs/deploy.md](.claude/docs/deploy.md) — **ler antes de rodar `supabase db push`/`functions deploy`/`secrets set`.** Frontend sobe sozinho no push pra `main`; migração/function não — exige comando manual contra o projeto certo (dev `mjzgkszckwcnbzrltrww` vs produção `ahhzgxcafoaodetwkyti`).
 - [ROADMAP.md](ROADMAP.md) — o que já foi feito e o que vem a seguir.
 
 ## Stack
 
 Vite 8 + React 18 + TS + Zustand(persist) · `@3d-dice/dice-box-threejs` nos dados 3D · Three.js nos tokens · @fontsource self-host · `docx` no export de ficha · Supabase (Realtime + Edge Functions) opcional. Porquê de cada escolha: `arquitetura.md`.
 
-`npm run dev` · `build` · `preview` · `test` (vitest) · `test:watch`. CI: push em `main` → build + test → deploy no Cloudflare Pages (`.github/workflows/deploy.yml`).
+`npm run dev` · `build` · `preview` · `test` (vitest) · `test:watch`. CI: push em `main` → build + test → deploy no Cloudflare Pages (`.github/workflows/deploy.yml`) — **só o frontend**; migração/Edge Function não sobem sozinhas, ver `deploy.md`.
+
+**Ambiente de dev isolado** (desde 27/08, ver `deploy.md`): `.env.development.local` (fora do git) aponta `npm run dev` pro projeto Supabase de dev (`mjzgkszckwcnbzrltrww`) + bucket R2 próprio — produção (`ahhzgxcafoaodetwkyti`) fica intocada mesmo testando com o multiplayer ligado. `iniciar-mestre.bat`/`iniciar-jogador.bat` (raiz) sobem o servidor (reiniciando se já tiver um rodando) e abrem a tela certa — atalho pro usuário, não é parte do app.
 
 ## Convenções
 

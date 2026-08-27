@@ -254,6 +254,12 @@ export default function PlayerApp() {
             ) : (
               <p className="vazio">link inválido ou ficha ainda não vinculada — confira com o mestre.</p>
             )}
+            {outrasFichas.length > 0 && (
+              <div>
+                <h3 className="label" style={{ marginBottom: '0.2rem' }}>outros jogadores</h3>
+                <p className="vazio" style={{ marginBottom: '0.5rem' }}>não é a sua ficha — só pra saber quem mais está na mesa.</p>
+              </div>
+            )}
             {outrasFichas.map((f) => (
               <div key={f.id} className="secao" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span aria-hidden style={{ background: f.corVisual, width: 14, height: 14, borderRadius: '50%', display: 'inline-block', flexShrink: 0 }} />
@@ -321,6 +327,12 @@ export default function PlayerApp() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {minhaFicha && (
               <CombateJogadorView iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} npcs={npcs} />
+            )}
+            {npcs.length > 0 && (
+              <div>
+                <h3 className="label" style={{ marginBottom: '0.2rem' }}>npcs</h3>
+                <p className="vazio" style={{ marginBottom: '0.5rem' }}>aparecem aqui porque o mestre revelou.</p>
+              </div>
             )}
             {npcs.length === 0 ? (
               <p className="vazio">nada revelado ainda.</p>

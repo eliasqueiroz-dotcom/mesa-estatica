@@ -469,7 +469,7 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 - Cliente precisa de `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` (Vite só expõe vars com prefixo `VITE_` via `import.meta.env`). Injetados no build do GitHub Actions como **repo secrets** (passo `env:` novo no `deploy.yml`) — mesmo públicos, secret evita commit acidental e facilita rotação.
 - **Anon key é pública por design** — a fronteira de segurança é o RLS, não a chave. Pode ir no bundle; repo público não é problema.
 - **`service_role`**: SÓ dentro das Edge Functions (`supabase secrets set`), NUNCA no cliente/repo. É a chave que ignora RLS.
-- **`gm_token`**: validado dentro de Edge Function (comparado a um secret do projeto), nunca embutido no bundle (§6).
+- **`gm_token`**: validado dentro de Edge Function, nunca embutido no bundle (§6). **⚠ desatualizado desde 27/08**: não é mais só comparação direta com o secret `GM_TOKEN` — `vincular-mestre` primeiro confere um hash em `mestre_config` (tabela nova); só cai no secret puro se essa tabela ainda não tiver linha (bootstrap). Function nova `trocar-token-mestre` deixa o mestre rotacionar o próprio token sem depender do dev/secrets do projeto. Ver `ROADMAP.md` item 2 e `.claude/docs/deploy.md`.
 
 ## 2. Autenticação — Anonymous Auth (§6 solução 1)
 
@@ -514,7 +514,7 @@ Overlays de ruído/alerta do jogador derivam só da própria Sanidade e dos gaug
 ## 9. Checklist "primeira vez no ar"
 
 - [ ] Projeto Supabase criado; `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` nos secrets do Actions e no `deploy.yml`.
-- [ ] `service_role` e `gm_token` só nos secrets do Supabase — nunca no repo/bundle.
+- [ ] `service_role`, `gm_token` e (desde 27/08) `reset_token` só nos secrets do Supabase — nunca no repo/bundle. `reset_token` autoriza a Edge Function `reset-mesa` (zera a mesa via `service_role`, sem depender de `is_gm()`) — ver `.claude/docs/deploy.md`.
 - [ ] `supabase db push` aplicou tabelas + policies; teste com chave `anon` lê `forced_queue`/`sessao_privada` → vazio/erro (§15).
 - [ ] Seed da mesa via export JSON; links por ficha gerados.
 - [ ] 2 dispositivos reais: jogador entra pelo link, edita a própria ficha, rola, sincroniza via Realtime; tenta ler ficha privada alheia / adivinhar rolagem forçada → recusado/indistinguível.
