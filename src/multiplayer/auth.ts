@@ -78,6 +78,22 @@ export async function vincularComoMestre(gmToken: string): Promise<ResultadoVinc
   return { ok: false, erro: await extrairErroFuncao(error) };
 }
 
+/**
+ * Troca o GM_TOKEN vigente (ROADMAP.md item 2, Parte B) — a Edge Function `trocar-token-mestre`
+ * não checa is_gm(), só exige o token atual válido, então isso funciona mesmo se esta sessão
+ * nunca tiver se vinculado como mestre.
+ */
+export async function trocarTokenMestre(tokenAtual: string, tokenNovo: string): Promise<ResultadoVinculo> {
+  const cliente = supabase;
+  if (!cliente) return { ok: false, erro: 'multiplayer não configurado nesta máquina' };
+  await iniciarAuthMultiplayer();
+  const { error } = await cliente.functions.invoke('trocar-token-mestre', {
+    body: { token_atual: tokenAtual, token_novo: tokenNovo },
+  });
+  if (!error) return { ok: true };
+  return { ok: false, erro: await extrairErroFuncao(error) };
+}
+
 /** Consulta a função SQL `is_gm()` (migração 0002) via RPC — um boolean literal, sem os
  *  falsos positivos/negativos de tentar inferir o vínculo lendo uma tabela GM-only (uma
  *  linha vazia por RLS e uma tabela genuinamente vazia parecem a mesma coisa). */

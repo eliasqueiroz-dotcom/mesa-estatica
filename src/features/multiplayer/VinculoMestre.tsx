@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { consultarIsGm, iniciarAuthMultiplayer, vincularComoMestre } from '../../multiplayer/auth';
+import { consultarIsGm, iniciarAuthMultiplayer, trocarTokenMestre, vincularComoMestre } from '../../multiplayer/auth';
 
 const CHAVE_TOKEN = 'estatica-gm-token';
 
 type Vinculo = 'checando' | 'vinculado' | 'nao-vinculado';
 type StatusModal = 'idle' | 'vinculando' | 'sucesso';
+type StatusTroca = 'idle' | 'trocando' | 'sucesso';
 
 /**
  * Indicador + tela de vínculo de mestre (mesa-estatica-multiplayer-completo.md §6, §V.2) —
@@ -23,6 +24,11 @@ export default function VinculoMestre() {
   const [token, setToken] = useState(() => localStorage.getItem(CHAVE_TOKEN) ?? '');
   const [statusModal, setStatusModal] = useState<StatusModal>('idle');
   const [erro, setErro] = useState<string | null>(null);
+  const [trocaAberta, setTrocaAberta] = useState(false);
+  const [tokenAtual, setTokenAtual] = useState('');
+  const [tokenNovo, setTokenNovo] = useState('');
+  const [statusTroca, setStatusTroca] = useState<StatusTroca>('idle');
+  const [erroTroca, setErroTroca] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -65,6 +71,29 @@ export default function VinculoMestre() {
     setModalAberto(false);
     setStatusModal('idle');
     setErro(null);
+    setTrocaAberta(false);
+    setTokenAtual('');
+    setTokenNovo('');
+    setStatusTroca('idle');
+    setErroTroca(null);
+  };
+
+  const trocarToken = async () => {
+    if (!tokenAtual.trim() || !tokenNovo.trim()) return;
+    setStatusTroca('trocando');
+    setErroTroca(null);
+    const resultado = await trocarTokenMestre(tokenAtual.trim(), tokenNovo.trim());
+    if (!resultado.ok) {
+      setErroTroca(resultado.erro);
+      setStatusTroca('idle');
+      return;
+    }
+    // este navegador precisa do valor novo pra revincular no futuro (ex.: sessão anônima nova).
+    localStorage.setItem(CHAVE_TOKEN, tokenNovo.trim());
+    setToken(tokenNovo.trim());
+    setStatusTroca('sucesso');
+    setTokenAtual('');
+    setTokenNovo('');
   };
 
   const vincular = async () => {
@@ -150,6 +179,56 @@ export default function VinculoMestre() {
             <button className="acento" onClick={vincular} disabled={!token.trim() || statusModal !== 'idle'}>
               {statusModal === 'vinculando' ? 'vinculando…' : 'vincular'}
             </button>
+
+            <hr style={{ width: '100%', border: 'none', borderTop: '1px solid var(--concrete-2)', margin: '0.2rem 0' }} />
+
+            {!trocaAberta ? (
+              <button onClick={() => setTrocaAberta(true)} style={{ alignSelf: 'flex-start' }}>
+                trocar token
+              </button>
+            ) : (
+              <>
+                <p className="vazio" style={{ margin: 0 }}>
+                  troca o token de mestre sem precisar do dev — só exige o token atual. depois de
+                  trocar, avise quem mais tiver o link antigo.
+                </p>
+                <label className="label" htmlFor="vinculo-mestre-token-atual">
+                  token atual
+                </label>
+                <input
+                  id="vinculo-mestre-token-atual"
+                  type="password"
+                  value={tokenAtual}
+                  onChange={(e) => {
+                    setTokenAtual(e.target.value);
+                    setErroTroca(null);
+                  }}
+                  style={{ width: '100%' }}
+                />
+                <label className="label" htmlFor="vinculo-mestre-token-novo">
+                  token novo
+                </label>
+                <input
+                  id="vinculo-mestre-token-novo"
+                  type="password"
+                  value={tokenNovo}
+                  onChange={(e) => {
+                    setTokenNovo(e.target.value);
+                    setErroTroca(null);
+                  }}
+                  style={{ width: '100%' }}
+                />
+                {erroTroca && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erroTroca}</span>}
+                {statusTroca === 'sucesso' && <span style={{ color: 'var(--rede)', fontSize: '12px' }}>token trocado.</span>}
+                <button
+                  className="acento"
+                  onClick={trocarToken}
+                  disabled={!tokenAtual.trim() || !tokenNovo.trim() || statusTroca === 'trocando'}
+                >
+                  {statusTroca === 'trocando' ? 'trocando…' : 'confirmar troca'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

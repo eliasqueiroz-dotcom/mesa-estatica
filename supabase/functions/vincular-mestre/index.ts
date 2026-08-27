@@ -17,6 +17,11 @@
 // valor velho e nunca travar o limite; (2) uma trava GLOBAL (`registrar_tentativa_mestre_global`,
 // linha única) conta falhas de QUALQUER identidade na mesma janela — sem ela, trocar de auth_uid
 // (aba anônima nova) resetava as 5 tentativas de graça, indefinidamente.
+//
+// Migração 0036 (ROADMAP.md item 2, Parte B): o token válido deixa de ser só o secret GM_TOKEN.
+// Se existir uma linha em `mestre_config` (o mestre já trocou o próprio token pela function
+// `trocar-token-mestre`), compara o hash de lá; sem linha ainda, cai no GM_TOKEN de sempre —
+// esse fallback é o que permite bootstrap sem precisar seedar um hash na migração.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -31,6 +36,12 @@ const jsonResponse = (body: unknown, status: number) =>
 const LIMITE_TENTATIVAS = 5;
 const LIMITE_TENTATIVAS_GLOBAL = 20;
 const JANELA_BLOQUEIO_MINUTOS = 15;
+
+async function sha256Hex(texto: string): Promise<string> {
+  const bytes = new TextEncoder().encode(texto);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -72,7 +83,10 @@ Deno.serve(async (req) => {
     return jsonResponse({ erro: 'muitas tentativas — espere um pouco antes de tentar de novo' }, 429);
   }
 
-  if (gmToken !== Deno.env.get('GM_TOKEN')) {
+  const { data: config } = await admin.from('mestre_config').select('token_hash').eq('id', true).maybeSingle();
+  const tokenValido = config ? (await sha256Hex(gmToken)) === config.token_hash : gmToken === Deno.env.get('GM_TOKEN');
+
+  if (!tokenValido) {
     // Incremento atômico (migração 0024) — por identidade E global, em paralelo. Cada RPC é uma
     // única instrução SQL (INSERT...ON CONFLICT DO UPDATE / UPDATE sob lock de linha), então
     // tentativas concorrentes nunca leem o mesmo valor "antes" e perdem incremento.

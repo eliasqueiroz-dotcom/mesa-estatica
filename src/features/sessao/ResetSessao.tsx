@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 import { resetarMesaCompleta } from '../../multiplayer/resetMesa';
 import { useStore } from '../../state/store';
 
 /**
  * Botão de "sessão limpa" — mora ao lado de "limpar log", no header do `LogView`, mas entra lá
  * como slot vindo do `LogTab.tsx` (GM-only). O `LogView` é compartilhado com o app do jogador:
- * importar este componente lá dentro arrastaria `resetMesa`/`remocaoExplicita` pro bundle dele.
+ * importar este componente lá dentro arrastaria `resetMesa` pro bundle dele.
  *
  * Destrutivo e irreversível (apaga no servidor também, ver `resetMesa.ts`), então a confirmação
  * é um modal — mesmo padrão de `VinculoMestre.tsx` — com o backup oferecido no meio do caminho,
  * enquanto ainda existe o que salvar.
+ *
+ * Pede um `RESET_TOKEN` quando o multiplayer está configurado (ROADMAP.md item 2, Parte A) — a
+ * Edge Function `reset-mesa` não checa is_gm() nem depende do token de mestre, então quem roda o
+ * reset (tipicamente o dev, antes/depois de uma sessão) não precisa estar logado como mestre.
  */
 export default function ResetSessao() {
   const [modalAberto, setModalAberto] = useState(false);
   const [resetando, setResetando] = useState(false);
+  const [token, setToken] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const precisaToken = supabase !== null;
 
   useEffect(() => {
     if (!modalAberto) return;
@@ -36,9 +44,15 @@ export default function ResetSessao() {
 
   const confirmar = async () => {
     setResetando(true);
+    setErro(null);
     try {
-      await resetarMesaCompleta();
+      const resultado = await resetarMesaCompleta(token.trim() || undefined);
+      if (!resultado.ok) {
+        setErro(resultado.erro);
+        return;
+      }
       setModalAberto(false);
+      setToken('');
     } finally {
       setResetando(false);
     }
@@ -82,14 +96,33 @@ export default function ResetSessao() {
               servidor, pra todo mundo. não dá pra desfazer.
             </p>
             <p className="vazio" style={{ margin: 0 }}>
-              os links de jogador atuais param de valer (as fichas somem junto). os arquivos de
-              áudio continuam no armazenamento, só saem da playlist.
+              os links de jogador atuais param de valer (as fichas somem junto). imagens e áudio
+              também são apagados do armazenamento, não só as referências.
             </p>
+            {precisaToken && (
+              <>
+                <label className="label" htmlFor="reset-sessao-token">
+                  reset token
+                </label>
+                <input
+                  id="reset-sessao-token"
+                  type="password"
+                  value={token}
+                  onChange={(e) => {
+                    setToken(e.target.value);
+                    setErro(null);
+                  }}
+                  disabled={resetando}
+                  style={{ width: '100%' }}
+                />
+              </>
+            )}
+            {erro && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erro}</span>}
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
               <button className="acento" onClick={baixarBackup} disabled={resetando}>
                 baixar backup antes
               </button>
-              <button className="perigo" onClick={confirmar} disabled={resetando}>
+              <button className="perigo" onClick={confirmar} disabled={resetando || (precisaToken && !token.trim())}>
                 {resetando ? 'apagando…' : 'confirmar — apaga tudo'}
               </button>
               <button onClick={() => setModalAberto(false)} disabled={resetando}>

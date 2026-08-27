@@ -779,3 +779,81 @@ save, irrelevante frente aos ~2GB livres).
 - Sem Supabase configurado: clicar "importar"/"exportar" vai direto pro caminho local (sem abrir
   menu), "exportar" continua baixando local sem
   tentar subir nem quebrar a UI.
+
+# Parte 6 — Ambiente de dev isolado (Supabase + R2 separados)
+
+## Por quê
+
+`ROADMAP.md` item 2, Parte C: testar feature nova hoje encosta direto no banco/bucket de
+produção — não existe segundo ambiente. Runbook manual (não é uma Edge Function, é o usuário
+quem roda isto uma vez, na própria máquina de dev).
+
+**"Dois tokens" no mesmo projeto não resolve** (ver `ROADMAP.md` item 2 pro raciocínio completo):
+nenhuma tabela tem coluna de "mesa", e `sessao_publica`/`mapa_publico`/`midia_estado`/
+`soundpad_estado` são singletons por `check` constraint — duas mesas no mesmo banco quebram a
+constraint e enxergam exatamente os mesmos dados. Por isso o caminho é um projeto Supabase
+inteiro à parte (o free tier permite dois) e, pra completar o isolamento, um bucket R2 à parte
+também (áudio mora em R2 desde a Parte 1 acima — testar upload/remoção de som contra o bucket de
+produção seria o mesmo problema que isso resolve pro banco).
+
+## Passo 1 — segundo projeto Supabase
+
+1. Criar um projeto novo no [dashboard do Supabase](https://supabase.com/dashboard) (ex.:
+   `estatica-dev`), plano free.
+2. `npx.cmd supabase link --project-ref <ref-do-projeto-de-dev>` — note que isso troca o link
+   *local* da CLI; o projeto de produção continua linkado em CI/outros clones via o próprio
+   `project-ref` de produção, não é uma troca destrutiva.
+3. `npx.cmd supabase db push` — roda as ~36 migrações do zero nesse projeto novo.
+4. Gerar um `GM_TOKEN` de dev (qualquer string, só pra uso local) e setar:
+   `npx.cmd supabase secrets set GM_TOKEN=<valor-de-dev>` (secrets são por projeto — não
+   compartilha com produção automaticamente).
+5. **Pegadinha confirmada em 27/08**: projeto novo vem com "Allow anonymous sign-ins" desligado
+   por padrão — `iniciarAuthMultiplayer()` (`src/multiplayer/auth.ts`) depende de
+   `signInAnonymously()`, então sem isso todo o multiplayer falha calado (422
+   `anonymous_provider_disabled`, sem crash visível na UI). Habilitar em Authentication → Sign In
+   / Providers → Anonymous Sign-Ins no dashboard do projeto de dev (não existe flag disso em
+   `supabase db push`/migração — é config de Auth, não schema).
+
+## Passo 2 — `.env.development.local`
+
+Criar na raiz (já coberto por `*.local` no `.gitignore` — nunca versionar):
+```
+VITE_SUPABASE_URL=<url do projeto de dev>
+VITE_SUPABASE_ANON_KEY=<anon key do projeto de dev>
+```
+Vite prioriza `.env.development.local` sobre `.env` em modo dev (`npm run dev`), e variável de
+processo (o que a Action injeta em CI) tem precedência sobre arquivo `.env` — então `npm run dev`
+fala com o banco de dev e o deploy de produção continua usando os secrets do GitHub Actions, sem
+nenhuma flag no código. `.env.example` continua documentando só os nomes das vars, sem exemplo de
+dev (o valor é local a cada máquina).
+
+## Passo 3 — bucket R2 de dev
+
+1. Criar um bucket novo no Cloudflare R2 (ex.: `estatica-audio-dev`).
+2. Gerar um token de API R2 (Account API Token, permissão Object Read & Write, escopo só nesse
+   bucket) — não reaproveitar as credenciais de produção.
+3. Setar as 4 vars no projeto Supabase **de dev** (não no de produção):
+   ```
+   npx.cmd supabase secrets set R2_ACCOUNT_ID=<mesmo account id> \
+     R2_BUCKET_NAME=estatica-audio-dev \
+     R2_ACCESS_KEY_ID=<access key do token novo> \
+     R2_SECRET_ACCESS_KEY=<secret key do token novo> \
+     R2_PUBLIC_BASE_URL=<domínio público do bucket de dev>
+   ```
+4. Deploy de todas as Edge Functions no projeto de dev (mesmo comando de sempre, `--use-api`, uma
+   por função) — cada projeto Supabase tem seu próprio conjunto de functions implantadas.
+
+## Passo 4 — `localStorage` já vem isolado de graça
+
+`localhost:5173` e o site publicado no Cloudflare Pages são origens diferentes — o estado local
+de teste (fichas, config) nunca encosta no do site real. A única ressalva é não testar feature
+nova abrindo o site publicado.
+
+## Passo 5 — testar
+
+- `npm run dev` sem `.env.development.local`: continua caindo no `.env` normal (produção) —
+  confirma que o isolamento é opt-in, não quebra quem ainda não montou o projeto de dev.
+- Com `.env.development.local` preenchido: abrir `?gm=<GM_TOKEN-de-dev>` local, confirmar
+  vínculo de mestre, criar uma ficha de teste, confirmar no dashboard do Supabase de dev que a
+  linha caiu lá (não no de produção). Testar upload de um som e confirmar que o objeto aparece no
+  bucket R2 de dev, não no de produção.
