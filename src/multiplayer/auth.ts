@@ -117,12 +117,20 @@ export async function consultarIsGm(): Promise<boolean> {
   return !error && data === true;
 }
 
-// Memoiza por boot (mesmo padrão de `promessaEmVoo` acima) — `GateOverlay.tsx` e
+// Memoiza só as chamadas CONCORRENTES (mesmo instante) — `GateOverlay.tsx` e
 // `VinculoMestre.tsx` fazem essa MESMA pergunta ("esta sessão está vinculada como mestre?")
-// no mount, em paralelo. Sem compartilhar a promise, os dois disparavam a sequência
-// consultarIsGm→autocura (que pode incluir uma chamada a `vincular-mestre`) por conta
-// própria — duas tentativas gastas contra o rate limit da function pra confirmar o mesmo
-// fato uma vez só. Com isso, o segundo chamador só espera o resultado do primeiro.
+// no mount, em paralelo, e sem isso os dois disparavam a sequência consultarIsGm→autocura
+// (que pode incluir uma chamada a `vincular-mestre`) por conta própria — duas tentativas
+// gastas contra o rate limit da function pra confirmar o mesmo fato uma vez só.
+//
+// Diferente de `promessaEmVoo` acima, essa promise NÃO pode ficar em cache pra sempre: a
+// resposta muda no meio da sessão assim que o mestre digita o token certo no `GateOverlay`.
+// Cachear pra sempre foi um bug real (28/08) — a checagem do boot (antes de qualquer token
+// existir) resolvia `false` e ficava presa; quando `GateOverlay` reconferia logo depois de um
+// `entrar()` bem-sucedido, recebia esse `false` requentado e destrancava o gate só pra
+// retrancar sozinho no instante seguinte, com "entrando…" travado pra sempre (status nunca
+// voltava a `idle` nesse caminho). `.finally` limpa o cache assim que a checagem termina —
+// dedup só entre chamadas de verdade simultâneas, nunca entre uma futura e uma velha.
 let promessaVinculoMestre: Promise<boolean> | null = null;
 
 /**
@@ -134,7 +142,11 @@ let promessaVinculoMestre: Promise<boolean> | null = null;
  * continuaria "vinculado" localmente pra sempre, mesmo depois de revogado de propósito.
  */
 export function verificarVinculoMestre(): Promise<boolean> {
-  if (!promessaVinculoMestre) promessaVinculoMestre = executarVerificacaoVinculo();
+  if (!promessaVinculoMestre) {
+    promessaVinculoMestre = executarVerificacaoVinculo().finally(() => {
+      promessaVinculoMestre = null;
+    });
+  }
   return promessaVinculoMestre;
 }
 

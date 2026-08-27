@@ -67,6 +67,12 @@ export default function GateOverlay() {
     } catch (erro) {
       console.error('[gate] gravação local falhou — vai pedir o token de novo ao recarregar', erro);
     }
+    // Sempre volta pra idle aqui, mesmo o componente normalmente sumindo com `desbloqueado`
+    // true — rede de segurança caso a reconferida do outro `useEffect` destranque e retranque
+    // de novo por algum motivo futuro: sem isso, o botão fica "entrando…" desabilitado pra
+    // sempre, sem nenhum jeito de tentar de novo (bug real de 28/08, ver comentário acima do
+    // useEffect e o de `verificarVinculoMestre` em auth.ts).
+    setStatus('idle');
     setDesbloqueado(true);
   };
 
