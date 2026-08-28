@@ -172,7 +172,7 @@ export default function SoundpadGrid() {
             step={0.05}
             value={volume}
             onChange={(e) => definirVolumeSoundpad(Number(e.target.value))}
-            style={{ width: '120px' }}
+            style={{ width: '260px' }}
           />
         </div>
       </div>

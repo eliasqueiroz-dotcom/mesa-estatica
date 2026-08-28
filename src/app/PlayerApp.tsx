@@ -195,7 +195,12 @@ export default function PlayerApp() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <h1 style={{ fontSize: '18px', margin: 0 }}>Estática — Mesa</h1>
+          <h1 style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+            <span style={{ color: 'var(--ink-dim)', fontWeight: 400 }}>Estática —</span>
+            <span style={{ color: minhaFicha?.corVisual || 'var(--rede)', fontWeight: 700 }}>
+              {minhaFicha?.nome || 'Mesa'}
+            </span>
+          </h1>
           <DesyncIndicadorJogador />
           <nav style={{ display: 'flex', gap: '0.4rem' }}>
             {ABAS.map((a) => {
