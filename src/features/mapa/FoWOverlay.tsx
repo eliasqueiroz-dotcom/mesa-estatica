@@ -57,7 +57,6 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
   const limparFoW = useStore((s) => s.limparFoW);
   const definirZonaFoW = useStore((s) => s.definirZonaFoW);
   const definirFoWAtivo = useStore((s) => s.definirFoWAtivo);
-  const registrarLog = useStore((s) => s.registrarLog);
 
   const definirRascunho = useFowStore((s) => s.definirRascunho);
 
@@ -149,28 +148,17 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
     if (r.modo === 'revelar') {
       // Filtrar RegiaoFoW só os campos persistentes: 'forma','x','y','w','h'.
       adicionarRegiaoFoW({ forma: r.forma, x: r.x, y: r.y, w: r.w, h: r.h });
-      registrarLog('anotacao', 'memória estabelecida', null, 'privada'); // microcopy: minúsculas, sem exclamação
     } else if (r.modo === 'cobrirLuz') {
       // cobrir luz: apaga EXATAMENTE o retângulo desenhado, recortando as regiões visíveis que
       // ele toca (o pedaço coberto continua em `vistas`, então vira memória). Antes isto removia
       // a região inteira por interseção — cobrir um canto apagava o cômodo todo.
-      const antes = useStore.getState().mapa.fow.visiveisAgora;
       cobrirAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
-      // sem interseção com nada visível, `cobrirAreaFoW` é no-op (mesma referência) — não
-      // registra log de "apagou" quando na prática nada mudou (mentiria pro mestre).
-      if (useStore.getState().mapa.fow.visiveisAgora !== antes) {
-        registrarLog('anotacao', 'luz apagada na área', null, 'privada');
-      }
     } else {
       // esquecer: some com a área desenhada de `vistas` E `visiveisAgora` — volta a ser
-      // nunca-visto. Mesmo cuidado de log honesto do `cobrirLuz`: sem interseção é no-op.
-      const antes = useStore.getState().mapa.fow;
+      // nunca-visto.
       esquecerAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
-      if (useStore.getState().mapa.fow !== antes) {
-        registrarLog('anotacao', 'memória apagada', null, 'privada');
-      }
     }
-  }, [adicionarRegiaoFoW, cobrirAreaFoW, esquecerAreaFoW, definirRascunho, registrarLog]);
+  }, [adicionarRegiaoFoW, cobrirAreaFoW, esquecerAreaFoW, definirRascunho]);
 
   const trocarModo = (m: 'revelar' | 'cobrirLuz' | 'esquecer') => {
     const proximo = modo === m ? 'desligado' : m;
