@@ -28,10 +28,10 @@ export default function SessaoTab() {
       >
         <SituacaoSection />
         <EstatisticasSection />
-        <StatusGrupoSection />
+        <EstadoMesaSection />
         <ProximosEventosSection />
         <LembretesSection />
-        <EstadoMesaSection />
+        <StatusGrupoSection />
         <MiniLogSection />
       </div>
     </div>
