@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { useVinculoMestreStore } from './vinculoMestreStore';
 
 // Chave de localStorage do token de mestre — compartilhada por `VinculoMestre.tsx` (vínculo
 // RLS) e `GateOverlay.tsx` (barreira visual da tela do mestre), que reaproveita o mesmo token.
@@ -83,7 +84,13 @@ export async function vincularComoMestre(gmToken: string): Promise<ResultadoVinc
   if (!cliente) return { ok: false, erro: 'multiplayer não configurado nesta máquina' };
   await iniciarAuthMultiplayer();
   const { error } = await cliente.functions.invoke('vincular-mestre', { body: { gm_token: gmToken } });
-  if (!error) return { ok: true };
+  if (!error) {
+    // toda chamada que vincula com sucesso passa por aqui (GateOverlay.entrar(),
+    // VinculoMestre.vincular(), e a autocura em executarVerificacaoVinculo() abaixo) — sincroniza
+    // o pill de VinculoMestre.tsx mesmo quando quem vinculou foi outro componente irmão.
+    useVinculoMestreStore.getState().definirStatus('vinculado');
+    return { ok: true };
+  }
   return {
     ok: false,
     erro: await extrairErroFuncao(error),
@@ -151,6 +158,16 @@ export function verificarVinculoMestre(): Promise<boolean> {
 }
 
 async function executarVerificacaoVinculo(): Promise<boolean> {
+  const vinculado = await checarVinculo();
+  // `vincularComoMestre()` (chamado dentro de `checarVinculo` na autocura, ou por
+  // `GateOverlay.entrar()`/`VinculoMestre.vincular()`) já marca 'vinculado' sozinho no sucesso
+  // — só falta cobrir aqui os caminhos que terminam sem chamá-lo (is_gm() já true, ou sem token
+  // salvo pra tentar autocura).
+  useVinculoMestreStore.getState().definirStatus(vinculado ? 'vinculado' : 'nao-vinculado');
+  return vinculado;
+}
+
+async function checarVinculo(): Promise<boolean> {
   await iniciarAuthMultiplayer();
   if (await consultarIsGm()) return true;
 

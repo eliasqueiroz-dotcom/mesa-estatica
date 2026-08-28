@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { CHAVE_TOKEN_MESTRE, trocarTokenMestre, verificarVinculoMestre, vincularComoMestre } from '../../multiplayer/auth';
+import { useVinculoMestreStore } from '../../multiplayer/vinculoMestreStore';
 
 const CHAVE_TOKEN = CHAVE_TOKEN_MESTRE;
 
-type Vinculo = 'checando' | 'vinculado' | 'nao-vinculado';
 type StatusModal = 'idle' | 'vinculando' | 'sucesso';
 type StatusTroca = 'idle' | 'trocando' | 'sucesso';
 
@@ -19,7 +19,7 @@ type StatusTroca = 'idle' | 'trocando' | 'sucesso';
  * já mantém `#controle`/`forcarRolagem` fora do chunk do jogador).
  */
 export default function VinculoMestre() {
-  const [vinculo, setVinculo] = useState<Vinculo>('checando');
+  const vinculo = useVinculoMestreStore((s) => s.status);
   const [modalAberto, setModalAberto] = useState(false);
   const [token, setToken] = useState(() => localStorage.getItem(CHAVE_TOKEN) ?? '');
   const [statusModal, setStatusModal] = useState<StatusModal>('idle');
@@ -34,16 +34,13 @@ export default function VinculoMestre() {
   // cenário de 24/07, origem nova/sessão anônima nova/vínculo antigo órfão) e a checagem de
   // token revogado vivem em `verificarVinculoMestre()`, compartilhada com `GateOverlay.tsx`
   // (mesmo mount, mesma pergunta — evita gastar duas tentativas contra o rate limit de
-  // `vincular-mestre` só pra confirmar o mesmo fato duas vezes).
+  // `vincular-mestre` só pra confirmar o mesmo fato duas vezes). Ela mesma escreve o resultado
+  // em `useVinculoMestreStore` — não precisa de `setVinculo` local aqui: isso é o que mantém o
+  // pill sincronizado mesmo quando é o `GateOverlay` (não este efeito) que vincula com sucesso
+  // (achado ao vivo em 28/08 — sem estado compartilhado, o pill ficava preso em "não vinculado"
+  // até um F5 manual).
   useEffect(() => {
-    let cancelado = false;
-    (async () => {
-      const vinculado = await verificarVinculoMestre();
-      if (!cancelado) setVinculo(vinculado ? 'vinculado' : 'nao-vinculado');
-    })();
-    return () => {
-      cancelado = true;
-    };
+    void verificarVinculoMestre();
   }, []);
 
   useEffect(() => {
