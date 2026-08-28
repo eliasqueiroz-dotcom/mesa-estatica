@@ -32,6 +32,7 @@ import { iniciarSyncReguas } from '../multiplayer/reguasSync';
 import { iniciarSyncRolagemAoVivo } from '../multiplayer/rolagemAoVivoSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
+import { usePedidoRolagemDanoStore } from '../state/pedidoRolagemDanoStore';
 import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import { useRolagemRapidaSanidadeStore } from '../state/rolagemRapidaSanidadeStore';
 import { useStore } from '../state/store';
@@ -72,6 +73,13 @@ export default function PlayerApp() {
   const [pedidosSanidadeRapida, setPedidosSanidadeRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
+  const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+
+  // chip de dano na aba Combate (ArmasCombate.tsx) pede a rolagem por esse store — abre o
+  // "d20 rápido" sozinho pra física rodar lá (mesma bandeja, sem caixinha própria por card).
+  useEffect(() => {
+    if (pedidoDano) setOverlayAberto(true);
+  }, [pedidoDano]);
 
   useHidratarSessaoPublica();
   useHidratarMapaPublico();

@@ -1,9 +1,8 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { surtosAtivosNaSessao, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
-import { consumirForcados } from '../../dice/forcarRolagem';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 import ArmasCombate from '../combate/ArmasCombate';
 import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeLamina, IconeMais } from '../combate/icones';
@@ -38,19 +37,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
     podePrimeirosSocorros, tentarPrimeirosSocorros,
     agruparNpcs, setAgruparNpcs,
-    registrarLog, registrarRoll,
   } = hook;
-
-  // `IniciativaPanel` é montado duas vezes ao mesmo tempo (`CombatOverlay.tsx` E `NpcsTab.tsx`,
-  // cada um com seu próprio `useIniciativa()`) — sem um prefixo por instância, os `diceBoxId`
-  // de `ArmasCombate` colidiriam quando o mesmo participante está expandido nos dois lugares,
-  // e só uma das duas bandejas 3D conseguiria de fato se inicializar no elemento (achado ao
-  // vivo, 28/08: chip de arma ficava desabilitado pra sempre numa das duas instâncias).
-  // `useId()` sozinho tem `:` (ex. `:r0:`) — `useDiceBox` usa o id como seletor CSS
-  // (`new DiceBox('#'+id, ...)`), e `:` sem escapar quebra o seletor (`querySelector` lança
-  // `SyntaxError`). Tira os `:` — só precisa ser único por instância, não precisa do formato
-  // original.
-  const instanceId = useId().replace(/:/g, '');
 
   const [danoEmMassa, setDanoEmMassa] = useState('');
   const [condicaoEmMassa, setCondicaoEmMassa] = useState('');
@@ -332,14 +319,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       const ficha = fichas.find((f) => f.id === e.participanteId);
                       if (!ficha || ficha.armas.length === 0) return null;
                       return (
-                        <ArmasCombate
-                          ficha={ficha}
-                          registrarLog={registrarLog}
-                          registrarRoll={registrarRoll}
-                          diceBoxId={`dice-arma-mestre-${instanceId}-${e.id}`}
-                          podeForcar={consumirForcados}
-                          souMestre
-                        />
+                        <ArmasCombate ficha={ficha} souMestre />
                       );
                     })()}
                     {npcAcoes.length > 0 && (

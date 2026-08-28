@@ -55,6 +55,9 @@ export function rolarDanoArmaFicha(
       cor: ficha.corVisual,
       origem: nomePersonagem,
       tipo: 'dano',
+      // modificador da arma + Vigor (corpo a corpo) já embutidos em `resultado.total` — sem
+      // isso o header animava só a soma bruta dos dados, divergindo do total real do log.
+      bonus: resultado.total - valoresDados.reduce((a, b) => a + b, 0),
     });
   }
 

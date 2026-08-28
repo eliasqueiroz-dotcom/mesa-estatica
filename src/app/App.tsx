@@ -15,6 +15,7 @@ import RuidoOverlay from '../features/ruido/RuidoOverlay';
 import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
+import { usePedidoRolagemDanoStore } from '../state/pedidoRolagemDanoStore';
 import { useStore } from '../state/store';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
 import { iniciarSyncFoW } from '../multiplayer/fowSync';
@@ -287,6 +288,13 @@ export default function App() {
   const [pedidosRolagemRapida, setPedidosRolagemRapida] = useState(0);
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
+  const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+
+  // chip de dano na aba Combate (ArmasCombate.tsx) pede a rolagem por esse store — abre o
+  // "d20 rápido" sozinho pra física rodar lá (mesma bandeja, sem caixinha própria por card).
+  useEffect(() => {
+    if (pedidoDano) setOverlayAberto(true);
+  }, [pedidoDano]);
 
   const abrirControle = () => {
     window.open(

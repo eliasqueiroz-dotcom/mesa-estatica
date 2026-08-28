@@ -3,6 +3,9 @@ import { useDiceBox } from '../../dice/useDiceBox';
 import { consumirForcados } from '../../dice/forcarRolagem';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
+import { rolarDanoArmaFicha } from '../../rules/armasCombate';
+import { parseDanoArma } from '../../rules/teste';
+import { usePedidoRolagemDanoStore, type PedidoRolagemDano } from '../../state/pedidoRolagemDanoStore';
 import { useStore } from '../../state/store';
 
 interface QuickRollOverlayProps {
@@ -14,7 +17,7 @@ interface QuickRollOverlayProps {
 
 export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, pedidoRolagem }: QuickRollOverlayProps) {
   const habilitado = abaAtual !== 'dados' && aberto;
-  const { ready, rolando, modo2D, rolar } = useDiceBox('dice-overlay-rapido', habilitado, 45, undefined, consumirForcados);
+  const { ready, rolando, modo2D, rolar, reproduzir } = useDiceBox('dice-overlay-rapido', habilitado, 45, undefined, consumirForcados);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
   const fichaAtivaId = useStore((s) => s.fichaAtivaId);
@@ -29,6 +32,9 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const [privado, setPrivado] = useState(true);
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
+  const [resultadoDano, setResultadoDano] = useState<{ nomeArma: string; texto: string; erro: boolean } | null>(null);
+  const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+  const limparPedidoRolagemDano = usePedidoRolagemDanoStore((s) => s.limparPedidoRolagemDano);
 
   const ficha = fichas.find((f) => f.id === fichaAtivaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
@@ -120,6 +126,36 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
     }
   };
 
+  // Rolagem de dano de arma pedida de fora (chip em `ArmasCombate.tsx`, aba Combate) — a física
+  // roda nesta bandeja (a mesma do "d20 rápido") em vez da caixinha 40×40 que existia embutida
+  // em cada card de PC (removida — colidia entre instâncias simultâneas, ver `armasCombate.ts`).
+  const executarPedidoDano = (p: PedidoRolagemDano) => {
+    const fichaAlvo = fichas.find((f) => f.id === p.fichaId);
+    const arma = fichaAlvo?.armas.find((a) => a.id === p.armaId);
+    if (!fichaAlvo || !arma) {
+      limparPedidoRolagemDano();
+      return;
+    }
+    setResultadoDano(null);
+    const finalizar = (valoresDados: number[], termos: Parameters<typeof reproduzir>[0]) => {
+      const r = rolarDanoArmaFicha(fichaAlvo, arma, termos, valoresDados, p.critico, registrarLog, registrarRoll, p.visibilidade);
+      setResultadoDano({ nomeArma: arma.nome || 'arma', texto: r.texto, erro: r.erro });
+      limparPedidoRolagemDano();
+    };
+    const parsed = parseDanoArma(arma.dano);
+    if (!parsed) {
+      finalizar([], []);
+      return;
+    }
+    const termos = [{ sides: parsed.lados, qty: parsed.qtd }];
+    if (p.critico) {
+      const valoresMaximos = Array(parsed.qtd).fill(parsed.lados);
+      reproduzir(termos, valoresMaximos, { base: 'rede', cor: fichaAlvo.corVisual }, () => finalizar(valoresMaximos, termos));
+    } else {
+      rolar(termos, (grupos) => finalizar(grupos.flatMap((g) => g.rolls.map((r) => r.value)), termos), 'rede', fichaAlvo.id, 'dano');
+    }
+  };
+
   const pendenteRef = useRef(false);
   const rolarAtual = modo === 'simples' ? rolarSimples : rolarPericia;
   const rolarAtualRef = useRef(rolarAtual);
@@ -141,6 +177,31 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
       if (!rolando && podeRolar) rolarAtualRef.current();
     }
   }, [ready, rolando, podeRolar]);
+
+  // Mesmo padrão acima, pro pedido de dano: `pedidoDano` só limpa (volta a `null`) quando o
+  // roll termina — se chegar um pedido novo enquanto o dado ainda cai, fica pendente até
+  // `ready`/`rolando` liberarem.
+  const pedidoDanoPendenteRef = useRef<PedidoRolagemDano | null>(null);
+  const executarPedidoDanoRef = useRef(executarPedidoDano);
+  executarPedidoDanoRef.current = executarPedidoDano;
+
+  useEffect(() => {
+    if (!pedidoDano) return;
+    if (ready && !rolando) {
+      executarPedidoDanoRef.current(pedidoDano);
+    } else {
+      pedidoDanoPendenteRef.current = pedidoDano;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoDano?.id]);
+
+  useEffect(() => {
+    if (ready && !rolando && pedidoDanoPendenteRef.current) {
+      const p = pedidoDanoPendenteRef.current;
+      pedidoDanoPendenteRef.current = null;
+      executarPedidoDanoRef.current(p);
+    }
+  }, [ready, rolando]);
 
   if (abaAtual === 'dados') return null;
 
@@ -308,6 +369,17 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
                 {resultadoRoll.modificador === 0
                   ? `1d20 → ${resultadoRoll.total}`
                   : `1d20: ${resultadoRoll.d20}${resultadoRoll.modificador > 0 ? ` + ${resultadoRoll.modificador}` : ` - ${Math.abs(resultadoRoll.modificador)}`} = ${resultadoRoll.total}`}
+              </span>
+            </div>
+          )}
+
+          {resultadoDano && (
+            <div
+              className="alerta-banner mono"
+              style={{ marginTop: '0.5rem', justifyContent: 'center', borderColor: resultadoDano.erro ? 'var(--ruido)' : undefined }}
+            >
+              <span style={{ fontSize: 12, color: resultadoDano.erro ? 'var(--ruido)' : undefined }}>
+                dano · {resultadoDano.nomeArma}: {resultadoDano.texto}
               </span>
             </div>
           )}
