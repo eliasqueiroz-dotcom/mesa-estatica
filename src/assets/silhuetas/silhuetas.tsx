@@ -31,7 +31,7 @@ const Base: FC<SVGProps<SVGSVGElement>> = (props) => (
 
 function Guarda(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#5a7d9a" {...props}>
+    <svg viewBox="0 0 24 24" fill="#4a72d9" {...props}>
       <circle cx="12" cy="9" r="3.4" />
       <path d="M4 22c0-5.3 3.6-7.7 8-7.7s8 2.4 8 7.7v1H4z" />
       {/* quepe: copa arredondada baixa + pala curta e pontuda só na frente (bem menor que o
@@ -62,7 +62,7 @@ function Policial(props: SVGProps<SVGSVGElement>) {
 
 function Trabalhador(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#d4a54f" {...props}>
+    <svg viewBox="0 0 24 24" fill="#a3b83c" {...props}>
       <circle cx="12" cy="10.2" r="3" />
       <path d="M4.3 22c0-4.9 3.4-7.1 7.7-7.1s7.7 2.2 7.7 7.1v1H4.3z" />
       {/* capacete de obra: cúpula alta cobrindo a cabeça inteira + aba em disco contornando
@@ -77,7 +77,7 @@ function Trabalhador(props: SVGProps<SVGSVGElement>) {
 
 function Entregador(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#d48c4a" {...props}>
+    <svg viewBox="0 0 24 24" fill="#e8672a" {...props}>
       <circle cx="12" cy="9" r="3.4" />
       <path d="M4 22c0-5.3 3.6-7.7 8-7.7s8 2.4 8 7.7v1H4z" />
       {/* boné baixo e arredondado — família visual diferente do quepe pontudo, do boné largo
@@ -93,22 +93,22 @@ function Entregador(props: SVGProps<SVGSVGElement>) {
 
 function Medico(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#6bb37a" {...props}>
+    <svg viewBox="0 0 24 24" fill="#5cb85c" {...props}>
       <circle cx="12" cy="8" r="3.6" />
       <path d="M4 22c0-5.3 3.6-7.7 8-7.7s8 2.4 8 7.7v1H4z" />
       {/* sem chapéu de propósito — o símbolo é a braçadeira/crachá no peito, não a cabeça.
           Recorte circular + cruz de saúde universal (verde, NUNCA vermelho — cor reservada
           a dano/Sanidade em arte.md) desenhada por cima do recorte */}
       <circle cx="12" cy="16.2" r="2.7" fill="var(--concrete-1)" />
-      <rect x="11.35" y="14.3" width="1.3" height="3.8" rx="0.3" fill="#6bb37a" />
-      <rect x="10.1" y="15.55" width="3.8" height="1.3" rx="0.3" fill="#6bb37a" />
+      <rect x="11.35" y="14.3" width="1.3" height="3.8" rx="0.3" fill="#5cb85c" />
+      <rect x="10.1" y="15.55" width="3.8" height="1.3" rx="0.3" fill="#5cb85c" />
     </svg>
   );
 }
 
 function Idosa(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#d47a9e" {...props}>
+    <svg viewBox="0 0 24 24" fill="#d9498f" {...props}>
       <circle cx="11.6" cy="8.3" r="3.5" />
       {/* coque de cabelo no topo/atrás da cabeça */}
       <circle cx="14" cy="4.9" r="1.5" />
@@ -122,7 +122,7 @@ function Idosa(props: SVGProps<SVGSVGElement>) {
 
 function Mendigo(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#c99a5a" {...props}>
+    <svg viewBox="0 0 24 24" fill="#d9a53f" {...props}>
       <circle cx="11" cy="9.4" r="3.2" />
       {/* postura curvada + cobertor puxado alto sobre um ombro só — o volume extra vira parte
           do MESMO contorno sólido (não uma camada translúcida), lê como silhueta assimétrica */}
@@ -148,7 +148,7 @@ function Transeunte(props: SVGProps<SVGSVGElement>) {
 
 function Corporativo(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#8b7cd8" {...props}>
+    <svg viewBox="0 0 24 24" fill="#9163d4" {...props}>
       <circle cx="12" cy="8" r="3.6" />
       <path d="M4 22c0-5.3 3.6-7.7 8-7.7s8 2.4 8 7.7v1H4z" />
       {/* colarinho + gravata RECORTADOS (var(--concrete-1) — por cima do busto já sólido,
@@ -162,7 +162,7 @@ function Corporativo(props: SVGProps<SVGSVGElement>) {
 
 function Informante(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="#3a8a7a" {...props}>
+    <svg viewBox="0 0 24 24" fill="#1f8f80" {...props}>
       <path d="M4.3 22c0-5.1 3.5-7.4 7.7-7.4s7.7 2.3 7.7 7.4v1H4.3z" />
       {/* capuz: bump bem maior que uma cabeça normal (r 4.6 vs. 3.6 padrão), estourando o
           contorno pra cima — sem isso vira vulto sem cabeça. Lê como "cabeça grande e

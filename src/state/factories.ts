@@ -17,8 +17,8 @@ const ATRIBUTOS_ZERO: Record<Atributo, number> = {
 
 /** paleta curada — Ficha escolhe daqui (SeletorCor), nunca RGB livre (arte.md). */
 export const CORES_PERSONAGEM = [
-  '#4fc1d4', '#c99a5a', '#8b7cd8', '#6bb37a', '#d47a9e', '#d4a54f',
-  '#a8463e', '#5a7d9a', '#d48c4a', '#3a8a7a',
+  '#4fc1d4', '#d9a53f', '#9163d4', '#5cb85c', '#d9498f', '#a3b83c',
+  '#d9534f', '#4a72d9', '#e8672a', '#1f8f80',
 ];
 
 /** cor padrão de NPC — neutra, distinta da paleta viva de PC até o mestre customizar. */
