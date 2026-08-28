@@ -5,8 +5,8 @@
 const LARGURA_MAXIMA = 1600;
 const QUALIDADE_JPEG = 0.82;
 
-const TAMANHO_AVATAR = 256;
-const QUALIDADE_AVATAR = 0.85;
+const TAMANHO_AVATAR = 384;
+const QUALIDADE_AVATAR = 0.88;
 
 /** Data URL (pintura local imediata, funciona sem Supabase) + Blob (upload pro Storage) do
  *  mesmo canvas já redimensionado/recortado — nenhum dos dois refaz o resize/crop. */
