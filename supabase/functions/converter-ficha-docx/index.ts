@@ -7,10 +7,12 @@
 // passa por aqui nem pelo Supabase Storage — só o texto extraído (pequeno), que é cota de
 // invocação de function, não egress de Storage.
 //
-// Groq como primário, OpenRouter como fallback: mesmo modelo (`openai/gpt-oss-20b`) nos dois,
-// mas a Groq roda em hardware dedicado a velocidade (LPU) — ~1000 tokens/s documentado, contra o
-// pool compartilhado e mais lento do free tier da OpenRouter. Se a Groq falhar (rate limit, fora
-// do ar, sem secret configurado), cai pro OpenRouter em vez de devolver erro na hora — mesma API
+// Groq como primário, OpenRouter como fallback. Groq roda `openai/gpt-oss-20b` em hardware
+// dedicado a velocidade (LPU) — ~1000 tokens/s documentado. OpenRouter usa `openrouter/free`, o
+// roteador oficial deles pros modelos grátis disponíveis no momento (evita fixar um modelo
+// específico que pode ser descontinuado do free tier sem aviso — foi o que aconteceu com
+// `openai/gpt-oss-20b:free` em 28/08/2026, ver git log). Se a Groq falhar (rate limit, fora do
+// ar, sem secret configurado), cai pro OpenRouter em vez de devolver erro na hora — mesma API
 // compatível com o formato OpenAI nos dois, então é só trocar URL/chave/modelo.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -45,7 +47,10 @@ function provedores(): Provedor[] {
       nome: 'OpenRouter',
       url: 'https://openrouter.ai/api/v1/chat/completions',
       apiKey: Deno.env.get('OPENROUTER_API_KEY'),
-      modelo: Deno.env.get('OPENROUTER_MODEL') || 'openai/gpt-oss-20b:free',
+      // `openrouter/free` é o roteador oficial da OpenRouter pros modelos grátis disponíveis no
+      // momento — evita fixar um modelo específico (ex: `openai/gpt-oss-20b:free`, que a
+      // OpenRouter descontinuou como free em 28/08/2026 e passou a devolver 404).
+      modelo: Deno.env.get('OPENROUTER_MODEL') || 'openrouter/free',
     },
   ];
 }

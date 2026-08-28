@@ -662,9 +662,10 @@ npx.cmd supabase secrets set GROQ_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 npx.cmd supabase secrets set OPENROUTER_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-`GROQ_MODEL` (default `openai/gpt-oss-20b`) e `OPENROUTER_MODEL` (default `openai/gpt-oss-20b:free`)
-são opcionais — só sete se quiser trocar o modelo de algum dos dois sem reeditar/redeployar a
-function:
+`GROQ_MODEL` (default `openai/gpt-oss-20b`) e `OPENROUTER_MODEL` (default `openrouter/free`, o
+roteador oficial da OpenRouter pros modelos grátis disponíveis no momento — evita fixar um modelo
+que pode ser descontinuado do free tier sem aviso) são opcionais — só sete se quiser trocar o
+modelo de algum dos dois sem reeditar/redeployar a function:
 
 ```powershell
 npx.cmd supabase secrets set GROQ_MODEL=algum-outro-modelo
