@@ -48,8 +48,19 @@ function formatarSeparadorDia(iso: string): string {
   });
 }
 
-function LinhaLog({ entrada: e, renderAcao }: { entrada: EntradaLog; renderAcao?: (e: EntradaLog) => ReactNode }) {
+function LinhaLog({
+  entrada: e,
+  renderAcao,
+  podeLimpar,
+  definirVisibilidadeLog,
+}: {
+  entrada: EntradaLog;
+  renderAcao?: (e: EntradaLog) => ReactNode;
+  podeLimpar: boolean;
+  definirVisibilidadeLog: (id: string, visibilidade: 'publica' | 'privada') => void;
+}) {
   const destaque = TIPOS_RUIDO.has(e.tipo);
+  const privada = e.visibilidade === 'privada';
   return (
     <div
       style={{
@@ -61,9 +72,22 @@ function LinhaLog({ entrada: e, renderAcao }: { entrada: EntradaLog; renderAcao?
         paddingLeft: destaque ? '0.4rem' : undefined,
       }}
     >
-      <span>
+      <span style={{ opacity: privada ? 0.6 : 1 }}>
         [{new Date(e.timestamp).toLocaleTimeString()}] {LABELS_TIPO[e.tipo]} · {e.texto}
       </span>
+      {podeLimpar && (
+        <>
+          <span style={{ fontSize: '11px', opacity: 0.5 }}>{privada ? 'privado' : 'público'}</span>
+          <button
+            className="icone-botao"
+            onClick={() => definirVisibilidadeLog(e.id, privada ? 'publica' : 'privada')}
+            title={privada ? 'tornar pública' : 'tornar privada'}
+            style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
+          >
+            {privada ? 'revelar' : 'ocultar'}
+          </button>
+        </>
+      )}
       {renderAcao?.(e)}
     </div>
   );
@@ -72,33 +96,28 @@ function LinhaLog({ entrada: e, renderAcao }: { entrada: EntradaLog; renderAcao?
 function LinhaRoll({
   entrada: r,
   podeLimpar,
-  revelarRoll,
+  definirVisibilidadeRoll,
 }: {
   entrada: EntradaRoll;
   podeLimpar: boolean;
-  revelarRoll: (id: string) => void;
+  definirVisibilidadeRoll: (id: string, visibilidade: 'publica' | 'privada') => void;
 }) {
+  const privada = r.visibilidade === 'privada';
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <span style={{ opacity: r.visibilidade === 'privada' ? 0.6 : 1 }}>
+      <span style={{ opacity: privada ? 0.6 : 1 }}>
         [{new Date(r.timestamp).toLocaleTimeString()}] [{r.origem}] rolou {r.formula}: {r.total} (bruto: {r.bruto})
       </span>
-      {r.visibilidade === 'privada' ? (
-        <>
-          <span style={{ fontSize: '11px', opacity: 0.5 }}>privado</span>
-          {podeLimpar && (
-            <button
-              className="icone-botao"
-              onClick={() => revelarRoll(r.id)}
-              title="revelar rolagem"
-              style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
-            >
-              revelar
-            </button>
-          )}
-        </>
-      ) : (
-        <span style={{ fontSize: '11px', opacity: 0.5 }}>público</span>
+      <span style={{ fontSize: '11px', opacity: 0.5 }}>{privada ? 'privado' : 'público'}</span>
+      {podeLimpar && (
+        <button
+          className="icone-botao"
+          onClick={() => definirVisibilidadeRoll(r.id, privada ? 'publica' : 'privada')}
+          title={privada ? 'tornar pública' : 'tornar privada'}
+          style={{ fontSize: '11px', padding: '0.15rem 0.4rem' }}
+        >
+          {privada ? 'revelar' : 'ocultar'}
+        </button>
       )}
     </div>
   );
@@ -135,7 +154,8 @@ export default function LogView({
   const rollsLog = useStore((s) => s.rollsLog);
   const fichas = useStore((s) => s.fichas);
   const limparLog = useStore((s) => s.limparLog);
-  const revelarRoll = useStore((s) => s.revelarRoll);
+  const definirVisibilidadeRoll = useStore((s) => s.definirVisibilidadeRoll);
+  const definirVisibilidadeLog = useStore((s) => s.definirVisibilidadeLog);
   const [filtroPersonagem, setFiltroPersonagem] = useState<string>('todos');
   const [filtroTipo, setFiltroTipo] = useState<TipoLog | 'todos'>('todos');
   const [filtroTexto, setFiltroTexto] = useState('');
@@ -250,9 +270,14 @@ export default function LogView({
                   </div>
                 )}
                 {item.tipo === 'log' ? (
-                  <LinhaLog entrada={item.entrada} renderAcao={renderAcaoEntrada} />
+                  <LinhaLog
+                    entrada={item.entrada}
+                    renderAcao={renderAcaoEntrada}
+                    podeLimpar={podeLimpar}
+                    definirVisibilidadeLog={definirVisibilidadeLog}
+                  />
                 ) : (
-                  <LinhaRoll entrada={item.entrada} podeLimpar={podeLimpar} revelarRoll={revelarRoll} />
+                  <LinhaRoll entrada={item.entrada} podeLimpar={podeLimpar} definirVisibilidadeRoll={definirVisibilidadeRoll} />
                 )}
               </div>
             );

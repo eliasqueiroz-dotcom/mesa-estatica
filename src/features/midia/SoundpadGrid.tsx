@@ -6,7 +6,7 @@ import { useSoundpadUiStore } from '../../state/soundpadUiStore';
 import { useStore } from '../../state/store';
 import type { SomSoundpad } from '../../state/types';
 
-const SLOTS = [0, 1, 2, 3, 4, 5];
+const SLOTS = Array.from({ length: 12 }, (_, i) => i);
 
 interface ResultadoBusca {
   id: number;
@@ -22,7 +22,7 @@ const formatarDuracao = (segundos: number): string => {
 };
 
 /**
- * Soundpad do mestre — 6 botões de efeito. Clicar num slot parado dispara pra todo mundo;
+ * Soundpad do mestre — 12 botões de efeito. Clicar num slot parado dispara pra todo mundo;
  * clicar de novo enquanto ele está tocando (neste cliente) para só esse efeito — não mexe nos
  * outros slots nem na jukebox, que tem seus próprios controles de transporte. O áudio em si
  * toca no `SoundpadPlayer` (montado no header), por cima da música, sem tocar no player dela.
@@ -183,7 +183,7 @@ export default function SoundpadGrid() {
         </p>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
             {SLOTS.map((slot) => {
               const som = sons.find((x) => x.slot === slot) ?? null;
               const enviando = enviandoSlot === slot;

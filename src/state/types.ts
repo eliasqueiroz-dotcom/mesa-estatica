@@ -410,7 +410,7 @@ export interface EstadoMidia {
   volume: number;
 }
 
-/** Um dos 6 botões do soundpad. `slot` (0–5) é a identidade de posição na grade. */
+/** Um dos 12 botões do soundpad. `slot` (0–11) é a identidade de posição na grade. */
 export interface SomSoundpad {
   id: string;
   slot: number;

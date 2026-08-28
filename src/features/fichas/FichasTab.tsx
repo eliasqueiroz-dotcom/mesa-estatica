@@ -57,7 +57,7 @@ export default function FichasTab() {
         ))}
       </div>
       {fichaAtiva ? (
-        <FichaEditor key={fichaAtiva.id} ficha={fichaAtiva} />
+        <FichaEditor key={fichaAtiva.id} ficha={fichaAtiva} souMestre />
       ) : (
         <p className="vazio">nenhum personagem ainda — clique em "+ novo personagem".</p>
       )}

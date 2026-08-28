@@ -23,6 +23,10 @@ interface Props {
    *  mesmo padrão de `DadosTabJogador.tsx`/`QuickRollOverlayJogador.tsx`. Mestre omite (usa o
    *  default de `useDiceBox`, hoje sempre local). */
   resolverRemoto?: ResolverRemoto;
+  /** true só quando `IniciativaPanel.tsx` (mestre) monta este componente — controla se o dano
+   *  nasce privado por padrão, com checkbox. Ausente (jogador, `CombateJogadorView.tsx`) =
+   *  sempre público, sem checkbox — comportamento inalterado. */
+  souMestre?: boolean;
 }
 
 /**
@@ -33,12 +37,14 @@ interface Props {
  * e `CombateJogadorView.tsx` — mesmo componente, montado em cada bundle separadamente (cada um
  * com seu próprio `useDiceBox`, igual `IniciativaPanel`/`CombatenteResumo` já são compartilhados).
  */
-export default function ArmasCombate({ ficha, registrarLog, registrarRoll, diceBoxId, podeForcar, resolverRemoto }: Props) {
+export default function ArmasCombate({ ficha, registrarLog, registrarRoll, diceBoxId, podeForcar, resolverRemoto, souMestre }: Props) {
   const { ready, rolando, modo2D, rolar, reproduzir } = useDiceBox(diceBoxId, true, 45, resolverRemoto, podeForcar);
   // "crít." é flag de "próxima rolagem" por arma, mesmo padrão de `ArmasSection.tsx` — desarma
   // sozinho depois de usado.
   const [critico, setCritico] = useState<Record<string, boolean>>({});
   const [resultado, setResultado] = useState<{ armaId: string; texto: string; erro: boolean } | null>(null);
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = souMestre && privado ? 'privada' : 'publica';
 
   if (ficha.armas.length === 0) return null;
 
@@ -49,7 +55,7 @@ export default function ArmasCombate({ ficha, registrarLog, registrarRoll, diceB
     setCritico((prev) => ({ ...prev, [armaId]: false }));
 
     const finalizar = (valoresDados: number[], termos: RollTermo[]) => {
-      const r = rolarDanoArmaFicha(ficha, arma, termos, valoresDados, ehCritico, registrarLog, registrarRoll);
+      const r = rolarDanoArmaFicha(ficha, arma, termos, valoresDados, ehCritico, registrarLog, registrarRoll, visibilidade);
       setResultado({ armaId, texto: r.texto, erro: r.erro });
     };
 
@@ -81,6 +87,15 @@ export default function ArmasCombate({ ficha, registrarLog, registrarRoll, diceB
   return (
     <div style={{ marginBottom: '0.4rem' }}>
       <span className="combate-rotulo">armas</span>
+      {souMestre && (
+        <label
+          title="dano rolado aqui nasce privado por padrão — desmarque pra rolar público"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: 10, cursor: 'pointer', color: 'var(--ink-faint)', marginLeft: '0.4rem' }}
+        >
+          <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+          privado
+        </label>
+      )}
       <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {ficha.armas.map((a) => (
           <span key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>

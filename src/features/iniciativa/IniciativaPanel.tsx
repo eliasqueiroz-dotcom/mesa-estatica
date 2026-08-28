@@ -338,6 +338,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                           registrarRoll={registrarRoll}
                           diceBoxId={`dice-arma-mestre-${instanceId}-${e.id}`}
                           podeForcar={consumirForcados}
+                          souMestre
                         />
                       );
                     })()}

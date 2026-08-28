@@ -5,6 +5,7 @@ import { useStore } from '../state/store';
 import { executarComRetentativa, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 
 const PREFIXO_LOG = 'log:';
+const PREFIXO_LOG_VISIBILIDADE = 'log-visibilidade:';
 const PREFIXO_ROLL_INSERT = 'roll-insert:';
 const PREFIXO_ROLL_VISIBILIDADE = 'roll-visibilidade:';
 const CHAVE_LOG_CLEAR = 'log-clear';
@@ -125,10 +126,18 @@ export function iniciarSyncLogRolls(): () => void {
         // sempre-verdadeira no PostgREST).
         executarComRetentativa('log-rolls-sync', CHAVE_LOG_CLEAR, () => cliente.from('log_publico').delete().not('id', 'is', null));
       } else {
-        const idsAnteriores = new Set(logAnterior.map((e) => e.id));
+        const anterioresPorId = new Map(logAnterior.map((e) => [e.id, e]));
         for (const entrada of state.log) {
-          if (!idsAnteriores.has(entrada.id)) {
+          const anterior = anterioresPorId.get(entrada.id);
+          if (!anterior) {
             executarComRetentativa('log-rolls-sync', `${PREFIXO_LOG}${entrada.id}`, () => cliente.from('log_publico').insert(paraLinhaLog(entrada)));
+          } else if ((anterior.visibilidade ?? 'publica') !== (entrada.visibilidade ?? 'publica')) {
+            executarComRetentativa('log-rolls-sync', `${PREFIXO_LOG_VISIBILIDADE}${entrada.id}`, () =>
+              cliente
+                .from('log_publico')
+                .update({ visibilidade: useStore.getState().log.find((e) => e.id === entrada.id)?.visibilidade ?? 'publica' })
+                .eq('id', entrada.id),
+            );
           }
         }
       }
@@ -165,6 +174,16 @@ export function iniciarSyncLogRolls(): () => void {
       const entrada = useStore.getState().log.find((e) => e.id === id);
       if (entrada) executarComRetentativa('log-rolls-sync', chave, () => cliente.from('log_publico').insert(paraLinhaLog(entrada)));
       else resolverPendencia('log-rolls-sync', chave);
+    } else if (chave.startsWith(PREFIXO_LOG_VISIBILIDADE)) {
+      const id = chave.slice(PREFIXO_LOG_VISIBILIDADE.length);
+      const entrada = useStore.getState().log.find((e) => e.id === id);
+      if (entrada) {
+        executarComRetentativa('log-rolls-sync', chave, () =>
+          cliente.from('log_publico').update({ visibilidade: entrada.visibilidade ?? 'publica' }).eq('id', id),
+        );
+      } else {
+        resolverPendencia('log-rolls-sync', chave);
+      }
     } else if (chave.startsWith(PREFIXO_ROLL_INSERT)) {
       const id = chave.slice(PREFIXO_ROLL_INSERT.length);
       const roll = useStore.getState().rollsLog.find((r) => r.id === id);

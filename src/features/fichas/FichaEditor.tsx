@@ -14,7 +14,7 @@ import ReguladoresSection from './sections/ReguladoresSection';
 import TraumasSection from './sections/TraumasSection';
 import VinculosSection from './sections/VinculosSection';
 
-export default function FichaEditor({ ficha }: { ficha: Ficha }) {
+export default function FichaEditor({ ficha, souMestre }: { ficha: Ficha; souMestre?: boolean }) {
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const basePV = useStore((s) => s.config.basePV);
   const onChange = (patch: Partial<Ficha>) => atualizarFicha(ficha.id, patch);
@@ -39,11 +39,11 @@ export default function FichaEditor({ ficha }: { ficha: Ficha }) {
       <IdentidadeSection ficha={ficha} onChange={onChange} />
       <VinculosSection ficha={ficha} onChange={onChange} />
       <AtributosDerivadosSection ficha={ficha} onChange={onChange} />
-      <PericiasSection ficha={ficha} onChange={onChange} />
-      <TraumasSection ficha={ficha} onChange={onChange} />
+      <PericiasSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
+      <TraumasSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
       <EquipamentoSection ficha={ficha} onChange={onChange} />
       <InvestigacaoSection ficha={ficha} onChange={onChange} />
-      <ArmasSection ficha={ficha} onChange={onChange} />
+      <ArmasSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
       <ReguladoresSection ficha={ficha} onChange={onChange} />
       <DinheiroSection ficha={ficha} onChange={onChange} />
       <AnotacoesSection ficha={ficha} onChange={onChange} />

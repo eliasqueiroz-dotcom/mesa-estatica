@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
@@ -39,7 +39,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
   const [fichaId, setFichaId] = useState('');
   const [npcId, setNpcId] = useState('');
   const [bonus, setBonus] = useState(0);
-  const [privado, setPrivado] = useState(false);
+  const [privado, setPrivado] = useState(true);
   const [termos, setTermos] = useState<Termo[]>([termoVazio()]);
   const [grupos, setGrupos] = useState<RollGroupResult[] | null>(null);
   const [rolando, setRolando] = useState(false);
@@ -47,10 +47,6 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
   const podeRolar = ready && !rolando;
-
-  useEffect(() => {
-    setPrivado(modo === 'npc');
-  }, [modo]);
 
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
@@ -113,7 +109,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           formula: notacaoTexto,
           total,
           bruto: total,
-          visibilidade: privado ? 'privada' : 'publica',
+          visibilidade,
         });
       }
     }, undefined, personagemId, 'qualquer');
@@ -220,16 +216,14 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
         <button disabled={!podeRolar || rolando} onClick={rolarCombinado}>
           rolar {notacaoTexto}
         </button>
-        {modo === 'npc' && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
-            <input
-              type="checkbox"
-              checked={privado}
-              onChange={(e) => setPrivado(e.target.checked)}
-            />
-            privado
-          </label>
-        )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
+          <input
+            type="checkbox"
+            checked={privado}
+            onChange={(e) => setPrivado(e.target.checked)}
+          />
+          privado
+        </label>
       </div>
 
       {grupos && (

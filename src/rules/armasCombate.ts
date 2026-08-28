@@ -11,12 +11,14 @@ type RegistrarRoll = (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
  * `usarAcaoNpc` em `npcAcoes.ts`: recebe os dados JÁ ROLADOS (quem chama decide se foi
  * `rolar()`/`reproduzir()` do `useDiceBox`) e cuida do resto (cálculo, log, registro).
  *
- * Dano de PC sempre foi público (`ArmasSection.tsx` já usava `visibilidade: 'publica'`) —
- * diferente do padrão privado de ação de NPC.
+ * `visibilidade` vem de quem chama: `ArmasCombate.tsx` calcula com base no `souMestre` que
+ * recebeu — jogador rolando a própria arma continua sempre público (comportamento inalterado);
+ * mestre rolando por um PC nasce privado por padrão, com checkbox pra tornar público.
  *
  * SEMPRE publica em `rolagemAoVivoStore` (mestre incluído — decisão deliberada desta feature,
  * ver comentário em `rolagemAoVivoStore.ts`): quem estiver conectado, jogador ou mestre, vê o
- * dado caindo no próprio header, não só quem está assistindo a tela do mestre por Discord.
+ * dado caindo no próprio header, não só quem está assistindo a tela do mestre por Discord. Isso
+ * é independente da visibilidade do log/rollsLog — a animação do dado não expõe o resultado.
  */
 export function rolarDanoArmaFicha(
   ficha: Ficha,
@@ -26,19 +28,20 @@ export function rolarDanoArmaFicha(
   critico: boolean,
   registrarLog: RegistrarLog,
   registrarRoll: RegistrarRoll,
+  visibilidade: 'publica' | 'privada',
 ): ResultadoDanoArma {
   const resultado = resolverDanoArma(arma, valoresDados, ficha.atributos.vigor, critico);
   const nomePersonagem = ficha.nome || 'Personagem';
   const nomeArma = arma.nome || 'arma';
 
-  registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id);
+  registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id, visibilidade);
   registrarRoll({
     origem: nomePersonagem,
     personagemId: ficha.id,
     formula: arma.dano,
     total: resultado.total,
     bruto: resultado.bruto,
-    visibilidade: 'publica',
+    visibilidade,
   });
 
   if (!resultado.erro) {

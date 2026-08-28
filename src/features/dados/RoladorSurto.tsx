@@ -28,6 +28,8 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
   const [rolando, setRolando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoSurto | null>(null);
   const [escolhido, setEscolhido] = useState<'A' | 'B' | null>(null);
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   // `surtoPendente` mora na própria ficha (sincroniza por `characters_privado`, mestre+dono) —
@@ -67,6 +69,7 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
           'surto',
           `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
           ficha.id,
+          visibilidade,
         );
       } else {
         atualizarFicha(ficha.id, {
@@ -109,9 +112,15 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
         </div>
       </div>
 
-      <button className="perigo" style={{ marginTop: '0.75rem' }} disabled={!ready || !ficha || rolando} onClick={rolarSurto}>
-        rolar surto (2d20)
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
+        <button className="perigo" disabled={!ready || !ficha || rolando} onClick={rolarSurto}>
+          rolar surto (2d20)
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
+          <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+          privado
+        </label>
+      </div>
 
       {resultado && resultado.mesmoNumero && (
         <div className="alerta-banner mono" style={{ marginTop: '0.75rem' }}>

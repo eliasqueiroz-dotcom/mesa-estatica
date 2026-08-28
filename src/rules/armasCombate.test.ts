@@ -16,7 +16,7 @@ describe('rolarDanoArmaFicha', () => {
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    rolarDanoArmaFicha(ficha, arma('1d6 + Vigor'), [{ sides: 6, qty: 1 }], [4], false, registrarLog, registrarRoll);
+    rolarDanoArmaFicha(ficha, arma('1d6 + Vigor'), [{ sides: 6, qty: 1 }], [4], false, registrarLog, registrarRoll, 'publica');
 
     expect(registrarRoll).toHaveBeenCalledTimes(1);
     expect(registrarRoll.mock.calls[0][0]).toMatchObject({
@@ -26,7 +26,7 @@ describe('rolarDanoArmaFicha', () => {
       bruto: 4,
       visibilidade: 'publica',
     });
-    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Ana · faca ·'), ficha.id);
+    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Ana · faca ·'), ficha.id, 'publica');
   });
 
   it('publica em rolagemAoVivoStore — mestre e jogador, sem exceção (decisão desta feature)', () => {
@@ -34,7 +34,7 @@ describe('rolarDanoArmaFicha', () => {
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    rolarDanoArmaFicha(ficha, arma('1d6'), [{ sides: 6, qty: 1 }], [5], false, registrarLog, registrarRoll);
+    rolarDanoArmaFicha(ficha, arma('1d6'), [{ sides: 6, qty: 1 }], [5], false, registrarLog, registrarRoll, 'publica');
 
     const atual = useRolagemAoVivoStore.getState().atual;
     expect(atual).not.toBeNull();
@@ -43,7 +43,7 @@ describe('rolarDanoArmaFicha', () => {
 
   it('crítico: publica os valores fornecidos (já o máximo do dado, decidido por quem chama)', () => {
     const ficha = criarFichaVazia();
-    rolarDanoArmaFicha(ficha, arma('1d6'), [{ sides: 6, qty: 1 }], [6], true, vi.fn(), vi.fn());
+    rolarDanoArmaFicha(ficha, arma('1d6'), [{ sides: 6, qty: 1 }], [6], true, vi.fn(), vi.fn(), 'publica');
 
     expect(useRolagemAoVivoStore.getState().atual?.valores).toEqual([6]);
   });
@@ -53,7 +53,7 @@ describe('rolarDanoArmaFicha', () => {
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    const resultado = rolarDanoArmaFicha(ficha, arma('especial, ver nota'), [], [], false, registrarLog, registrarRoll);
+    const resultado = rolarDanoArmaFicha(ficha, arma('especial, ver nota'), [], [], false, registrarLog, registrarRoll, 'publica');
 
     expect(resultado.erro).toBe(true);
     expect(registrarRoll).toHaveBeenCalledTimes(1); // ainda registra no histórico, como ArmasSection.tsx já fazia

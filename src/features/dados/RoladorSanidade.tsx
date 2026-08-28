@@ -48,6 +48,8 @@ interface RoladorSanidadeProps {
 export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) {
   const fichas = useStore((s) => s.fichas);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
 
   const [fichaId, setFichaId] = useState('');
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
@@ -55,6 +57,8 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
   const [resultado, setResultado] = useState<{ d20: number; perdaRolada: number; aplicado: { sucesso: boolean; perda: number } | null } | null>(
     null,
   );
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const gatilho = PERDA_SANIDADE.find((g) => g.id === gatilhoId)!;
@@ -78,6 +82,20 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
     if (!ficha || !resultado || resultado.aplicado) return;
     const perda = calcularPerdaSanidade(resultado.perdaRolada, sucesso);
     setResultado({ ...resultado, aplicado: { sucesso, perda } });
+    registrarLog(
+      'sanidade',
+      `${ficha.nome || 'Personagem'} · rolagem de Sanidade · gatilho "${gatilho.nome}" → d20=${resultado.d20}, ${gatilho.dado}=${resultado.perdaRolada} · ${sucesso ? 'sucesso' : 'falha'}, perde ${perda}`,
+      ficha.id,
+      visibilidade,
+    );
+    registrarRoll({
+      origem: ficha.nome || 'Personagem',
+      personagemId: ficha.id,
+      formula: `d20 + ${gatilho.dado}`,
+      total: resultado.d20,
+      bruto: resultado.d20,
+      visibilidade,
+    });
     ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
   };
 
@@ -109,9 +127,15 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
         </div>
       </div>
 
-      <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || !ficha || rolando} onClick={rolarSanidade}>
-        rolar Vontade + {gatilho.dado}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
+        <button className="acento" disabled={!ready || !ficha || rolando} onClick={rolarSanidade}>
+          rolar Vontade + {gatilho.dado}
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
+          <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+          privado
+        </label>
+      </div>
 
       {resultado && !resultado.aplicado && (
         <div className="alerta-banner mono" style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

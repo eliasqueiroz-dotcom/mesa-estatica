@@ -197,9 +197,14 @@ interface Acoes {
 
   registrarLog: (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
   limparLog: () => void;
+  /** Alterna a visibilidade de uma entrada de `log` já existente, nos dois sentidos — vale
+   *  pra qualquer `tipo`, inclusive as que nasceram públicas (sem `visibilidade` setada). */
+  definirVisibilidadeLog: (id: string, visibilidade: 'publica' | 'privada') => void;
 
   registrarRoll: (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
-  revelarRoll: (id: string) => void;
+  /** Alterna a visibilidade de um roll já existente, nos dois sentidos (substitui o antigo
+   *  `revelarRoll`, que só ia privada→pública). */
+  definirVisibilidadeRoll: (id: string, visibilidade: 'publica' | 'privada') => void;
 
   atualizarSessaoPublica: (patch: Partial<SessaoPublica>) => void;
   atualizarSessaoPrivada: (patch: Partial<SessaoPrivada>) => void;
@@ -640,9 +645,13 @@ export const useStore = create<Store>()(
         const delta = valor - ficha.pvAtual;
         if (delta === 0) return;
         set((s) => ({ fichas: s.fichas.map((f) => (f.id === id ? { ...f, pvAtual: valor } : f)) }));
+        // Só a variação, nunca o total (atual/máximo) — outro jogador vendo o log não pode saber
+        // quanto de PV alguém tem, só que perdeu/ganhou algo. O total continua visível pra quem
+        // já tem acesso a ele por outro caminho: o próprio dono da ficha (Atributos) e o mestre
+        // (Status do Grupo/aba Personagens).
         get().registrarLog(
           delta > 0 ? 'cura' : 'dano',
-          `${ficha.nome || 'Personagem'}: PV ${delta > 0 ? '+' : ''}${delta} (${ficha.pvAtual} → ${valor})`,
+          `${ficha.nome || 'Personagem'}: PV ${delta > 0 ? '+' : ''}${delta}`,
           id,
         );
       },
@@ -716,9 +725,10 @@ export const useStore = create<Store>()(
             fichas: s.fichas.map((f) => (f.id === id ? { ...f, sanidadeAtual: valor } : f)),
           }));
         }
+        // Mesmo motivo do PV acima — só a variação, nunca o total.
         get().registrarLog(
           'sanidade',
-          `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta} (${anterior} → ${valor})`,
+          `${ficha.nome || 'Personagem'}: Sanidade ${delta > 0 ? '+' : ''}${delta}`,
           id,
         );
         if (logSurtoImediato) get().registrarLog('surto', logSurtoImediato, id);
@@ -1319,6 +1329,10 @@ export const useStore = create<Store>()(
             estatisticas: { ...s.sessaoPrivada.estatisticas, rolagens: 0 },
           },
         })),
+      definirVisibilidadeLog: (id, visibilidade) =>
+        set((s) => ({
+          log: s.log.map((e) => (e.id === id ? { ...e, visibilidade } : e)),
+        })),
 
       registrarRoll: (entrada) => {
         const roll: EntradaRoll = {
@@ -1328,9 +1342,9 @@ export const useStore = create<Store>()(
         };
         set((s) => ({ rollsLog: [roll, ...(s.rollsLog ?? [])] }));
       },
-      revelarRoll: (id) =>
+      definirVisibilidadeRoll: (id, visibilidade) =>
         set((s) => ({
-          rollsLog: (s.rollsLog ?? []).map((r) => (r.id === id ? { ...r, visibilidade: 'publica' } : r)),
+          rollsLog: (s.rollsLog ?? []).map((r) => (r.id === id ? { ...r, visibilidade } : r)),
         })),
 
       atualizarSessaoPublica: (patch) => set((s) => ({ sessaoPublica: { ...s.sessaoPublica, ...patch } })),

@@ -32,7 +32,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
   const [npcId, setNpcId] = useState('');
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [bonus, setBonus] = useState(0);
-  const [privado, setPrivado] = useState(false);
+  const [privado, setPrivado] = useState(true);
   const [resultadoRolagem, setResultadoRolagem] = useState<{ d20: number; modificador: number; total: number } | null>(null);
   const [rolando, setRolando] = useState(false);
 
@@ -42,7 +42,6 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
 
   useEffect(() => {
-    setPrivado(modo === 'npc');
     setResultadoRolagem(null);
   }, [modo]);
 
@@ -210,10 +209,6 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
                   </option>
                 ))}
               </select>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
-                privado
-              </label>
             </div>
           </div>
           <div>
@@ -251,6 +246,10 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         <button className="acento" disabled={!podeRolar} onClick={rolarTeste}>
           rolar d20
         </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
+          <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+          privado
+        </label>
       </div>
 
       {resultadoRolagem && (

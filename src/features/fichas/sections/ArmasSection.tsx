@@ -8,11 +8,15 @@ import { useStore } from '../../../state/store';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
-export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
+export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
   const basePV = useStore((s) => s.config.basePV);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
   const [arsenalSelect, setArsenalSelect] = useState('');
+  // Privado por padrão só faz sentido pro mestre — o jogador rolando a própria arma continua
+  // sempre público, sem opção (comportamento inalterado). Ver `souMestre` em `tipos.ts`.
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = souMestre && privado ? 'privada' : 'publica';
   const [protecaoSelect, setProtecaoSelect] = useState('');
   /** "margem 10+ (ou 20 natural)" no ataque — 100% manual (a rolagem de ataque não compara mais
    *  contra a DT da cena, então não há margem pra pré-marcar sozinho): o mestre marca à mão,
@@ -40,8 +44,8 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
     const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
     const total = d20 + modificador;
     const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-    registrarLog('teste', `${nomePersonagem} · ${nomeArma} · ataque → 1d20: ${d20}${modStr} = ${total}`, ficha.id, 'publica');
-    registrarRoll({ origem: nomePersonagem, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade: 'publica' });
+    registrarLog('teste', `${nomePersonagem} · ${nomeArma} · ataque → 1d20: ${d20}${modStr} = ${total}`, ficha.id, visibilidade);
+    registrarRoll({ origem: nomePersonagem, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
     setResultadosAtaque((prev) => ({ ...prev, [arma.id]: `d20=${d20}${modStr}=${total}` }));
   };
 
@@ -57,14 +61,14 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
 
     const nomeArma = arma.nome || 'arma';
     const nomePersonagem = ficha.nome || 'Personagem';
-    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id);
+    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id, visibilidade);
     registrarRoll({
       origem: nomePersonagem,
       personagemId: ficha.id,
       formula: arma.dano,
       total: resultado.total,
       bruto: resultado.bruto,
-      visibilidade: 'publica',
+      visibilidade,
     });
     setResultados((prev) => ({ ...prev, [arma.id]: { texto: resultado.texto, erro: resultado.erro } }));
     // "crít." é flag de "próxima rolagem" (comentário acima) — desarma sozinho depois de
@@ -107,7 +111,20 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
 
   return (
     <section className="secao">
-      <h3 className="label">Armas e Proteção</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <h3 className="label" style={{ margin: 0 }}>
+          Armas e Proteção
+        </h3>
+        {souMestre && (
+          <label
+            title="ataque e dano rolados aqui nascem privados por padrão — desmarque pra rolar público"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '11px', cursor: 'pointer' }}
+          >
+            <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+            privado
+          </label>
+        )}
+      </div>
       {ficha.armas.length > 0 && (
         <table className="armas-tabela">
           <thead>

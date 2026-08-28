@@ -26,7 +26,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const [quem, setQuem] = useState<'pc' | 'npc'>('pc');
   const [npcId, setNpcId] = useState('');
   const [bonus, setBonus] = useState(0);
-  const [privado, setPrivado] = useState(false);
+  const [privado, setPrivado] = useState(true);
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
 
@@ -34,10 +34,6 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const npc = npcs.find((n) => n.id === npcId) ?? null;
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
-
-  useEffect(() => {
-    setPrivado(quem === 'npc');
-  }, [quem]);
 
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
@@ -285,12 +281,10 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
                 ? (ficha ? ficha.nome : 'sem personagem ativo')
                 : (npc ? npc.nome : 'selecione um NPC')}
             </span>
-            {quem === 'npc' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '11px' }}>
-                <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
-                privado
-              </label>
-            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '11px' }}>
+              <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+              privado
+            </label>
           </div>
 
           <button

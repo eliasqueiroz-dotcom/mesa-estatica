@@ -34,6 +34,8 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
   const [rolando, setRolando] = useState(false);
   const [teste, setTeste] = useState<ResultadoTeste | null>(null);
   const [resolvido, setResolvido] = useState(false);
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
   const ficha = fichas.find((f) => f.id === fichaId) ?? null;
   const traumasAtivos = ficha?.traumas.filter((t) => !t.virouCicatriz) ?? [];
@@ -66,6 +68,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
             r.modificador >= 0 ? '+' : ''
           }${r.modificador} = ${r.total} · segura`,
           ficha.id,
+          visibilidade,
         );
       } else {
         registrarLog(
@@ -74,6 +77,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
             r.modificador >= 0 ? '+' : ''
           }${r.modificador} = ${r.total} · falha — escolha a resposta`,
           ficha.id,
+          visibilidade,
         );
       }
     }, 'ruido', ficha.id);
@@ -89,7 +93,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
       [{ sides: 4, qty: 1 }],
       (grupos) => {
         const perda = grupos[0].value;
-        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id);
+        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id, visibilidade);
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
       },
       'ruido',
@@ -100,7 +104,7 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
   const interpretar = () => {
     if (!ficha || !trauma) return;
     ajustarDeterminacao(ficha.id, ficha.determinacao + 1);
-    registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · interpretou a Resposta, +1 Determinação`, ficha.id);
+    registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · interpretou a Resposta, +1 Determinação`, ficha.id, visibilidade);
     setResolvido(true);
   };
 
@@ -151,9 +155,15 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
       </div>
       {ficha && traumasAtivos.length === 0 && <p className="vazio">nenhum trauma ativo (não-cicatriz) nesta ficha.</p>}
 
-      <button className="acento" style={{ marginTop: '0.75rem' }} disabled={!ready || !trauma || rolando} onClick={rolarGatilho}>
-        rolar Vontade vs DT{DT_GATILHO}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
+        <button className="acento" disabled={!ready || !trauma || rolando} onClick={rolarGatilho}>
+          rolar Vontade vs DT{DT_GATILHO}
+        </button>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '12px' }}>
+          <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+          privado
+        </label>
+      </div>
 
       {teste && (
         <div

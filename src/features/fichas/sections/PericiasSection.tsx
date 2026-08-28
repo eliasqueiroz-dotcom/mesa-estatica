@@ -14,11 +14,13 @@ const GRAUS: { valor: GrauPericia; label: string }[] = [
 /** Cada linha tem um botão de rolagem direta (d20 + atributo + grau, com Ferido aplicado) —
  *  ficha.md já documentava isso, nunca tinha sido implementado. De propósito, sem sucesso/falha
  *  contra a DT da cena — só o total, igual RoladorTesteJogador.tsx; o mestre narra o resultado. */
-export default function PericiasSection({ ficha, onChange }: SecaoFichaProps) {
+export default function PericiasSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
   const basePV = useStore((s) => s.config.basePV);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
   const [resultados, setResultados] = useState<Record<string, string>>({});
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = souMestre && privado ? 'privada' : 'publica';
 
   const definirGrau = (periciaId: string, grau: GrauPericia) => {
     onChange({ pericias: { ...ficha.pericias, [periciaId]: grau } });
@@ -36,16 +38,25 @@ export default function PericiasSection({ ficha, onChange }: SecaoFichaProps) {
     const modificador = ficha.atributos[p.atributo] + grauPericia + penalidadeFerido;
     const total = d20 + modificador;
     const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-    registrarLog('teste', `${nome} · teste de perícia ${p.nome}(${atributoNome}) → 1d20: ${d20}${modStr} = ${total}`, ficha.id, 'publica');
-    registrarRoll({ origem: nome, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade: 'publica' });
+    registrarLog('teste', `${nome} · teste de perícia ${p.nome}(${atributoNome}) → 1d20: ${d20}${modStr} = ${total}`, ficha.id, visibilidade);
+    registrarRoll({ origem: nome, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
     setResultados((prev) => ({ ...prev, [p.id]: `d20=${d20}${modStr}=${total}` }));
   };
 
   return (
     <section className="secao">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
         <h3 className="label" style={{ margin: 0 }}>Perícias</h3>
         <span className="vazio" style={{ fontSize: 10 }}>— · T=treinado · V=veterano</span>
+        {souMestre && (
+          <label
+            title="teste de perícia rolado aqui nasce privado por padrão — desmarque pra rolar público"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '11px', cursor: 'pointer' }}
+          >
+            <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+            privado
+          </label>
+        )}
       </div>
       <div className="pericias-grid">
         {ATRIBUTOS.map((atributo) => {

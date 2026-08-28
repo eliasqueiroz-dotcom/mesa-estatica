@@ -245,6 +245,7 @@ export function useIniciativa() {
       'teste',
       `${nomeSocorrista} tenta estabilizar ${alvoNome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${estabilizou ? 'estabilizou' : 'falhou'}`,
       socorrista.id,
+      'privada',
     );
     registrarRoll({
       origem: nomeSocorrista,
@@ -252,7 +253,7 @@ export function useIniciativa() {
       formula: `d20${teste.modificador >= 0 ? '+' : ''}${teste.modificador}`,
       total: teste.total,
       bruto: d20,
-      visibilidade: 'publica',
+      visibilidade: 'privada',
     });
     if (estabilizou) alternarCondicaoCombate(alvoId, 'estavel');
   };
@@ -285,6 +286,7 @@ export function useIniciativa() {
       'teste',
       `${nomeSocorrista} tenta primeiros socorros em ${alvo.nome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${resultadoTexto}`,
       socorrista.id,
+      'privada',
     );
     registrarRoll({
       origem: nomeSocorrista,
@@ -292,7 +294,7 @@ export function useIniciativa() {
       formula: `d20${teste.modificador >= 0 ? '+' : ''}${teste.modificador}`,
       total: teste.total,
       bruto: d20,
-      visibilidade: 'publica',
+      visibilidade: 'privada',
     });
     atualizarSessaoPrivada({ primeirosSocorrosCena: registrarUsoPrimeirosSocorros(primeirosSocorrosCena, alvoId, contadorCena) });
   };

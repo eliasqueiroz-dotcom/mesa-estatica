@@ -310,6 +310,55 @@ describe('undefined em arrays aninhados', () => {
   });
 });
 
+describe('definirVisibilidadeRoll', () => {
+  it('alterna nos dois sentidos (privada -> pública -> privada)', () => {
+    useStore.getState().registrarRoll({
+      origem: 'teste', personagemId: null, formula: '1d20', total: 10, bruto: 10, visibilidade: 'privada',
+    });
+    const id = useStore.getState().rollsLog[0].id;
+
+    useStore.getState().definirVisibilidadeRoll(id, 'publica');
+    expect(useStore.getState().rollsLog[0].visibilidade).toBe('publica');
+
+    useStore.getState().definirVisibilidadeRoll(id, 'privada');
+    expect(useStore.getState().rollsLog[0].visibilidade).toBe('privada');
+  });
+
+  it('não afeta outras entradas de rollsLog', () => {
+    useStore.getState().registrarRoll({ origem: 'a', personagemId: null, formula: '1d20', total: 1, bruto: 1, visibilidade: 'privada' });
+    useStore.getState().registrarRoll({ origem: 'b', personagemId: null, formula: '1d20', total: 2, bruto: 2, visibilidade: 'privada' });
+    const [rollB, rollA] = useStore.getState().rollsLog; // prepend — mais novo primeiro
+
+    useStore.getState().definirVisibilidadeRoll(rollB.id, 'publica');
+
+    expect(useStore.getState().rollsLog.find((r) => r.id === rollB.id)?.visibilidade).toBe('publica');
+    expect(useStore.getState().rollsLog.find((r) => r.id === rollA.id)?.visibilidade).toBe('privada');
+  });
+});
+
+describe('definirVisibilidadeLog', () => {
+  it('marca como privada uma entrada que nasceu pública (sem campo visibilidade setado)', () => {
+    useStore.getState().registrarLog('teste', 'texto qualquer', null);
+    const entrada = useStore.getState().log[0];
+    expect(entrada.visibilidade).toBeUndefined(); // ausência = pública, hoje
+
+    useStore.getState().definirVisibilidadeLog(entrada.id, 'privada');
+
+    expect(useStore.getState().log[0].visibilidade).toBe('privada');
+  });
+
+  it('alterna nos dois sentidos', () => {
+    useStore.getState().registrarLog('teste', 'texto qualquer', null, 'privada');
+    const id = useStore.getState().log[0].id;
+
+    useStore.getState().definirVisibilidadeLog(id, 'publica');
+    expect(useStore.getState().log[0].visibilidade).toBe('publica');
+
+    useStore.getState().definirVisibilidadeLog(id, 'privada');
+    expect(useStore.getState().log[0].visibilidade).toBe('privada');
+  });
+});
+
 // ===== definirDuracaoCondicao (UI genérica de duração no rastreador/token) =====
 describe('definirDuracaoCondicao', () => {
   it('define a duração de uma condição pra um participante', () => {

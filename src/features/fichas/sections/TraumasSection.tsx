@@ -7,9 +7,11 @@ import type { SecaoFichaProps } from '../tipos';
 const MAX_TRAUMAS = 3;
 const DURACAO_RESULTADO_MS = 4000;
 
-export default function TraumasSection({ ficha, onChange }: SecaoFichaProps) {
+export default function TraumasSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
   const registrarLog = useStore((s) => s.registrarLog);
   const [escolhaTabela, setEscolhaTabela] = useState('');
+  const [privado, setPrivado] = useState(true);
+  const visibilidade = souMestre && privado ? 'privada' : 'publica';
   /** Resultado do último sorteio, mostrado por alguns segundos — some sozinho (mesmo padrão de
    *  "copiado" em PistasTab.tsx/CombatOverlay.tsx), não fica preso na tela feito os resultados
    *  de arma em ArmasSection.tsx (lá faz sentido persistir, comparando ataque após ataque; aqui
@@ -54,7 +56,7 @@ export default function TraumasSection({ ficha, onChange }: SecaoFichaProps) {
     const d20 = Math.floor(Math.random() * 20) + 1;
     const entrada = TABELA_TRAUMAS.find((t) => t.d20 === d20)!;
     adicionar(entrada);
-    registrarLog('trauma', `${ficha.nome || 'Personagem'} · sorteou trauma na tabela: d20=${d20} — ${entrada.nome}`, ficha.id);
+    registrarLog('trauma', `${ficha.nome || 'Personagem'} · sorteou trauma na tabela: d20=${d20} — ${entrada.nome}`, ficha.id, visibilidade);
     setUltimoSorteio({ d20, nome: entrada.nome });
     setTimeout(() => setUltimoSorteio(null), DURACAO_RESULTADO_MS);
   };
@@ -134,6 +136,15 @@ export default function TraumasSection({ ficha, onChange }: SecaoFichaProps) {
           <button className="acento" onClick={sortear}>
             sortear na tabela (d20)
           </button>
+          {souMestre && (
+            <label
+              title="sorteio nasce privado por padrão — desmarque pra logar público"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '11px', cursor: 'pointer' }}
+            >
+              <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+              privado
+            </label>
+          )}
         </div>
       )}
       {/* fora do bloco acima de propósito — se o sorteio preencher a última vaga, o bloco
