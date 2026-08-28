@@ -254,6 +254,64 @@ describe('resolverEscolhaSurtoPendente', () => {
   });
 });
 
+describe('removerSurtoAtivo', () => {
+  function adicionarFicha(sanidadeAtual: number, vontade: number = 5): string {
+    const ficha = criarFichaVazia();
+    ficha.sanidadeAtual = sanidadeAtual;
+    ficha.atributos.vontade = vontade;
+    useStore.setState({ fichas: [ficha] });
+    return ficha.id;
+  }
+
+  it('remove uma entrada resolvida específica, mantendo as outras', () => {
+    const id = adicionarFicha(10);
+    useStore.setState((s) => ({
+      fichas: s.fichas.map((f) =>
+        f.id === id
+          ? {
+              ...f,
+              surtosAtivos: [
+                { id: 'surto-1', expiraEm: 1, escolha: 'primeiro', modo: 'cena' as const },
+                { id: 'surto-2', expiraEm: 1, escolha: 'segundo', modo: 'cena' as const },
+              ],
+            }
+          : f,
+      ),
+    }));
+    useStore.getState().removerSurtoAtivo(id, 'surto-1');
+    const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(ficha.surtosAtivos.map((s) => s.id)).toEqual(['surto-2']);
+  });
+
+  it('remove uma entrada pendente e limpa surtoPendente junto', () => {
+    const id = adicionarFicha(10);
+    vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9);
+    useStore.getState().ajustarSanidadeAtual(id, 4);
+    vi.restoreAllMocks();
+    const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(ficha.surtoPendente).toBeDefined();
+    const surtoId = ficha.surtosAtivos[ficha.surtosAtivos.length - 1].id;
+
+    useStore.getState().removerSurtoAtivo(id, surtoId);
+    const depois = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(depois.surtosAtivos.find((s) => s.id === surtoId)).toBeUndefined();
+    expect(depois.surtoPendente).toBeUndefined();
+  });
+
+  it('id inexistente ou ficha inexistente: não quebra, não muda nada', () => {
+    const id = adicionarFicha(10);
+    useStore.setState((s) => ({
+      fichas: s.fichas.map((f) =>
+        f.id === id ? { ...f, surtosAtivos: [{ id: 'surto-1', expiraEm: 1, escolha: 'x', modo: 'cena' as const }] } : f,
+      ),
+    }));
+    expect(() => useStore.getState().removerSurtoAtivo(id, 'nao-existe')).not.toThrow();
+    expect(() => useStore.getState().removerSurtoAtivo('ficha-nao-existe', 'surto-1')).not.toThrow();
+    const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
+    expect(ficha.surtosAtivos.map((s) => s.id)).toEqual(['surto-1']);
+  });
+});
+
 describe('npcs.acoes undefined', () => {
   function npcSemAcoes(): string {
     useStore.getState().adicionarNpc();

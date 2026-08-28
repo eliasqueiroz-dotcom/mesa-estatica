@@ -46,6 +46,7 @@ Regras de preenchimento:
 - "vinculos" e "traumas": no máximo 3 cada.
 - "corVisual" (opcional): só se a ficha tiver uma cor definida, em hex tipo "#4fc1d4" — senão omita.
 - "kitInvestigacao": lista opcional de itens de investigação { nome, nota }.
+- texto do documento que não se encaixar em nenhum campo acima (comentário solto, nota sem seção clara, qualquer trecho sobrando) entra em "anotacoes" (concatenado ao que já tiver ali, sem se perder) — nenhum texto do documento original pode ser descartado.
 - apelido ou citação dentro de um texto: use aspas simples ('assim'), nunca aspas duplas sem escapar — aspas duplas cruas dentro de um valor quebram o JSON (veja "nome" no exemplo acima).
 - Responda só com o JSON, sem markdown, sem comentário antes ou depois.
 

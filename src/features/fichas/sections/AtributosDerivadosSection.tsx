@@ -16,7 +16,7 @@ import { useStore } from '../../../state/store';
 import BarraSegmentada from '../BarraSegmentada';
 import type { SecaoFichaProps } from '../tipos';
 
-export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFichaProps) {
+export default function AtributosDerivadosSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
@@ -26,6 +26,13 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const rodada = useStore((s) => s.sessaoPublica.rodada);
   const escolhaSurtoPendente = ficha.surtoPendente ?? null;
   const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
+  const removerSurtoAtivo = useStore((s) => s.removerSurtoAtivo);
+  // entrada de `surtosAtivos` correspondente à pendência acima — mesma busca (última com
+  // `escolha === null`) que a action `removerSurtoAtivo`/`resolverEscolhaSurtoPendente` já fazem
+  // internamente; só precisamos do id aqui pra dar pro botão "remover" do mestre.
+  const surtoPendenteId = escolhaSurtoPendente
+    ? [...(ficha.surtosAtivos ?? [])].reverse().find((s) => s.escolha === null)?.id ?? null
+    : null;
   const [alertas, setAlertas] = useState<string[]>([]);
 
   const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
@@ -135,9 +142,20 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
 
       {escolhaSurtoPendente && (
         <div style={{ marginTop: '0.6rem' }}>
-          <span className="label" style={{ fontSize: '12px' }}>
-            Surto — role duas vezes; escolha qual acontece
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            <span className="label" style={{ fontSize: '12px' }}>
+              Surto — role duas vezes; escolha qual acontece
+            </span>
+            {souMestre && surtoPendenteId && (
+              <button
+                className="icone-botao"
+                title="remover este Surto sem aplicar nenhum dos dois lados"
+                onClick={() => removerSurtoAtivo(ficha.id, surtoPendenteId)}
+              >
+                remover
+              </button>
+            )}
+          </div>
           <div className="campos-grid" style={{ marginTop: '0.4rem' }}>
             {(['A', 'B'] as const).map((lado) => {
               const entrada = lado === 'A' ? escolhaSurtoPendente.entradaA : escolhaSurtoPendente.entradaB;
@@ -171,6 +189,16 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
               title={s.escolha ? descricaoSurto(s.escolha) : undefined}
             >
               surto{s.escolha ? `: ${s.escolha}` : ' ativo'}
+              {souMestre && (
+                <button
+                  className="icone-botao"
+                  title="remover este Surto"
+                  onClick={() => removerSurtoAtivo(ficha.id, s.id)}
+                  style={{ marginLeft: '0.3rem' }}
+                >
+                  ×
+                </button>
+              )}
             </span>
           ))}
           {traumasAtivos >= 3 && <span className="badge">à beira de se perder — 3+ traumas</span>}

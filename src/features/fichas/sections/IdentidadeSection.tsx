@@ -198,18 +198,9 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
             <label htmlFor="ficha-resposta">Resposta</label>
             <textarea
               id="ficha-resposta"
-              rows={2}
+              rows={5}
               value={ficha.respostaPergunta}
               onChange={(e) => onChange({ respostaPergunta: e.target.value })}
-            />
-          </div>
-          <div className="campo-largo">
-            <label htmlFor="ficha-gancho">Gancho</label>
-            <textarea
-              id="ficha-gancho"
-              rows={3}
-              value={ficha.gancho}
-              onChange={(e) => onChange({ gancho: e.target.value })}
             />
           </div>
         </div>

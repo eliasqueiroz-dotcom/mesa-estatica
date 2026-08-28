@@ -38,7 +38,7 @@ export default function FichaEditor({ ficha, souMestre }: { ficha: Ficha; souMes
       </div>
       <IdentidadeSection ficha={ficha} onChange={onChange} />
       <VinculosSection ficha={ficha} onChange={onChange} />
-      <AtributosDerivadosSection ficha={ficha} onChange={onChange} />
+      <AtributosDerivadosSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
       <PericiasSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
       <TraumasSection ficha={ficha} onChange={onChange} souMestre={souMestre} />
       <EquipamentoSection ficha={ficha} onChange={onChange} />

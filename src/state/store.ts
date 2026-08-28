@@ -82,6 +82,10 @@ interface Acoes {
   ajustarSanidadeAtual: (id: string, novoValor: number) => AlertaSanidade;
   /** Resolve a escolha pendente de um personagem (dois d20 diferentes) com o lado que o mestre escolheu. */
   resolverEscolhaSurtoPendente: (fichaId: string, lado: 'A' | 'B') => void;
+  /** Remove um Surto específico (pendente ou já escolhido) de `surtosAtivos` — sem checagem de
+   *  "só mestre" aqui dentro (mesmo modelo do resto do store); quem restringe é a UI que chama
+   *  (`AtributosDerivadosSection.tsx`, botão só aparece com `souMestre`). */
+  removerSurtoAtivo: (fichaId: string, surtoId: string) => void;
   ajustarDeterminacao: (id: string, novoValor: number) => void;
   ajustarDinheiro: (id: string, tipo: 'real' | 'ponto', novoValor: number) => void;
   /** Câmbio entre R$/P$ (regras.md "grana e equipamento") — P$→R$ com cambista desconta 30%;
@@ -778,6 +782,31 @@ export const useStore = create<Store>()(
         get().registrarLog(
           'surto',
           `${pendente.nomeFicha} · Surto · escolhido: ${entrada.nome} — ${entrada.descricao}`,
+          fichaId,
+        );
+      },
+
+      removerSurtoAtivo: (fichaId, surtoId) => {
+        const ficha = get().fichas.find((f) => f.id === fichaId);
+        if (!ficha) return;
+        const alvo = (ficha.surtosAtivos ?? []).find((s) => s.id === surtoId);
+        if (!alvo) return;
+        set((s) => ({
+          fichas: s.fichas.map((f) =>
+            f.id === fichaId
+              ? {
+                  ...f,
+                  surtosAtivos: (f.surtosAtivos ?? []).filter((sur) => sur.id !== surtoId),
+                  // ainda pendente de escolha — some junto, senão a UI ficaria oferecendo
+                  // "escolher este" pra um Surto que não existe mais.
+                  surtoPendente: alvo.escolha === null ? undefined : f.surtoPendente,
+                }
+              : f,
+          ),
+        }));
+        get().registrarLog(
+          'surto',
+          `${ficha.nome || 'Personagem'} · Surto removido manualmente${alvo.escolha ? ` (${alvo.escolha})` : ' (ainda pendente de escolha)'}`,
           fichaId,
         );
       },
