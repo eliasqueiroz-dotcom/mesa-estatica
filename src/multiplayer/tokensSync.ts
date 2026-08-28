@@ -62,6 +62,13 @@ export function desmarcarTokenEmArrasto(id: string): void {
   tokensEmArrasto.delete(id);
 }
 
+/** Ids de token com upsert local agendado (debounce ainda não disparou) ou em voo — mesmo
+ *  papel de `pendencias` em `fichasSync.ts`. Cobre a janela que `tokensEmArrasto` deixa
+ *  passar: entre soltar o token (pointerup, que já desmarca o arrasto) e o upsert debounçado
+ *  (`ATRASO_PUSH_MS`) de fato disparar. Sem isso, um evento remoto (eco atrasado, ou outro
+ *  cliente) ou um refetch de reconexão nesse meio-tempo reverte a posição recém-solta. */
+const pendencias = new Set<string>();
+
 /**
  * Fase A (mesa-estatica-multiplayer-completo.md §11): sincroniza só a posição/existência
  * dos tokens via Supabase Realtime. Zustand continua a fonte local/otimista; o Supabase
@@ -78,13 +85,17 @@ export function iniciarSyncTokens(): () => void {
   let aplicandoRemoto = false;
   let tokensAnteriores = useStore.getState().mapa.tokens;
 
-  /** Busca inicial E refetch de reconexão (canal caiu e voltou) — substituição total, sem
-   *  merge fino: já era assim na busca de boot (sem isso, uma sessão sem localStorage — bundle
-   *  do jogador, ou o GM numa máquina limpa, ver CLAUDE.md "portabilidade" — só veria tokens a
-   *  partir da próxima mudança, nunca os que já existiam), e serve igual pra reconexão porque
-   *  posição de token não tem edição "parcial" pra perder — o Realtime não reenvia eventos
-   *  perdidos durante a queda, então sem isso um token movido enquanto este cliente estava
-   *  desconectado ficaria preso na posição antiga até reload. */
+  /** Busca inicial E refetch de reconexão (canal caiu e voltou) — merge preservando qualquer
+   *  token com `pendencias`/`tokensEmArrasto` (mesmo formato de `refetchFichas` em
+   *  `fichasSync.ts`), em vez da substituição total que havia antes. No boot, com os dois Sets
+   *  tipicamente vazios, o merge converge pro mesmo conjunto que a substituição total geraria
+   *  (sem isso, uma sessão sem localStorage — bundle do jogador, ou o GM numa máquina limpa, ver
+   *  CLAUDE.md "portabilidade" — só veria tokens a partir da próxima mudança, nunca os que já
+   *  existiam) — MAS agora também sobrevive ao caso em que uma edição local acontece nos
+   *  instantes entre o disparo desse fetch (assíncrono) e sua resolução, que antes era apagada
+   *  em silêncio. Na reconexão, o Realtime não reenvia eventos perdidos durante a queda, então
+   *  o refetch ainda precisa trazer tokens movidos por OUTRO cliente enquanto este estava
+   *  desconectado — só não pode mais pisar numa edição local ainda não confirmada. */
   const refetchTokens = () =>
     cliente
       .from('tokens')
@@ -93,7 +104,23 @@ export function iniciarSyncTokens(): () => void {
         if (error || !data) return;
         aplicandoRemoto = true;
         try {
-          useStore.setState((s) => ({ mapa: { ...s.mapa, tokens: (data as LinhaTokenSupabase[]).map(paraToken) } }));
+          const remotos = (data as LinhaTokenSupabase[]).map(paraToken);
+          const remotosPorId = new Map(remotos.map((t) => [t.id, t]));
+          useStore.setState((s) => {
+            const tokens: TokenMapa[] = [];
+            for (const local of s.mapa.tokens) {
+              if (pendencias.has(local.id) || tokensEmArrasto.has(local.id)) {
+                tokens.push(local);
+                continue;
+              }
+              const remoto = remotosPorId.get(local.id);
+              if (remoto) tokens.push(remoto);
+            }
+            for (const remoto of remotos) {
+              if (!s.mapa.tokens.some((t) => t.id === remoto.id)) tokens.push(remoto);
+            }
+            return { mapa: { ...s.mapa, tokens } };
+          });
         } finally {
           tokensAnteriores = useStore.getState().mapa.tokens;
           aplicandoRemoto = false;
@@ -102,6 +129,9 @@ export function iniciarSyncTokens(): () => void {
   void refetchTokens();
 
   const agendarUpsert = criarDebouncePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
+    // limpa ANTES de disparar a chamada de rede — a partir daqui, um evento remoto pra esse id
+    // (inclusive o eco desta própria escrita) pode ser aplicado normalmente de novo.
+    pendencias.delete(_id);
     executarComRetentativa('tokens-sync', token.id, () =>
       cliente.from('tokens').upsert(paraLinha(useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token)),
     );
@@ -115,7 +145,8 @@ export function iniciarSyncTokens(): () => void {
 
     for (const token of upserts) {
       // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
-      // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+      // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts e `pendencias` acima).
+      pendencias.add(token.id);
       marcarEmVoo('tokens-sync', token.id);
       agendarUpsert(token.id, token);
     }
@@ -149,11 +180,11 @@ export function iniciarSyncTokens(): () => void {
         const s = useStore.getState();
         if (payload.eventType === 'DELETE') {
           const idRemovido = (payload.old as { id: string }).id;
-          if (tokensEmArrasto.has(idRemovido)) return;
+          if (tokensEmArrasto.has(idRemovido) || pendencias.has(idRemovido)) return;
           useStore.setState({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== idRemovido) } });
         } else {
           const token = paraToken(payload.new as LinhaTokenSupabase);
-          if (tokensEmArrasto.has(token.id)) return;
+          if (tokensEmArrasto.has(token.id) || pendencias.has(token.id)) return;
           const existe = s.mapa.tokens.some((t) => t.id === token.id);
           const tokens = existe
             ? s.mapa.tokens.map((t) => (t.id === token.id ? token : t))

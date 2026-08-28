@@ -124,6 +124,7 @@ function criarStorageFalso() {
 // ===== refetch de reconexão =====
 function criarClienteComControle() {
   const resolvers: Array<(data: unknown) => void> = [];
+  const handlers: Array<(payload: any) => void> = [];
   let statusCb: ((status: string) => void) | undefined;
 
   const builder: any = {};
@@ -138,7 +139,10 @@ function criarClienteComControle() {
   builder.eq = () => Promise.resolve({ error: null });
 
   const channelObj: any = {};
-  channelObj.on = () => channelObj;
+  channelObj.on = (_event: string, _filter: object, handler: (payload: any) => void) => {
+    handlers.push(handler);
+    return channelObj;
+  };
   channelObj.subscribe = (cb: (status: string) => void) => {
     statusCb = cb;
     cb('SUBSCRIBED');
@@ -150,10 +154,15 @@ function criarClienteComControle() {
     channel: () => channelObj,
     removeChannel: () => {},
     resolvers,
+    handlers,
     get statusCb() {
       return statusCb;
     },
   };
+}
+
+function tokenRemoto(id: string, participanteId: string, x: number, y: number) {
+  return { id, participante_id: participanteId, tipo: 'pc' as const, x, y };
 }
 
 describe('iniciarSyncTokens — refetch de reconexão', () => {
@@ -171,6 +180,8 @@ describe('iniciarSyncTokens — refetch de reconexão', () => {
     cleanup = undefined;
     h.clienteAtual = null;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('canal cai e reconecta rebusca os tokens, mesmo sem evento Realtime durante a queda', async () => {
@@ -191,5 +202,115 @@ describe('iniciarSyncTokens — refetch de reconexão', () => {
       expect(useStore.getState().mapa.tokens.map((t) => t.id)).toEqual(['tok-1']);
     });
     expect(useStore.getState().mapa.tokens[0].x).toBe(42);
+  });
+
+  // ===== anti-eco (pendencias) — causa raiz do "rollback geral" com 2+ conectados =====
+
+  it('refetch de reconexão nunca sobrescreve uma posição local ainda pendente de push', async () => {
+    cleanup = iniciarSyncTokens();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([tokenRemoto('tok-pend', 'pc-pend', 0.1, 0.1)]);
+    await vi.waitFor(() => expect(useStore.getState().mapa.tokens.some((t) => t.id === 'tok-pend')).toBe(true));
+
+    // move localmente (coordenada normalizada 0-1, `moverTokenMapa` clampa) — upsert agendado
+    // pelo debounce (ATRASO_PUSH_MS), nunca disparado aqui
+    useStore.getState().moverTokenMapa('tok-pend', 0.55, 0.55);
+
+    // canal cai e reconecta ENQUANTO o push local ainda não confirmou no servidor
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1]([tokenRemoto('tok-pend', 'pc-pend', 0.1, 0.1)]); // servidor ainda tem a posição antiga
+
+    await vi.waitFor(() => {
+      const t = useStore.getState().mapa.tokens.find((tk) => tk.id === 'tok-pend');
+      expect(t?.x).toBe(0.55);
+      expect(t?.y).toBe(0.55);
+    });
+  });
+
+  it('refetch de reconexão aplica posição remota nova para token sem edição local pendente', async () => {
+    cleanup = iniciarSyncTokens();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([tokenRemoto('tok-livre', 'pc-livre', 1, 1)]);
+    await vi.waitFor(() => expect(useStore.getState().mapa.tokens.some((t) => t.id === 'tok-livre')).toBe(true));
+
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1]([tokenRemoto('tok-livre', 'pc-livre', 77, 88)]);
+
+    await vi.waitFor(() => {
+      const t = useStore.getState().mapa.tokens.find((tk) => tk.id === 'tok-livre');
+      expect(t?.x).toBe(77);
+      expect(t?.y).toBe(88);
+    });
+  });
+
+  it('handler de postgres_changes ignora payload remoto enquanto há upsert local pendente, fora da janela de arrasto', async () => {
+    cleanup = iniciarSyncTokens();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([tokenRemoto('tok-pg', 'pc-pg', 0.05, 0.05)]);
+    await vi.waitFor(() => expect(useStore.getState().mapa.tokens.some((t) => t.id === 'tok-pg')).toBe(true));
+
+    // solta o token (pointerup já rodou, tokensEmArrasto vazio) mas o upsert debounçado ainda
+    // não confirmou — só `pendencias` protege essa janela.
+    useStore.getState().moverTokenMapa('tok-pg', 0.6, 0.6);
+
+    const handler = mock.handlers[0];
+    expect(handler).toBeDefined();
+    handler({ eventType: 'UPDATE', new: tokenRemoto('tok-pg', 'pc-pg', 0.05, 0.05), old: {} });
+
+    const token = useStore.getState().mapa.tokens.find((t) => t.id === 'tok-pg');
+    expect(token?.x).toBe(0.6);
+    expect(token?.y).toBe(0.6);
+  });
+
+  it('refetch de reconexão preserva token recém-criado localmente e ainda não confirmado no servidor', async () => {
+    cleanup = iniciarSyncTokens();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
+    mock.resolvers[0]([]); // mapa vazio no boot
+
+    useStore.getState().adicionarTokenMapa('pc-novo', 'pc');
+    const novoId = useStore.getState().mapa.tokens[0].id;
+
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[1]([]); // servidor ainda não recebeu o insert (upsert em voo)
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().mapa.tokens.some((t) => t.id === novoId)).toBe(true);
+    });
+  });
+
+  it('pendencias é limpo quando o debounce dispara — refetch de reconexão volta a aplicar o remoto depois disso', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+    cleanup = iniciarSyncTokens();
+
+    expect(mock.resolvers.length).toBeGreaterThanOrEqual(1);
+    mock.resolvers[0]([tokenRemoto('tok-limpa', 'pc-limpa', 0.1, 0.1)]);
+    expect(useStore.getState().mapa.tokens.some((t) => t.id === 'tok-limpa')).toBe(true);
+
+    useStore.getState().moverTokenMapa('tok-limpa', 0.2, 0.2);
+
+    // avança além do ATRASO_PUSH_MS (150ms) — debounce dispara o upsert, `pendencias` é limpo
+    await vi.advanceTimersByTimeAsync(200);
+
+    mock.statusCb?.('CHANNEL_ERROR');
+    mock.statusCb?.('SUBSCRIBED');
+    expect(mock.resolvers.length).toBeGreaterThanOrEqual(2);
+    mock.resolvers[1]([tokenRemoto('tok-limpa', 'pc-limpa', 0.99, 0.99)]); // servidor confirma outro valor
+
+    const token = useStore.getState().mapa.tokens.find((t) => t.id === 'tok-limpa');
+    expect(token?.x).toBe(0.99);
   });
 });
