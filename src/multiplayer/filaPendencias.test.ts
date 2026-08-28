@@ -95,6 +95,41 @@ describe('filaPendencias', () => {
       await vi.waitFor(() => expect(executar).toHaveBeenCalledTimes(2));
       await vi.waitFor(() => expect(usePendenciasStore.getState().itens).toEqual([]));
     });
+
+    it('erro de RLS (código 42501) NUNCA entra na fila de retry — acende erroRuntime na hora', async () => {
+      const executar = vi.fn().mockResolvedValue({ error: { code: '42501', message: 'new row violates row-level security policy' } });
+      executarComRetentativa('tokens-sync', 'abc', executar);
+      await vi.waitFor(() => expect(useStatusMesa.getState().erroRuntime).not.toBeNull());
+
+      expect(usePendenciasStore.getState().itens).toEqual([]);
+      expect(useStatusMesa.getState().erroRuntime).toMatch(/sem permissão pra salvar \(tokens-sync\)/);
+    });
+
+    it('erro de RLS rejeitado como Promise (não {error}) também acende erroRuntime e não entra na fila', async () => {
+      const executar = vi.fn().mockRejectedValue({ code: '42501', message: 'negado' });
+      executarComRetentativa('fichas-sync', 'f1', executar);
+      await vi.waitFor(() => expect(useStatusMesa.getState().erroRuntime).not.toBeNull());
+
+      expect(usePendenciasStore.getState().itens).toEqual([]);
+      expect(useStatusMesa.getState().erroRuntime).toMatch(/sem permissão pra salvar \(fichas-sync\)/);
+    });
+
+    it('tentarTodasPendencias depois de um erro 42501 NÃO reexecuta — a pendência nunca foi registrada', async () => {
+      const executar = vi.fn().mockResolvedValue({ error: { code: '42501', message: 'negado' } });
+      executarComRetentativa('tokens-sync', 'abc', executar);
+      await vi.waitFor(() => expect(useStatusMesa.getState().erroRuntime).not.toBeNull());
+
+      tentarTodasPendencias();
+      expect(executar).toHaveBeenCalledTimes(1); // sem segunda chamada — nunca virou callback pendente
+    });
+
+    it('erro comum (não 42501) continua indo pra fila normalmente, sem tocar erroRuntime', async () => {
+      const executar = vi.fn().mockResolvedValue({ error: { code: '57P01', message: 'conexão caiu' } });
+      executarComRetentativa('tokens-sync', 'abc', executar);
+      await vi.waitFor(() => expect(usePendenciasStore.getState().itens).toHaveLength(1));
+
+      expect(useStatusMesa.getState().erroRuntime).toBeNull();
+    });
   });
 
   describe('instalarRetentativaAutomatica', () => {

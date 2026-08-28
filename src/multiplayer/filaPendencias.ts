@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
+import { marcarErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
 
 /**
  * Fila genérica de "isso não confirmou push, reenviar quando a conexão voltar" — não sabe
@@ -177,11 +177,38 @@ function desmarcarEmVoo(modulo: string, chave: string): void {
   gravarEmVoo(itens);
 }
 
+/** Código Postgres de RLS negando a operação (`insufficient_privilege` — a policy rodou e
+ *  disse "não"). Diferente de qualquer outra falha que passa por aqui (rede caiu, timeout,
+ *  Realtime reconectando): reenviar o MESMO payload nunca vai passar a funcionar sozinho —
+ *  a permissão não vai aparecer com um retry. Achado ao vivo (29/08): jogador move o próprio
+ *  token, `tokens_update_dono_ou_gm` (migração 0021) nega porque `characters_privado.auth_uid`
+ *  já não bate mais com `auth.uid()` desta sessão — normalmente porque o MESMO link de jogador
+ *  foi aberto em outro aparelho/navegador depois (a Edge Function `vincular-jogador` reatribui
+ *  o vínculo de propósito, "revincula sem drama" — ver seu comentário). Sem essa distinção, a
+ *  escrita entrava pra fila de "aguardando reconexão" pra sempre, tentando de novo a cada
+ *  `online`/reconexão de canal, sempre falhando do mesmo jeito, e o indicador (`⏳ N pendente`)
+ *  sugeria "é só rede" — o jogador nunca descobria que precisava recarregar a página pra
+ *  revincular. */
+function ehErroPermissaoNegada(erro: unknown): boolean {
+  return typeof erro === 'object' && erro !== null && (erro as { code?: unknown }).code === '42501';
+}
+
+function tratarErroPermanente(modulo: string, erro: unknown): void {
+  console.error(`[filaPendencias] ${modulo} negado por permissão (RLS) — retry não resolve`, erro);
+  marcarErroRuntime(
+    `sem permissão pra salvar (${modulo}) — o vínculo desta sessão com o personagem pode ter sido substituído ` +
+      '(o mesmo link foi aberto em outro aparelho/navegador?). Recarregue a página pra revincular.',
+  );
+}
+
 /**
  * Wrapper de conveniência pro padrão universal dos módulos de sync: `cliente.from(...).upsert
- * /delete(...).then(({error}) => ...)`. Sucesso resolve a pendência; erro (retornado como
- * `{error}` ou por rejeição da promise) registra com um callback que re-executa a mesma
- * `executar` — quem chama decide o que `executar` lê da store no momento em que roda de novo.
+ * /delete(...).then(({error}) => ...)`. Sucesso resolve a pendência; erro transitório (rede,
+ * canal caindo) registra com um callback que re-executa a mesma `executar` — quem chama decide
+ * o que `executar` lê da store no momento em que roda de novo. Negação de permissão (RLS,
+ * `ehErroPermissaoNegada`) é tratada à parte: nunca entra na fila de retry (ver comentário lá
+ * em cima) e acende o aviso visível (`⚠ erro inesperado`) na hora, em vez do `⏳ pendente`
+ * silencioso/enganoso.
  *
  * Marca "em voo" (silencioso) ANTES de chamar `executar` e desmarca assim que ela resolve —
  * ver `CHAVE_EM_VOO` acima. Falha confirmada some daqui e entra na fila visível de retry.
@@ -197,6 +224,11 @@ export function executarComRetentativa(
       .then((resultado) => {
         desmarcarEmVoo(modulo, chave);
         if (resultado && resultado.error) {
+          if (ehErroPermissaoNegada(resultado.error)) {
+            tratarErroPermanente(modulo, resultado.error);
+            resolverPendencia(modulo, chave);
+            return;
+          }
           console.error(`[filaPendencias] ${modulo}:${chave} falhou, aguardando reconexão`, resultado.error);
           registrarPendencia(modulo, chave, tentar);
         } else {
@@ -205,6 +237,11 @@ export function executarComRetentativa(
       })
       .catch((erro: unknown) => {
         desmarcarEmVoo(modulo, chave);
+        if (ehErroPermissaoNegada(erro)) {
+          tratarErroPermanente(modulo, erro);
+          resolverPendencia(modulo, chave);
+          return;
+        }
         console.error(`[filaPendencias] ${modulo}:${chave} falhou, aguardando reconexão`, erro);
         registrarPendencia(modulo, chave, tentar);
       });
