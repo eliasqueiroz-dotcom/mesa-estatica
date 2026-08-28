@@ -97,16 +97,20 @@ describe('iniciarSyncTokens — marca "em voo" antes do debounce disparar', () =
     vi.useRealTimers();
   });
 
-  it('marca "em voo" no momento em que agenda o upsert — antes do debounce (ATRASO_PUSH_MS) disparar', () => {
+  it('marca "em voo" no momento em que o diff detecta a mudança — mesmo enquanto o throttle ainda não disparou a chamada de rede', () => {
     vi.useFakeTimers();
     vi.stubGlobal('localStorage', criarStorageFalso());
 
     cleanup = iniciarSyncTokens();
     const t = token('token-1');
     useStore.setState((s) => ({ mapa: { ...s.mapa, tokens: [...s.mapa.tokens, t] } }));
+    // a primeira chamada do throttle (chave fria) já disparou a rede na hora — move de novo,
+    // agora dentro do cooldown, pra cobrir o caso em que a chamada fica só "pendente" (nem
+    // chegou a rodar `executarComRetentativa`, que tem seu próprio `marcarEmVoo`) — se a marca
+    // já existe aqui, uma aba fechada NESSE exato meio-tempo não perde a posição (achado de
+    // 23/08).
+    useStore.getState().moverTokenMapa('token-1', 0.4, 0.4);
 
-    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
-    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde a posição (achado de 23/08).
     expect(retomarPendenciasPersistidas('tokens-sync')).toContain('token-1');
   });
 });
@@ -124,6 +128,11 @@ function criarStorageFalso() {
 // ===== refetch de reconexão =====
 function criarClienteComControle() {
   const resolvers: Array<(data: unknown) => void> = [];
+  // upsert real vira rede de verdade (round-trip com latência) — deixar sem resolver até o
+  // teste mandar explicitamente simula esse "em voo", em vez do antigo `Promise.resolve()`
+  // instantâneo, que resolvia via microtask antes de qualquer `await` no teste conseguir
+  // testar a janela de escrita ainda não confirmada.
+  const upsertResolvers: Array<(resultado: { error: unknown }) => void> = [];
   const handlers: Array<(payload: any) => void> = [];
   let statusCb: ((status: string) => void) | undefined;
 
@@ -134,7 +143,7 @@ function criarClienteComControle() {
       resolvers.push((data: unknown) => resolve(onFulfilled({ data, error: null })));
     });
   };
-  builder.upsert = () => Promise.resolve({ error: null });
+  builder.upsert = () => new Promise((resolve) => upsertResolvers.push(resolve));
   builder.delete = () => builder;
   builder.eq = () => Promise.resolve({ error: null });
 
@@ -154,6 +163,7 @@ function criarClienteComControle() {
     channel: () => channelObj,
     removeChannel: () => {},
     resolvers,
+    upsertResolvers,
     handlers,
     get statusCb() {
       return statusCb;
@@ -291,7 +301,7 @@ describe('iniciarSyncTokens — refetch de reconexão', () => {
     });
   });
 
-  it('pendencias é limpo quando o debounce dispara — refetch de reconexão volta a aplicar o remoto depois disso', async () => {
+  it('pendencias é limpo quando o throttle dispara a chamada de rede — refetch de reconexão volta a aplicar o remoto depois disso', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('localStorage', criarStorageFalso());
     cleanup = iniciarSyncTokens();
@@ -300,9 +310,15 @@ describe('iniciarSyncTokens — refetch de reconexão', () => {
     mock.resolvers[0]([tokenRemoto('tok-limpa', 'pc-limpa', 0.1, 0.1)]);
     expect(useStore.getState().mapa.tokens.some((t) => t.id === 'tok-limpa')).toBe(true);
 
+    // chave fria — o throttle dispara o upsert na hora, sem esperar timer; `pendencias` só é
+    // limpo quando a escrita CONFIRMA (ver comentário em `tokensSync.ts`), então resolve o
+    // upsert explicitamente aqui pra simular a confirmação do servidor.
     useStore.getState().moverTokenMapa('tok-limpa', 0.2, 0.2);
+    expect(mock.upsertResolvers.length).toBeGreaterThanOrEqual(1);
+    mock.upsertResolvers[0]({ error: null });
 
-    // avança além do ATRASO_PUSH_MS (150ms) — debounce dispara o upsert, `pendencias` é limpo
+    // avança além do ATRASO_PUSH_MS (150ms) — sem mais chamadas nesse meio-tempo, o cooldown do
+    // throttle termina sem nada pendente e a chave volta a ficar fria
     await vi.advanceTimersByTimeAsync(200);
 
     mock.statusCb?.('CHANNEL_ERROR');

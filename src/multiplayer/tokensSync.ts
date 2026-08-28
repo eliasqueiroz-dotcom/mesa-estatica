@@ -2,7 +2,7 @@ import type { TokenMapa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
-import { criarDebouncePorChave } from './debounce';
+import { criarThrottlePorChave } from './debounce';
 import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 import { computarDiffTokens } from './tokensDiff';
@@ -18,10 +18,13 @@ export function resolverReplayToken(chave: string, tokens: TokenMapa[]): TokenMa
   return tokens.find((t) => t.id === chave) ?? null;
 }
 
-/** Mais curto que o de fichas/npcs (`ATRASO_PUSH_MS` em `fichasSync.ts`) — posição de token
- *  no mapa quer parecer "ao vivo" pros outros participantes; ainda assim, junta a rajada de
- *  `pointermove` de um arrasto (dezenas por segundo) numa escrita só, em vez de uma por
- *  evento — era a causa do lag ao arrastar token (visto ao vivo em 24/07). */
+/** Intervalo do THROTTLE (não debounce — ver `criarThrottlePorChave` em `debounce.ts`) que
+ *  junta a rajada de `pointermove` de um arrasto (dezenas por segundo) em ~1 upsert a cada
+ *  150ms, em vez de uma escrita por evento. Mais curto que o de fichas/npcs (`ATRASO_PUSH_MS`
+ *  em `fichasSync.ts`) — posição de token no mapa quer parecer "ao vivo" pros outros
+ *  participantes. Precisa ser throttle, não debounce: um debounce só dispara depois que o
+ *  movimento PARA, então quem observa só vê o salto final, nunca o trajeto (achado ao vivo em
+ *  27/08 — token de outro participante "teleportava" pro destino em vez de se mover). */
 const ATRASO_PUSH_MS = 150;
 
 interface LinhaTokenSupabase {
@@ -128,12 +131,21 @@ export function iniciarSyncTokens(): () => void {
       });
   void refetchTokens();
 
-  const agendarUpsert = criarDebouncePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
-    // limpa ANTES de disparar a chamada de rede — a partir daqui, um evento remoto pra esse id
-    // (inclusive o eco desta própria escrita) pode ser aplicado normalmente de novo.
-    pendencias.delete(_id);
+  const agendarUpsert = criarThrottlePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
     executarComRetentativa('tokens-sync', token.id, () =>
-      cliente.from('tokens').upsert(paraLinha(useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token)),
+      Promise.resolve(
+        cliente.from('tokens').upsert(paraLinha(useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token)),
+      ).then((resultado) => {
+        // só libera o id pro handler de Realtime aceitar eco/remoto de novo DEPOIS que a
+        // escrita CONFIRMA (sem erro) — com o throttle disparando a rede de leading edge (na
+        // hora, não só ~150ms depois que o arrasto pára), limpar antes de disparar deixava uma
+        // janela real: um reconnect ou eco chegando durante o round-trip da escrita pisava numa
+        // posição ainda não confirmada no servidor (viu isso quebrar `tokensSync.test.ts` ao
+        // trocar debounce por throttle, 28/08). Em erro, mantém marcado — a store local segue
+        // sendo a fonte mais recente até a retentativa (`filaPendencias.ts`) confirmar.
+        if (!resultado?.error) pendencias.delete(_id);
+        return resultado;
+      }),
     );
   });
 
