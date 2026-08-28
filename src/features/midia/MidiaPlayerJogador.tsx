@@ -25,9 +25,10 @@ const FADE_DUCK_MS = 250;
 export default function MidiaPlayerJogador() {
   const midia = useStore((s) => s.midia);
   const efeitoTocando = useSoundpadUiStore((s) => s.slotsTocando.size > 0);
+  const mudo = useSoundpadUiStore((s) => s.mudo);
+  const definirMudo = useSoundpadUiStore((s) => s.definirMudo);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [desbloqueado, setDesbloqueado] = useState(false);
-  const [mudo, setMudo] = useState(false);
 
   const fadeTokenRef = useRef(0);
   const prevFaixaIdRef = useRef<string | null>(null);
@@ -111,7 +112,7 @@ export default function MidiaPlayerJogador() {
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {faixaAtual ? faixaAtual.nome : 'sem áudio tocando'}
             </span>
-            <button className="icone-botao" onClick={() => setMudo((m) => !m)} title={mudo ? 'ativar som' : 'mudo (só pra você)'} style={{ fontSize: '10px' }}>
+            <button className="icone-botao" onClick={() => definirMudo(!mudo)} title={mudo ? 'ativar som' : 'mudo (só pra você)'} style={{ fontSize: '10px' }}>
               {mudo ? 'mudo' : 'som'}
             </button>
           </>

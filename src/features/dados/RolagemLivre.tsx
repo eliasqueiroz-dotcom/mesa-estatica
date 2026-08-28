@@ -78,11 +78,16 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
         .map((g) => `${g.qty}d${g.sides} → ${g.value} [${g.rolls.map((r) => r.value).join(', ')}]`)
         .join(' · ');
       const total = resultados.reduce((soma, g) => soma + g.value, 0);
-      const texto = `Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
-      registrarLog('rolagem-livre', texto, null, visibilidade);
+      const origem =
+        modo === 'npc' && npc
+          ? (npc.nome || 'NPC')
+          : modo === 'pc' && ficha
+            ? (ficha.nome || 'Personagem')
+            : 'Rolagem livre';
+      const texto = `${origem === 'Rolagem livre' ? '' : `${origem} · `}Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
+      registrarLog('rolagem-livre', texto, personagemId, visibilidade);
 
       if (modo === 'npc' && npc) {
-        const origem = npc.nome || 'NPC';
         const totalComBonus = total + bonus;
         registrarRoll({
           origem,
@@ -93,7 +98,6 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           visibilidade,
         });
       } else if (modo === 'pc' && ficha) {
-        const origem = ficha.nome || 'Personagem';
         registrarRoll({
           origem,
           personagemId: ficha.id,
@@ -104,7 +108,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
         });
       } else if (modo === 'nenhum') {
         registrarRoll({
-          origem: 'Rolagem livre',
+          origem,
           personagemId: null,
           formula: notacaoTexto,
           total,

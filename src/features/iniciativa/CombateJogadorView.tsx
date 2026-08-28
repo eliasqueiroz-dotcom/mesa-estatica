@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
@@ -28,6 +29,8 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const { modoCombate, turnoAtualId, rodada, contadorCena, condicoesCombate } = sessaoPublica;
+
+  const [mostrarGlossario, setMostrarGlossario] = useState(false);
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
   // por id da entrada, não índice: se for a vez de um NPC oculto, a RLS de `iniciativa` nem
@@ -65,6 +68,25 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
           }}
         >
           <IconeSeta size={13} /> sua vez
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+        <button
+          className="icone-botao"
+          onClick={() => setMostrarGlossario((v) => !v)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)', fontSize: 11 }}
+        >
+          glossário {mostrarGlossario ? '▾' : '▸'}
+        </button>
+      </div>
+      {mostrarGlossario && (
+        <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
+          {CONDICOES_COMBATE.map((c) => (
+            <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
+              <strong style={{ color: 'var(--ink)' }}>{c.nome}</strong> — {c.efeito}
+            </p>
+          ))}
         </div>
       )}
 

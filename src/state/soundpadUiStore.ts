@@ -7,6 +7,12 @@ interface SoundpadUiState {
   slotsTocando: Set<number>;
   marcarTocando: (slot: number) => void;
   marcarParado: (slot: number) => void;
+  /** Mudo local do jogador — silencia música E efeitos do soundpad pra si, sem afetar os outros
+   *  nem pedir permissão do mestre. Morar aqui (e não no `useStore` persistido) é o que deixa
+   *  `MidiaPlayerJogador` e `SoundpadPlayer` (dois `<audio>` distintos) respeitarem o mesmo
+   *  toggle sem sincronizar um fato que é só deste navegador. */
+  mudo: boolean;
+  definirMudo: (v: boolean) => void;
 }
 
 /**
@@ -17,6 +23,8 @@ interface SoundpadUiState {
  */
 export const useSoundpadUiStore = create<SoundpadUiState>((set) => ({
   slotsTocando: new Set<number>(),
+  mudo: false,
+  definirMudo: (v) => set({ mudo: v }),
   marcarTocando: (slot) =>
     set((s) => {
       const novo = new Set(s.slotsTocando);

@@ -60,7 +60,7 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
           : 'copiar link do jogador';
 
   return (
-    <>
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
       <span
         className="icone-botao"
         role="button"
@@ -88,6 +88,27 @@ export default function LinkJogadorBotao({ fichaId, fichaNome }: Props) {
       >
         ↻
       </span>
-    </>
+      {status === 'copiado' && (
+        <span
+          className="mono"
+          role="status"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            right: 0,
+            zIndex: 20,
+            whiteSpace: 'nowrap',
+            fontSize: '11px',
+            padding: '0.25rem 0.5rem',
+            color: 'var(--rede)',
+            border: '1px solid var(--rede-dim)',
+            background: 'var(--concrete-0)',
+            borderRadius: 2,
+          }}
+        >
+          link copiado
+        </span>
+      )}
+    </span>
   );
 }

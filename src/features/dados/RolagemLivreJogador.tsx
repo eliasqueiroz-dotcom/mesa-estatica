@@ -21,8 +21,10 @@ interface RolagemLivreJogadorProps {
 }
 
 export default function RolagemLivreJogador({ fichaId, ready, rolar }: RolagemLivreJogadorProps) {
+  const fichas = useStore((s) => s.fichas);
   const registrarLog = useStore((s) => s.registrarLog);
   const registrarRoll = useStore((s) => s.registrarRoll);
+  const fichaNome = fichas.find((f) => f.id === fichaId)?.nome ?? null;
 
   const [bonus, setBonus] = useState(0);
   const [termos, setTermos] = useState<Termo[]>([termoVazio()]);
@@ -53,11 +55,11 @@ export default function RolagemLivreJogador({ fichaId, ready, rolar }: RolagemLi
       const totalComBonus = total + bonus;
       const notacaoTexto = termos.map((t) => `${t.quantidade}d${t.faces}`).join(' + ');
       const textoBonus = bonus !== 0 ? ` + bônus ${bonus} = ${totalComBonus}` : '';
-      const texto = `Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}${textoBonus}`;
+      const texto = `${fichaNome ? `${fichaNome} · ` : ''}Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}${textoBonus}`;
       registrarLog('rolagem-livre', texto, fichaId, 'publica');
 
       registrarRoll({
-        origem: 'Rolagem livre',
+        origem: fichaNome || 'Rolagem livre',
         personagemId: fichaId,
         formula: `${notacaoTexto}${bonus !== 0 ? `+${bonus}` : ''}`,
         total: totalComBonus,

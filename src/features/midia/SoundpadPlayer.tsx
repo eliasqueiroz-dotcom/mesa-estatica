@@ -30,6 +30,7 @@ import { useStore } from '../../state/store';
  */
 export default function SoundpadPlayer() {
   const ultimoDisparo = useStore((s) => s.soundpad.ultimoDisparo);
+  const mudo = useSoundpadUiStore((s) => s.mudo);
   const jaTocado = useRef<number | null>(null);
   const audiosPorSlot = useRef<Map<number, HTMLAudioElement>>(new Map());
 
@@ -44,6 +45,12 @@ export default function SoundpadPlayer() {
       }),
     [],
   );
+
+  // Mudo é compartilhado com o player de música via soundpadUiStore — efeitos criados antes do
+  // toggle também precisam refletir a mudança sem esperar o próximo disparo.
+  useEffect(() => {
+    for (const audio of audiosPorSlot.current.values()) audio.muted = mudo;
+  }, [mudo]);
 
   useEffect(() => {
     if (!ultimoDisparo) return;
@@ -70,6 +77,7 @@ export default function SoundpadPlayer() {
 
     const audio = new Audio(som.url);
     audio.volume = volumeRef.current;
+    audio.muted = useSoundpadUiStore.getState().mudo;
     const encerrar = () => {
       audiosPorSlot.current.delete(slot);
       useSoundpadUiStore.getState().marcarParado(slot);
