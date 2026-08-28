@@ -38,4 +38,15 @@ describe('mesclar3Vias', () => {
     const remoto = { armas: ['espada'], pv: 12 }; // outro editor mudou os dois campos
     expect(mesclar3Vias(baseline, local, remoto)).toEqual({ armas: ['espada'], pv: 12 });
   });
+
+  it('campo intocado com MESMO valor mas referência DIFERENTE do baseline não conta como mudança', () => {
+    // Reproduz o baseline como `empurrarFicha` monta de verdade: depois de um push, o baseline
+    // vira o JSON recém-parseado da resposta do Postgres — uma referência nova, mesmo conteúdo.
+    // Sem comparar por valor, isso marcava `armas` como "editado localmente" a partir do 2º
+    // push e deixava a cópia velha do local sobrescrever uma mudança concorrente (achado 29/08).
+    const baseline = { armas: JSON.parse(JSON.stringify(['faca'])) as string[], pv: 20 };
+    const local = { armas: ['faca'], pv: 20 }; // outra referência, mesmo conteúdo — nunca editado
+    const remoto = { armas: ['faca', 'machado'], pv: 12 }; // outro editor acrescentou uma arma
+    expect(mesclar3Vias(baseline, local, remoto)).toEqual({ armas: ['faca', 'machado'], pv: 12 });
+  });
 });
