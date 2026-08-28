@@ -51,6 +51,34 @@ const paraToken = (r: LinhaTokenSupabase): TokenMapa => ({
   y: r.y,
 });
 
+/** `.upsert()` do PostgREST vira `INSERT ... ON CONFLICT DO UPDATE` — e a policy de INSERT
+ *  (`tokens_insert_gm`, migração 0021) roda pra QUALQUER upsert, mesmo quando a linha já existe
+ *  e o resultado real seria um UPDATE. Pra quem não é mestre, isso nega `42501` sempre, mesmo
+ *  movendo o PRÓPRIO token (que a policy de UPDATE deixaria passar) — achado ao vivo em 29/08:
+ *  jogador arrasta o próprio token, o console mostra a mesma negação de RLS que o fix de ontem
+ *  (`filaPendencias.ts`) passou a expor, mas em TODA tentativa, de qualquer aparelho, mesmo
+ *  logo depois de recarregar — não é disputa de vínculo, upsert nunca foi o caminho certo pra
+ *  quem só tem permissão de UPDATE.
+ *
+ *  Faz UPDATE primeiro (o caminho que jogador e mestre têm garantido pro próprio/qualquer
+ *  token); só tenta INSERT se zero linhas casarem — ou porque o token é genuinamente novo
+ *  (`adicionarTokenMapa`, só na UI do mestre) ou porque a policy de UPDATE já rejeitou por não
+ *  ser dono (aí o INSERT nega de novo, `is_gm()`-only, com o mesmo erro de sempre — não regride
+ *  nada). */
+function empurrarToken(cliente: NonNullable<typeof supabase>, token: TokenMapa) {
+  const linha = paraLinha(token);
+  return cliente
+    .from('tokens')
+    .update({ x: linha.x, y: linha.y, participante_id: linha.participante_id, tipo: linha.tipo })
+    .eq('id', linha.id)
+    .select('id')
+    .then((resultado): PromiseLike<{ error: unknown }> | { error: unknown } => {
+      if (resultado.error) return resultado;
+      if (resultado.data && resultado.data.length > 0) return resultado;
+      return cliente.from('tokens').insert(linha);
+    });
+}
+
 /** Tokens sendo arrastados localmente agora (MapaTab.tsx/MapaJogadorView.tsx marcam no
  *  pointerdown, desmarcam no pointerup) — o handler de Realtime abaixo pula update remoto
  *  pra esses ids. Sem isso, o eco da própria escrita (sempre ≥150ms atrás, por causa do
@@ -134,7 +162,7 @@ export function iniciarSyncTokens(): () => void {
   const agendarUpsert = criarThrottlePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
     executarComRetentativa('tokens-sync', token.id, () =>
       Promise.resolve(
-        cliente.from('tokens').upsert(paraLinha(useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token)),
+        empurrarToken(cliente, useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token),
       ).then((resultado) => {
         // só libera o id pro handler de Realtime aceitar eco/remoto de novo DEPOIS que a
         // escrita CONFIRMA (sem erro) — com o throttle disparando a rede de leading edge (na
@@ -178,7 +206,7 @@ export function iniciarSyncTokens(): () => void {
       const id = chave.slice(PREFIXO_DELETE.length);
       executarComRetentativa('tokens-sync', chave, () => cliente.from('tokens').delete().eq('id', id));
     } else if (replay) {
-      executarComRetentativa('tokens-sync', chave, () => cliente.from('tokens').upsert(paraLinha(replay)));
+      executarComRetentativa('tokens-sync', chave, () => empurrarToken(cliente, replay));
     } else {
       resolverPendencia('tokens-sync', chave);
     }

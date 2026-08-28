@@ -67,7 +67,10 @@ function criarClienteMinimo() {
   builder.eq = () => builder;
   builder.in = () => Promise.resolve({ error: null });
   builder.then = (resolve: (r: typeof resolvido) => unknown) => Promise.resolve(resolvido).then(resolve);
-  builder.upsert = () => Promise.resolve({ error: null });
+  // update().eq().select() resolve como se a linha já existisse — empurrarToken() nunca cai
+  // no fallback de insert nestes testes (não é isso que eles cobrem).
+  builder.update = () => ({ eq: () => ({ select: () => Promise.resolve({ data: [{ id: 'x' }], error: null }) }) });
+  builder.insert = () => Promise.resolve({ error: null });
   builder.delete = () => builder;
 
   const channelObj: any = {};
@@ -132,7 +135,7 @@ function criarClienteComControle() {
   // teste mandar explicitamente simula esse "em voo", em vez do antigo `Promise.resolve()`
   // instantâneo, que resolvia via microtask antes de qualquer `await` no teste conseguir
   // testar a janela de escrita ainda não confirmada.
-  const upsertResolvers: Array<(resultado: { error: unknown }) => void> = [];
+  const upsertResolvers: Array<(resultado: { data?: unknown; error: unknown }) => void> = [];
   const handlers: Array<(payload: any) => void> = [];
   let statusCb: ((status: string) => void) | undefined;
 
@@ -143,7 +146,11 @@ function criarClienteComControle() {
       resolvers.push((data: unknown) => resolve(onFulfilled({ data, error: null })));
     });
   };
-  builder.upsert = () => new Promise((resolve) => upsertResolvers.push(resolve));
+  // empurrarToken() faz update().eq().select() antes de tentar insert() — mesma fila de
+  // resolvers controláveis do antigo upsert(), pra não reescrever os testes que já resolvem
+  // manualmente pra simular latência de rede.
+  builder.update = () => ({ eq: () => ({ select: () => new Promise((resolve) => upsertResolvers.push(resolve)) }) });
+  builder.insert = () => new Promise((resolve) => upsertResolvers.push(resolve));
   builder.delete = () => builder;
   builder.eq = () => Promise.resolve({ error: null });
 
@@ -315,7 +322,7 @@ describe('iniciarSyncTokens — refetch de reconexão', () => {
     // upsert explicitamente aqui pra simular a confirmação do servidor.
     useStore.getState().moverTokenMapa('tok-limpa', 0.2, 0.2);
     expect(mock.upsertResolvers.length).toBeGreaterThanOrEqual(1);
-    mock.upsertResolvers[0]({ error: null });
+    mock.upsertResolvers[0]({ data: [{ id: 'tok-limpa' }], error: null });
 
     // avança além do ATRASO_PUSH_MS (150ms) — sem mais chamadas nesse meio-tempo, o cooldown do
     // throttle termina sem nada pendente e a chave volta a ficar fria
