@@ -57,21 +57,57 @@ export async function comprimirImagem(arquivo: File): Promise<ImagemComprimida> 
   return { dataUrl, blob };
 }
 
-/** Recorte central quadrado (cover) + resize pra TAMANHO_AVATAR — foto de perfil de Ficha (Avatar.tsx). */
-export async function comprimirImagemAvatar(arquivo: File): Promise<ImagemComprimida> {
-  const img = await carregarImagem(arquivo);
-  const lado = Math.min(img.width, img.height);
-  const sx = (img.width - lado) / 2;
-  const sy = (img.height - lado) / 2;
+function desenharAvatarNoCanvas(img: HTMLImageElement, sx: number, sy: number, lado: number): Promise<ImagemComprimida> {
   const canvas = document.createElement('canvas');
   canvas.width = TAMANHO_AVATAR;
   canvas.height = TAMANHO_AVATAR;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas indisponível');
   ctx.drawImage(img, sx, sy, lado, lado, 0, 0, TAMANHO_AVATAR, TAMANHO_AVATAR);
-  const [dataUrl, blob] = await Promise.all([
+  return Promise.all([
     Promise.resolve(canvas.toDataURL('image/jpeg', QUALIDADE_AVATAR)),
     canvasParaBlob(canvas, QUALIDADE_AVATAR),
-  ]);
-  return { dataUrl, blob };
+  ]).then(([dataUrl, blob]) => ({ dataUrl, blob }));
+}
+
+/** Recorte central quadrado (cover) + resize pra TAMANHO_AVATAR — foto de perfil de NPC
+ *  (`NpcsTab.tsx`, sem crop manual). Ficha usa `comprimirImagemAvatarComRecorte` abaixo, com
+ *  o recorte vindo do `CropFotoModal` em vez de calculado automático. */
+export async function comprimirImagemAvatar(arquivo: File): Promise<ImagemComprimida> {
+  const img = await carregarImagem(arquivo);
+  const lado = Math.min(img.width, img.height);
+  const sx = (img.width - lado) / 2;
+  const sy = (img.height - lado) / 2;
+  return desenharAvatarNoCanvas(img, sx, sy, lado);
+}
+
+/** Retângulo de recorte em pixels da imagem ORIGINAL (não da já comprimida) — mesmo shape que
+ *  `react-easy-crop` devolve em `onCropComplete`'s `croppedAreaPixels`. */
+export interface RecorteAvatar {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Garante que o recorte cai dentro dos limites da imagem — defesa barata contra
+ *  arredondamento do `react-easy-crop` devolver x/y/width/height fracionalmente fora da
+ *  borda (ex.: zoom no limite, imagem com dimensão ímpar). Função pura, sem DOM — testável
+ *  direto em vitest, ao contrário do resto deste arquivo (depende de `<canvas>`/`Image` reais). */
+export function normalizarRecorte(recorte: RecorteAvatar, imgWidth: number, imgHeight: number): RecorteAvatar {
+  const width = Math.min(recorte.width, imgWidth);
+  const height = Math.min(recorte.height, imgHeight);
+  const x = Math.min(Math.max(recorte.x, 0), imgWidth - width);
+  const y = Math.min(Math.max(recorte.y, 0), imgHeight - height);
+  return { x, y, width, height };
+}
+
+/** Igual a `comprimirImagemAvatar`, mas o recorte vem da interação do usuário no
+ *  `CropFotoModal` em vez de calculado automático (centro) — usado pela ficha. `recorte` já
+ *  vem 1:1 (largura===altura, `aspect={1}` no react-easy-crop), mas passa por
+ *  `normalizarRecorte` mesmo assim. */
+export async function comprimirImagemAvatarComRecorte(arquivo: File, recorte: RecorteAvatar): Promise<ImagemComprimida> {
+  const img = await carregarImagem(arquivo);
+  const r = normalizarRecorte(recorte, img.width, img.height);
+  return desenharAvatarNoCanvas(img, r.x, r.y, r.width);
 }

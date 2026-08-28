@@ -97,7 +97,7 @@ export default function NpcsTab() {
     try {
       const { dataUrl, blob } = await comprimirImagemAvatar(arquivo);
       atualizarNpc(id, { foto: dataUrl });
-      const url = await uploadImagemStorage(`npcs/${id}`, blob);
+      const { url } = await uploadImagemStorage(`npcs/${id}`, blob);
       if (url) atualizarNpc(id, { foto: url });
     } catch {
       window.alert('sinal corrompido — não foi possível ler essa imagem.');

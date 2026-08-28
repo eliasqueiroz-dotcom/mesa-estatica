@@ -132,7 +132,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
       // upload pro Storage completar, troca pela URL leve — é o que sai sincronizado em vez
       // do base64 (egress; ver mapaPublicoSync.ts).
       atualizarMapa({ imagemDataUrl: dataUrl });
-      const url = await uploadImagemStorage('mapa', blob);
+      const { url } = await uploadImagemStorage('mapa', blob);
       if (url) atualizarMapa({ imagemDataUrl: url });
     } catch {
       setErro('não foi possível carregar essa imagem.');
