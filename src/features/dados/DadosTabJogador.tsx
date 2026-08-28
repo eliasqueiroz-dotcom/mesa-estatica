@@ -82,6 +82,8 @@ export default function DadosTabJogador({ ficha, active = true, pedidoRapidoSani
             height: '280px',
             background: 'var(--concrete-0)',
             border: '1px solid var(--concrete-2)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         />
       )}

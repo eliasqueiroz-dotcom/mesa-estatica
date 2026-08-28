@@ -33,6 +33,8 @@ export default function DadosTab({ active = true }: { active?: boolean }) {
             height: '280px',
             background: 'var(--concrete-0)',
             border: '1px solid var(--concrete-2)',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         />
       )}

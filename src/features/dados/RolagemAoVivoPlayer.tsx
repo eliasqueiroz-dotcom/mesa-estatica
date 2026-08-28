@@ -76,7 +76,15 @@ export default function RolagemAoVivoPlayer() {
       {!modo2D && (
         <div
           id="dice-ao-vivo"
-          style={{ width: 56, height: 56, background: 'var(--concrete-0)', border: '1px solid var(--concrete-2)', flexShrink: 0 }}
+          style={{
+            width: 56,
+            height: 56,
+            background: 'var(--concrete-0)',
+            border: '1px solid var(--concrete-2)',
+            flexShrink: 0,
+            position: 'relative',
+            overflow: 'hidden',
+          }}
         />
       )}
       <span style={{ fontSize: 12, color: rotulo?.cor ?? 'var(--ink-dim)', whiteSpace: 'nowrap' }}>

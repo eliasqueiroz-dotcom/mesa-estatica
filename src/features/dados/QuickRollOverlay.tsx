@@ -263,7 +263,14 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
           {!modo2D && (
             <div
               id="dice-overlay-rapido"
-              style={{ width: '100%', height: '140px', background: 'var(--concrete-0)', border: '1px solid var(--concrete-2)' }}
+              style={{
+                width: '100%',
+                height: '140px',
+                background: 'var(--concrete-0)',
+                border: '1px solid var(--concrete-2)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
             />
           )}
           {modo2D && (
