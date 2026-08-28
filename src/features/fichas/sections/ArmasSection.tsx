@@ -3,7 +3,7 @@ import { rolarDadosComForcados } from '../../../dice/registroForcados';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
 import { PERICIAS } from '../../../rules/data/pericias';
 import { calcularPvMaximo, estaFerido } from '../../../rules/derivados';
-import { calcularDanoAtaque, parseDanoArma } from '../../../rules/teste';
+import { parseDanoArma, resolverDanoArma } from '../../../rules/teste';
 import { useStore } from '../../../state/store';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
@@ -47,46 +47,26 @@ export default function ArmasSection({ ficha, onChange }: SecaoFichaProps) {
 
   const rolarDano = (arma: ArmaFicha) => {
     const parsed = parseDanoArma(arma.dano);
+    const critico = margem10Mais[arma.id] ?? false;
+    // Em crítico, o dado nem precisa ser rolado de verdade — `resolverDanoArma` usa o máximo do
+    // dado de qualquer jeito (regras.md, margem 10+/20 natural), então rolar só confundiria a
+    // exibição com um valor que não afeta o resultado. Sem `parsed`, não tem quantidade/lados
+    // pra rolar — `resolverDanoArma` cai no próprio branch de erro com a lista vazia.
+    const valoresDados = parsed && !critico ? rolarDadosComForcados(parsed.qtd, parsed.lados, ficha.id, 'dano') : [];
+    const resultado = resolverDanoArma(arma, valoresDados, ficha.atributos.vigor, critico);
+
     const nomeArma = arma.nome || 'arma';
     const nomePersonagem = ficha.nome || 'Personagem';
-    if (!parsed) {
-      const texto = `dano "${arma.dano}" não reconhecido, calcule na mão`;
-      registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${texto}`, ficha.id);
-      setResultados((prev) => ({ ...prev, [arma.id]: { texto, erro: true } }));
-      return;
-    }
-    const { qtd, lados, modificador, corpoACorpo } = parsed;
-    const critico = margem10Mais[arma.id] ?? false;
-    const danoMaximoDado = qtd * lados + modificador;
-    // Em crítico, o dado nem precisa ser rolado de verdade — calcularDanoAtaque usa o máximo do
-    // dado de qualquer jeito (regras.md, margem 10+/20 natural), então rolar só confundiria a
-    // exibição com um valor que não afeta o resultado.
-    let rolagemDano: number;
-    if (critico) {
-      rolagemDano = danoMaximoDado;
-    } else {
-      rolagemDano = rolarDadosComForcados(qtd, lados, ficha.id, 'dano').reduce((a, b) => a + b, 0) + modificador;
-    }
-    const vigor = ficha.atributos.vigor;
-    const dano = calcularDanoAtaque({ rolagemDano, danoMaximoDado, vigor, corpoACorpo, margem10Mais: critico });
-
-    // Resultado do dado separado do total, ex: "1d6 → [4] + Vigor [5] · total 9" — em crítico,
-    // "1d6 → máximo [6] + Vigor [5] · total 11".
-    const notacaoDado = `${qtd}d${lados}${modificador !== 0 ? `${modificador > 0 ? '+' : ''}${modificador}` : ''}`;
-    const parteDado = critico ? `${notacaoDado} → máximo [${rolagemDano}]` : `${notacaoDado} → [${rolagemDano}]`;
-    const parteVigor = corpoACorpo ? ` + Vigor [${vigor}]` : '';
-    const texto = `${parteDado}${parteVigor} · total ${dano}`;
-
-    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${texto}`, ficha.id);
+    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id);
     registrarRoll({
       origem: nomePersonagem,
       personagemId: ficha.id,
       formula: arma.dano,
-      total: dano,
-      bruto: rolagemDano,
+      total: resultado.total,
+      bruto: resultado.bruto,
       visibilidade: 'publica',
     });
-    setResultados((prev) => ({ ...prev, [arma.id]: { texto, erro: false } }));
+    setResultados((prev) => ({ ...prev, [arma.id]: { texto: resultado.texto, erro: resultado.erro } }));
     // "crít." é flag de "próxima rolagem" (comentário acima) — desarma sozinho depois de
     // aplicado, senão fica "armado" e infla silenciosamente o próximo ataque normal.
     setMargem10Mais((prev) => ({ ...prev, [arma.id]: false }));

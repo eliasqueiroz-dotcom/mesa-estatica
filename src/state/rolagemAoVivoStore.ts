@@ -39,10 +39,16 @@ interface RolagemAoVivoState {
  * `aoeStore.ts`/`pingsStore.ts`: é estado de interação ao vivo (um jogador rolando agora), não
  * estado da mesa; não pode vazar pro localStorage nem pro export/import JSON.
  *
- * Só os componentes do JOGADOR (`DadosTabJogador.tsx`, `QuickRollOverlayJogador.tsx`) chamam
- * `definirAtual` — o mestre nunca publica a própria rolagem aqui, só lê via
- * `RolagemAoVivoPlayer.tsx`. Mesmo sigilo por bundle já usado no projeto, não uma trava de
+ * Por padrão, só os componentes do JOGADOR (`DadosTabJogador.tsx`, `QuickRollOverlayJogador.tsx`)
+ * chamam `definirAtual` — o mestre normalmente nunca publica a própria rolagem aqui, só lê via
+ * `RolagemAoVivoPlayer.tsx` (a tela dele já é compartilhada por Discord, não precisa do
+ * broadcast pra ser vista). Mesmo sigilo por bundle já usado no projeto, não uma trava de
  * runtime.
+ *
+ * Exceção deliberada: dano de arma de PC rolado pela aba Combate (`rolarDanoArmaFicha` em
+ * `rules/armasCombate.ts`) publica dos dois lados, mestre incluído — é uma ação de PC (sempre
+ * pública), e quem estiver conectado no próprio app deve ver o dado caindo mesmo sem estar
+ * olhando a tela do mestre.
  */
 export const useRolagemAoVivoStore = create<RolagemAoVivoState>((set) => ({
   atual: null,

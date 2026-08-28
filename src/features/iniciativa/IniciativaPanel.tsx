@@ -1,9 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { surtosAtivosNaSessao, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
+import { consumirForcados } from '../../dice/forcarRolagem';
 import BarraSegmentada from '../fichas/BarraSegmentada';
+import ArmasCombate from '../combate/ArmasCombate';
 import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeLamina, IconeMais } from '../combate/icones';
 
 interface IniciativaPanelProps {
@@ -36,7 +38,19 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
     podePrimeirosSocorros, tentarPrimeirosSocorros,
     agruparNpcs, setAgruparNpcs,
+    registrarLog, registrarRoll,
   } = hook;
+
+  // `IniciativaPanel` é montado duas vezes ao mesmo tempo (`CombatOverlay.tsx` E `NpcsTab.tsx`,
+  // cada um com seu próprio `useIniciativa()`) — sem um prefixo por instância, os `diceBoxId`
+  // de `ArmasCombate` colidiriam quando o mesmo participante está expandido nos dois lugares,
+  // e só uma das duas bandejas 3D conseguiria de fato se inicializar no elemento (achado ao
+  // vivo, 28/08: chip de arma ficava desabilitado pra sempre numa das duas instâncias).
+  // `useId()` sozinho tem `:` (ex. `:r0:`) — `useDiceBox` usa o id como seletor CSS
+  // (`new DiceBox('#'+id, ...)`), e `:` sem escapar quebra o seletor (`querySelector` lança
+  // `SyntaxError`). Tira os `:` — só precisa ser único por instância, não precisa do formato
+  // original.
+  const instanceId = useId().replace(/:/g, '');
 
   const [danoEmMassa, setDanoEmMassa] = useState('');
   const [condicaoEmMassa, setCondicaoEmMassa] = useState('');
@@ -318,21 +332,13 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                       const ficha = fichas.find((f) => f.id === e.participanteId);
                       if (!ficha || ficha.armas.length === 0) return null;
                       return (
-                        <div style={{ marginBottom: '0.4rem' }}>
-                          <span className="combate-rotulo">armas</span>
-                          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                            {ficha.armas.map((a) => (
-                              <span
-                                key={a.id}
-                                className="badge"
-                                style={{ alignSelf: 'flex-start', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                                title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
-                              >
-                                <IconeLamina size={10} /> {a.nome || 'arma'}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
+                        <ArmasCombate
+                          ficha={ficha}
+                          registrarLog={registrarLog}
+                          registrarRoll={registrarRoll}
+                          diceBoxId={`dice-arma-mestre-${instanceId}-${e.id}`}
+                          podeForcar={consumirForcados}
+                        />
                       );
                     })()}
                     {npcAcoes.length > 0 && (

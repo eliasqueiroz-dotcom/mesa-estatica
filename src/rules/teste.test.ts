@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { calcularDanoAtaque, descricaoResultado, inserirNaIniciativa, ordenarIniciativa, parseDanoArma, resolverTeste } from './teste';
+import type { ArmaFicha } from '../state/types';
+import { calcularDanoAtaque, descricaoResultado, inserirNaIniciativa, ordenarIniciativa, parseDanoArma, resolverDanoArma, resolverTeste } from './teste';
+
+const arma = (dano: string): ArmaFicha => ({ id: 'a1', nome: 'faca', bonusAtaque: '', dano, alcance: '', nota: '', periciaAtaqueId: null });
 
 describe('resolverTeste', () => {
   it('sucesso normal quando total >= DT', () => {
@@ -152,6 +155,44 @@ describe('parseDanoArma', () => {
   it('texto sem termo de dado reconhecível retorna null — campo é livre (ficha.md)', () => {
     expect(parseDanoArma('especial, ver nota')).toBeNull();
     expect(parseDanoArma('')).toBeNull();
+  });
+});
+
+describe('resolverDanoArma', () => {
+  it('à distância: soma os dados rolados, sem Vigor', () => {
+    const r = resolverDanoArma(arma('1d6'), [4], 3, false);
+    expect(r.erro).toBe(false);
+    expect(r.total).toBe(4);
+    expect(r.bruto).toBe(4);
+    expect(r.texto).toBe('1d6 → [4] · total 4');
+  });
+
+  it('corpo a corpo: soma Vigor ao total, mas o bruto é só o dado', () => {
+    const r = resolverDanoArma(arma('1d6 + Vigor'), [4], 3, false);
+    expect(r.total).toBe(7);
+    expect(r.bruto).toBe(4);
+    expect(r.texto).toBe('1d6 → [4] + Vigor [3] · total 7');
+  });
+
+  it('com modificador numérico, soma no bruto exibido', () => {
+    const r = resolverDanoArma(arma('2d6+1'), [3, 5], 0, false);
+    expect(r.bruto).toBe(9); // 3+5+1
+    expect(r.total).toBe(9);
+    expect(r.texto).toBe('2d6+1 → [9] · total 9');
+  });
+
+  it('crítico usa o dano máximo do dado, ignora valoresDados', () => {
+    const r = resolverDanoArma(arma('1d6 + Vigor'), [1], 3, true);
+    expect(r.bruto).toBe(6);
+    expect(r.total).toBe(9); // máximo 6 + Vigor 3
+    expect(r.texto).toBe('1d6 → máximo [6] + Vigor [3] · total 9');
+  });
+
+  it('fórmula não reconhecida retorna erro, sem quebrar', () => {
+    const r = resolverDanoArma(arma('especial, ver nota'), [], 0, false);
+    expect(r.erro).toBe(true);
+    expect(r.total).toBe(0);
+    expect(r.texto).toBe('dano "especial, ver nota" não reconhecido, calcule na mão');
   });
 });
 

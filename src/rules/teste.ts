@@ -1,4 +1,5 @@
 import type { Atributo } from './data/pericias';
+import type { ArmaFicha } from '../state/types';
 
 export interface ResultadoTeste {
   d20: number;
@@ -113,6 +114,40 @@ export function parseDanoArma(texto: string): DanoArmaParseado | null {
     modificador: m[3] ? parseInt(m[3], 10) : 0,
     corpoACorpo: /vigor/i.test(texto),
   };
+}
+
+export interface ResultadoDanoArma {
+  texto: string;
+  total: number;
+  bruto: number;
+  erro: boolean;
+}
+
+/**
+ * Calcula o dano de uma arma a partir de dados JÁ ROLADOS (`valoresDados`, na ordem que
+ * `parseDanoArma(arma.dano)` pede) — quem chama decide COMO rolar (matemática pura ou animação
+ * 3D); esta função só aplica a regra (Vigor em corpo a corpo, crítico usa o máximo do dado) e
+ * monta o texto de log. Extraída de `ArmasSection.tsx` (única UI que rolava dano de arma até
+ * a aba Combate ganhar o próprio botão) pra não duplicar a mesma lógica nos dois lugares.
+ */
+export function resolverDanoArma(arma: ArmaFicha, valoresDados: number[], vigor: number, critico: boolean): ResultadoDanoArma {
+  const parsed = parseDanoArma(arma.dano);
+  if (!parsed) {
+    return { texto: `dano "${arma.dano}" não reconhecido, calcule na mão`, total: 0, bruto: 0, erro: true };
+  }
+  const { qtd, lados, modificador, corpoACorpo } = parsed;
+  const danoMaximoDado = qtd * lados + modificador;
+  // Em crítico, o dado nem precisa ser rolado de verdade — calcularDanoAtaque usa o máximo do
+  // dado de qualquer jeito (regras.md, margem 10+/20 natural).
+  const rolagemDano = critico ? danoMaximoDado : valoresDados.reduce((a, b) => a + b, 0) + modificador;
+  const dano = calcularDanoAtaque({ rolagemDano, danoMaximoDado, vigor, corpoACorpo, margem10Mais: critico });
+
+  // Resultado do dado separado do total, ex: "1d6 → [4] + Vigor [5] · total 9" — em crítico,
+  // "1d6 → máximo [6] + Vigor [5] · total 11".
+  const notacaoDado = `${qtd}d${lados}${modificador !== 0 ? `${modificador > 0 ? '+' : ''}${modificador}` : ''}`;
+  const parteDado = critico ? `${notacaoDado} → máximo [${rolagemDano}]` : `${notacaoDado} → [${rolagemDano}]`;
+  const parteVigor = corpoACorpo ? ` + Vigor [${vigor}]` : '';
+  return { texto: `${parteDado}${parteVigor} · total ${dano}`, total: dano, bruto: rolagemDano, erro: false };
 }
 
 export function descricaoResultado(r: ResultadoTeste): string {

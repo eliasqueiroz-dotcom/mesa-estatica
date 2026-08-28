@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
+import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
+import ArmasCombate from '../combate/ArmasCombate';
 import CombatenteResumo from '../combate/CombatenteResumo';
-import { IconeEscudo, IconeLamina, IconeSeta } from '../combate/icones';
+import { IconeEscudo, IconeSeta } from '../combate/icones';
 
 interface Props {
   iniciativa: EntradaIniciativa[];
@@ -28,7 +30,14 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
   const { modoCombate, turnoAtualId, rodada, contadorCena, condicoesCombate } = sessaoPublica;
+  // `CombateJogadorView` é montado duas vezes ao mesmo tempo (`PlayerApp.tsx` direto E
+  // `CombatOverlayJogador.tsx`) — sem um id por instância, os dois `ArmasCombate` colidiriam no
+  // mesmo `diceBoxId` (mesmo problema achado no lado mestre, `IniciativaPanel.tsx`, 28/08). `:`
+  // de `useId()` quebraria o seletor CSS que `useDiceBox` monta (`#`+id) — tirado.
+  const instanceId = useId().replace(/:/g, '');
 
   const [mostrarGlossario, setMostrarGlossario] = useState(false);
 
@@ -133,21 +142,13 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                 {souEu && (
                   <div style={{ paddingLeft: '1.1rem' }}>
                     {minhaFicha.armas.length > 0 && (
-                      <div style={{ marginBottom: '0.4rem' }}>
-                        <span className="combate-rotulo">armas</span>
-                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                          {minhaFicha.armas.map((a) => (
-                            <span
-                              key={a.id}
-                              className="badge"
-                              style={{ alignSelf: 'flex-start', fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                              title={`${a.nome || 'arma'} · bonus: ${a.bonusAtaque} · dano: ${a.dano} · alcance: ${a.alcance}${a.nota ? ` · ${a.nota}` : ''}`}
-                            >
-                              <IconeLamina size={10} /> {a.nome || 'arma'}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                      <ArmasCombate
+                        ficha={minhaFicha}
+                        registrarLog={registrarLog}
+                        registrarRoll={registrarRoll}
+                        diceBoxId={`dice-arma-jogador-${instanceId}`}
+                        resolverRemoto={resolverRolagemJogador}
+                      />
                     )}
                     <CombatenteResumo
                       nome=""

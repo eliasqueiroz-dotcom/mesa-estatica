@@ -308,7 +308,7 @@ export function useIniciativa() {
     expandidos, adicionarAberto, dragIndex, dropIndex,
     setDragIndex, setDropIndex, setAdicionarAberto,
     toggleSelecionado, toggleTodos, rolarSelecionados, resetar, toggleExpandido,
-    pvDoCombatente, defesaDoCombatente, usarAcaoNpc,
+    pvDoCombatente, defesaDoCombatente, usarAcaoNpc, registrarLog, registrarRoll,
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
