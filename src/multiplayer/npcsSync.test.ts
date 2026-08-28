@@ -280,6 +280,32 @@ describe('iniciarSyncNpcs — guard de corrida', () => {
     });
   });
 
+  it('dois eventos (publico+privado) pro MESMO id no mesmo push fazem só um buscarEMontar (dedup de egress)', async () => {
+    cleanup = iniciarSyncNpcs();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([]);
+    mock.resolvers[1]([]);
+
+    const npcId = 'npc-dedup-1';
+    // um único push de verdade escreve nas duas tabelas em sequência — cada uma dispara seu
+    // próprio evento Realtime pro mesmo id, quase simultâneos.
+    mock.handlers[0]({ new: { id: npcId }, old: {} }); // canal npcs_publico
+    mock.handlers[1]({ new: { id: npcId }, old: {} }); // canal npcs_privado
+
+    // um buscarEMontar (2 selects: publico+privado) — não dois buscarEMontar (4 selects).
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    await Promise.resolve();
+    expect(mock.resolvers.length).toBe(4);
+
+    mock.resolvers[2](npcRemoto(npcId, 'Guarda Dedup'));
+    mock.resolvers[3](linhasPrivadasVazias(npcId));
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().npcs.some((n) => n.id === npcId && n.nome === 'Guarda Dedup')).toBe(true);
+    });
+  });
+
   it('marca "em voo" no momento em que agenda o push — antes do debounce (ATRASO_PUSH_MS) disparar', () => {
     vi.useFakeTimers();
     vi.stubGlobal('localStorage', criarStorageFalso());

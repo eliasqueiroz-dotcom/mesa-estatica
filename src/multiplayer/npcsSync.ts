@@ -173,6 +173,21 @@ export function iniciarSyncNpcs(): () => void {
   let npcsAnteriores = useStore.getState().npcs;
   const pendencias = new Set<string>();
 
+  // `npcs_publico`/`npcs_privado` disparam DOIS eventos Realtime pra um único push, e cada um
+  // chama `aplicarRemoto` independente — mesmo dedup de `fichasSync.ts` (achado revisando o
+  // egress do PostgREST, 28/08): uma promise em voo por id, compartilhada entre os dois
+  // chamadores, cada um ainda faz sua PRÓPRIA checagem de pendência/snapshot antes de aguardar.
+  const buscasEmVoo = new Map<string, Promise<Npc | null>>();
+  const buscarEMontarCompartilhado = (id: string): Promise<Npc | null> => {
+    const emVoo = buscasEmVoo.get(id);
+    if (emVoo) return emVoo;
+    const promessa = buscarEMontar(cliente, id).finally(() => {
+      if (buscasEmVoo.get(id) === promessa) buscasEmVoo.delete(id);
+    });
+    buscasEmVoo.set(id, promessa);
+    return promessa;
+  };
+
   const agendarPush = criarDebouncePorChave<Npc>(ATRASO_PUSH_MS, (_id, npc) => {
     pendencias.delete(_id);
     executarComRetentativa('npcs-sync', npc.id, () =>
@@ -238,7 +253,7 @@ export function iniciarSyncNpcs(): () => void {
       // sem nunca reenviá-la. Se mudou, a edição local vence e reagenda o push que a guarda
       // engoliu.
       const npcLocalAntes = useStore.getState().npcs.find((n) => n.id === id);
-      const npcRemoto = await buscarEMontar(cliente, id);
+      const npcRemoto = await buscarEMontarCompartilhado(id);
       const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
 
       if (npcLocalAgora !== npcLocalAntes || pendencias.has(id)) {

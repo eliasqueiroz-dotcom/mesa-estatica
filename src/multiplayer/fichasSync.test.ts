@@ -284,6 +284,32 @@ describe('iniciarSyncFichas — guard de corrida', () => {
     });
   });
 
+  it('dois eventos (publico+privado) pro MESMO id no mesmo push fazem só um buscarEMontar (dedup de egress)', async () => {
+    cleanup = iniciarSyncFichas();
+
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
+    mock.resolvers[0]([]);
+    mock.resolvers[1]([]);
+
+    const fichaId = 'ficha-dedup-1';
+    // um único push de verdade escreve nas duas tabelas em sequência — cada uma dispara seu
+    // próprio evento Realtime pro mesmo id, quase simultâneos.
+    mock.handlers[0]({ new: { id: fichaId }, old: {} }); // canal characters_publico
+    mock.handlers[1]({ new: { id: fichaId }, old: {} }); // canal characters_privado
+
+    // um buscarEMontar (2 selects: publico+privado) — não dois buscarEMontar (4 selects).
+    await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(4));
+    await Promise.resolve();
+    expect(mock.resolvers.length).toBe(4);
+
+    mock.resolvers[2](fichaRemotaPublica(fichaId, 'Helena Dedup'));
+    mock.resolvers[3](fichaRemotaPrivada(fichaId));
+
+    await vi.waitFor(() => {
+      expect(useStore.getState().fichas.some((f) => f.id === fichaId && f.nome === 'Helena Dedup')).toBe(true);
+    });
+  });
+
   it('monta a ficha corretamente com o select estreito de characters_privado (só {dados}, sem owner_token/auth_uid)', async () => {
     cleanup = iniciarSyncFichas();
 

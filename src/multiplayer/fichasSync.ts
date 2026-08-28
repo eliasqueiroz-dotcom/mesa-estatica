@@ -278,6 +278,23 @@ export function iniciarSyncFichas(): () => void {
   // imune a isso porque só o subscriber (edição de verdade) a incrementa.
   const geracaoLocal = new Map<string, number>();
 
+  // `characters_publico`/`characters_privado` disparam DOIS eventos Realtime pra um único
+  // push, e cada um chama `aplicarRemoto` independente — sem isso, cada par de eventos batia
+  // DOIS `buscarEMontar` (4 selects, incluindo o JSON inteiro de `dados` duas vezes) pro MESMO
+  // id, achado revisando o egress do PostgREST (28/08: 70% do tráfego do dia). Uma promise em
+  // voo por id, compartilhada entre os dois chamadores — cada um ainda faz sua PRÓPRIA checagem
+  // de geração/pendência (ver `aplicarRemoto`), só a chamada de rede em si é uma só.
+  const buscasEmVoo = new Map<string, Promise<Ficha | null>>();
+  const buscarEMontarCompartilhado = (id: string): Promise<Ficha | null> => {
+    const emVoo = buscasEmVoo.get(id);
+    if (emVoo) return emVoo;
+    const promessa = buscarEMontar(cliente, id).finally(() => {
+      if (buscasEmVoo.get(id) === promessa) buscasEmVoo.delete(id);
+    });
+    buscasEmVoo.set(id, promessa);
+    return promessa;
+  };
+
   const agendarPush = criarDebouncePorChave<Ficha>(ATRASO_PUSH_MS, (_id, ficha) => {
     pendencias.delete(_id);
     executarComRetentativa('fichas-sync', ficha.id, () =>
@@ -352,7 +369,7 @@ export function iniciarSyncFichas(): () => void {
     // ao vivo em 28/08. `geracaoLocal` não sofre disso: só o subscriber a incrementa, nunca
     // este método.
     const geracaoAntes = geracaoLocal.get(id) ?? 0;
-    const fichaRemota = await buscarEMontar(cliente, id);
+    const fichaRemota = await buscarEMontarCompartilhado(id);
     const geracaoDepois = geracaoLocal.get(id) ?? 0;
 
     if (geracaoDepois !== geracaoAntes || pendencias.has(id)) {
