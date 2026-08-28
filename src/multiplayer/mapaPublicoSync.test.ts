@@ -166,3 +166,61 @@ describe('iniciarSyncMapaPublico — refetch de reconexão', () => {
     });
   });
 });
+
+// ===== eco remoto durante a janela de debounce não reverte a edição local (achado pré-sessão) =====
+function criarClienteComEventoRealtime() {
+  let handlerPostgresChanges: ((payload: { new: unknown }) => void) | undefined;
+
+  const builder: any = {};
+  builder.select = () => builder;
+  builder.eq = () => builder;
+  builder.maybeSingle = () => Promise.resolve({ data: null, error: null }); // sem linha ainda
+  builder.upsert = () => Promise.resolve({ error: null });
+
+  const channelObj: any = {};
+  channelObj.on = (_evento: string, _filtro: unknown, handler: (payload: { new: unknown }) => void) => {
+    handlerPostgresChanges = handler;
+    return channelObj;
+  };
+  channelObj.subscribe = (cb?: (status: string) => void) => {
+    cb?.('SUBSCRIBED');
+    return channelObj;
+  };
+
+  return {
+    from: () => builder,
+    channel: () => channelObj,
+    removeChannel: () => {},
+    dispararPostgresChanges: (linha: unknown) => handlerPostgresChanges?.({ new: linha }),
+  };
+}
+
+describe('iniciarSyncMapaPublico — eco remoto atrasado não reverte edição local em voo', () => {
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+
+  it('grid ajustado duas vezes rápido: eco do 1o push não apaga o 2o ajuste ainda não pushado', async () => {
+    const mock = criarClienteComEventoRealtime();
+    h.clienteAtual = mock;
+    cleanup = iniciarSyncMapaPublico();
+
+    // 1a edição — agenda o push (debounce ainda não disparou).
+    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, colunas: 8 } } }));
+    // 2a edição, ainda dentro da janela de debounce — o valor que deve sobreviver.
+    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, colunas: 12 } } }));
+
+    // eco Realtime do 1o push chega ANTES do debounce da 2a edição disparar — payload reflete
+    // o valor antigo (colunas: 8), não a edição mais recente do mestre.
+    mock.dispararPostgresChanges({ id: 'mapa', imagem_data_url: null, grade: { ...useStore.getState().mapa.grade, colunas: 8 } });
+
+    expect(useStore.getState().mapa.grade.colunas).toBe(12);
+  });
+});

@@ -115,3 +115,52 @@ describe('iniciarSyncMidiaEstado — marca "em voo" antes do debounce disparar',
     expect(retomarPendenciasPersistidas('midia-estado-sync')).toContain('midia');
   });
 });
+
+// ===== eco remoto durante a janela de debounce não reverte a ação local (achado pré-sessão) =====
+describe('iniciarSyncMidiaEstado — eco remoto atrasado não reverte clique local em voo', () => {
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+  });
+
+  it('play seguido de pause rápido: eco do 1o push (play) não desfaz o pause ainda não pushado', () => {
+    let handlerPostgresChanges: ((payload: { new: unknown }) => void) | undefined;
+
+    const builder: any = {};
+    builder.select = () => builder;
+    builder.eq = () => builder;
+    builder.maybeSingle = () => Promise.resolve({ data: null, error: null });
+    builder.upsert = () => Promise.resolve({ error: null });
+
+    const channelObj: any = {};
+    channelObj.on = (_evento: string, _filtro: unknown, handler: (payload: { new: unknown }) => void) => {
+      handlerPostgresChanges = handler;
+      return channelObj;
+    };
+    channelObj.subscribe = (cb?: (status: string) => void) => {
+      cb?.('SUBSCRIBED');
+      return channelObj;
+    };
+
+    h.clienteAtual = { from: () => builder, channel: () => channelObj, removeChannel: () => {} };
+    cleanup = iniciarSyncMidiaEstado();
+
+    // clica "play" — agenda o push (debounce 150ms ainda não disparou).
+    useStore.setState((s) => ({ midia: { ...s.midia, tocando: true } }));
+    // clica "pause" logo em seguida, ainda dentro da janela de debounce.
+    useStore.setState((s) => ({ midia: { ...s.midia, tocando: false } }));
+
+    // eco Realtime do push do "play" chega ANTES do debounce do "pause" disparar.
+    handlerPostgresChanges?.({ new: { id: 'midia', ...paraLinha({ ...useStore.getState().midia, tocando: true }) } });
+
+    expect(useStore.getState().midia.tocando).toBe(false);
+  });
+});

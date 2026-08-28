@@ -153,3 +153,55 @@ describe('iniciarSyncFoW — refetch de reconexão', () => {
     expect(useStore.getState().mapa.fow.ativa).toBe(true);
   });
 });
+
+// ===== eco remoto durante o round-trip do upsert não reverte a revelação local (achado pré-sessão) =====
+describe('iniciarSyncFoW — eco remoto em voo não reverte revelação local pendente', () => {
+  let cleanup: (() => void) | undefined;
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+  });
+
+  it('revelar uma região e receber o eco do upsert anterior (ainda não confirmado) não apaga a revelação', async () => {
+    useStore.setState(criarEstadoInicial());
+
+    let handlerPostgresChanges: ((payload: { new: unknown }) => void) | undefined;
+    const upsertResolvers: Array<() => void> = [];
+
+    const builder: any = {};
+    builder.select = () => builder;
+    builder.eq = () => builder;
+    builder.maybeSingle = () => Promise.resolve({ data: null, error: null });
+    builder.upsert = () =>
+      new Promise((resolve) => {
+        upsertResolvers.push(() => resolve({ error: null }));
+      });
+
+    const channelObj: any = {};
+    channelObj.on = (_evento: string, _filtro: unknown, handler: (payload: { new: unknown }) => void) => {
+      handlerPostgresChanges = handler;
+      return channelObj;
+    };
+    channelObj.subscribe = (cb?: (status: string) => void) => {
+      cb?.('SUBSCRIBED');
+      return channelObj;
+    };
+
+    h.clienteAtual = { from: () => builder, channel: () => channelObj, removeChannel: () => {} };
+    cleanup = iniciarSyncFoW();
+
+    // revela uma região — dispara o upsert (ainda não resolvido, ver `upsertResolvers`).
+    useStore.setState((s) => ({
+      mapa: { ...s.mapa, fow: { ...s.mapa.fow, vistas: [{ id: 'r1', forma: 'rect', x: 0, y: 0, w: 0.5, h: 0.5 }] } },
+    }));
+
+    // eco Realtime chega ANTES desse upsert confirmar — payload reflete o estado ANTERIOR à
+    // revelação (sem `r1`), como um segundo cliente reconectando ou o eco de um upsert anterior.
+    handlerPostgresChanges?.({ new: { id: 'fow', vistas: [], visiveis_agora: [], proximo_id_zona: null, ativa: false, version: 1 } });
+
+    expect(useStore.getState().mapa.fow.vistas).toHaveLength(1);
+  });
+});

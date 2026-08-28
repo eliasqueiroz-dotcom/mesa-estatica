@@ -61,11 +61,21 @@ export function iniciarSyncMidiaEstado(): () => void {
   const cliente = supabase;
   if (!cliente) return () => {};
 
+  // true entre uma edição local agendar o push (debounce) e ele confirmar — mesmo guard de
+  // `mapaPublicoSync.ts`/`fowSync.ts`: sem isso, o eco de um play/pause/seek anterior chegando
+  // dentro da janela de debounce de um clique seguinte (troca de faixa, ajuste de volume)
+  // reverte esse clique mais novo pro estado antigo.
+  let pendente = false;
+
   const push = () => {
     const { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume } = useStore.getState().midia;
     return cliente
       .from('midia_estado')
-      .upsert({ id: ID_MIDIA, ...paraLinha({ faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume }) });
+      .upsert({ id: ID_MIDIA, ...paraLinha({ faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume }) })
+      .then((resultado) => {
+        pendente = false;
+        return resultado;
+      });
   };
 
   const agendarPush = criarDebouncePorChave<PatchEstadoMidia>(ATRASO_PUSH_MS, () => {
@@ -87,16 +97,19 @@ export function iniciarSyncMidiaEstado(): () => void {
     }
     // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
     // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    pendente = true;
     marcarEmVoo('midia-estado-sync', ID_MIDIA);
     agendarPush(ID_MIDIA, { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume });
   });
 
   // reenvia se ficou pendente de uma sessão anterior — singleton, chave sempre ID_MIDIA.
   if (retomarPendenciasPersistidas('midia-estado-sync').length > 0) {
+    pendente = true;
     executarComRetentativa('midia-estado-sync', ID_MIDIA, push);
   }
 
   const aplicarLinha = (linha: Linha) => {
+    if (pendente) return;
     aplicandoRemotoContagem++;
     try {
       useStore.setState((s) => ({ midia: { ...s.midia, ...paraEstadoMidia(linha) } }));

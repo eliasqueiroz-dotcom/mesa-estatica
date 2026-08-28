@@ -54,8 +54,15 @@ export function iniciarSyncFoW(): () => void {
   if (!cliente) return () => {};
 
   let aplicandoRemotoContagem = 0;
+  // true entre uma edição local disparar o upsert e ele confirmar — mesmo motivo do guard em
+  // `mapaPublicoSync.ts`/`sessaoPublicaSync.ts`: sem push debounçado aqui, mas o upsert ainda
+  // é um round-trip de rede; um eco (ou refetch de reconexão) chegando nesse meio-tempo
+  // aplicava o valor ANTES da revelação de FoW que acabou de ser feita, "apagando-a" na tela
+  // até o próximo evento corrigir sozinho.
+  let pendente = false;
 
   const aplicarLinha = (linha: LinhaFow) => {
+    if (pendente) return;
     aplicandoRemotoContagem++;
     try {
       useStore.setState((s) => ({ mapa: { ...s.mapa, fow: paraEstadoFoW(linha) } }));
@@ -92,21 +99,28 @@ export function iniciarSyncFoW(): () => void {
     })
     .subscribe(assinarStatusCanalComRefetch('fow-sync', refetchFoW));
 
+  const push = () =>
+    cliente
+      .from('fow_estado')
+      .upsert({ id: ID_FOW, ...paraLinha(useStore.getState().mapa.fow) })
+      .then((resultado) => {
+        pendente = false;
+        return resultado;
+      });
+
   // Push local → remoto. Compara por referência de objeto (imutável por troca — ver acima).
   const unsubscribeLocal = useStore.subscribe((state, prevState) => {
     if (aplicandoRemotoContagem > 0) return;
     if (state.mapa.fow === prevState.mapa.fow) return;
-    executarComRetentativa('fow-sync', ID_FOW, () =>
-      cliente.from('fow_estado').upsert({ id: ID_FOW, ...paraLinha(useStore.getState().mapa.fow) }),
-    );
+    pendente = true;
+    executarComRetentativa('fow-sync', ID_FOW, push);
   });
 
   // reenvia se ficou pendente de uma sessão anterior — singleton, então a única chave
   // possível é ID_FOW; relê a store ATUAL, não um payload congelado.
   if (retomarPendenciasPersistidas('fow-sync').length > 0) {
-    executarComRetentativa('fow-sync', ID_FOW, () =>
-      cliente.from('fow_estado').upsert({ id: ID_FOW, ...paraLinha(useStore.getState().mapa.fow) }),
-    );
+    pendente = true;
+    executarComRetentativa('fow-sync', ID_FOW, push);
   }
 
   return () => {

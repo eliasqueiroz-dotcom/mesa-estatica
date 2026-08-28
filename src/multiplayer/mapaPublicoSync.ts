@@ -38,8 +38,15 @@ export function iniciarSyncMapaPublico(): () => void {
   if (!cliente) return () => {};
 
   let aplicandoRemotoContagem = 0;
+  // true entre uma edição local agendar o push (debounce) e esse push de fato confirmar —
+  // mesmo papel de `pendente.valor` em `sessaoPublicaSync.ts`. Sem isso, um ajuste de grid
+  // seguido de outro em menos de ATRASO_PUSH_MS deixa o eco Realtime do PRIMEIRO push chegar
+  // (~100-300ms, bem dentro da janela de debounce do segundo) e `aplicarLinha` sobrescreve o
+  // segundo ajuste — ainda não pushado — de volta pro valor antigo, na cara do mestre.
+  let pendente = false;
 
   const aplicarLinha = (linha: Linha) => {
+    if (pendente) return;
     aplicandoRemotoContagem++;
     try {
       // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
@@ -55,8 +62,14 @@ export function iniciarSyncMapaPublico(): () => void {
   // próxima mudança, quando o upload virar URL, sincroniza de verdade.
   const push = () => {
     const { imagemDataUrl, grade } = useStore.getState().mapa;
-    const pendente = ehDataUrl(imagemDataUrl);
-    return cliente.from('mapa_publico').upsert({ id: ID_MAPA, ...(pendente ? {} : { imagem_data_url: imagemDataUrl }), grade });
+    const fotoPendente = ehDataUrl(imagemDataUrl);
+    return cliente
+      .from('mapa_publico')
+      .upsert({ id: ID_MAPA, ...(fotoPendente ? {} : { imagem_data_url: imagemDataUrl }), grade })
+      .then((resultado) => {
+        pendente = false;
+        return resultado;
+      });
   };
 
   const agendarPush = criarDebouncePorChave<{ imagemDataUrl: string | null; grade: GradeMapa }>(ATRASO_PUSH_MS, () => {
@@ -68,6 +81,7 @@ export function iniciarSyncMapaPublico(): () => void {
     if (state.mapa.imagemDataUrl === prevState.mapa.imagemDataUrl && state.mapa.grade === prevState.mapa.grade) return;
     // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
     // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts).
+    pendente = true;
     marcarEmVoo('mapa-publico-sync', ID_MAPA);
     agendarPush(ID_MAPA, { imagemDataUrl: state.mapa.imagemDataUrl, grade: state.mapa.grade });
   });
