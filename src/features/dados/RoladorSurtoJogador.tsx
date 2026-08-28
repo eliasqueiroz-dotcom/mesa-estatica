@@ -35,15 +35,20 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
   const [rolando, setRolando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoSurto | null>(null);
   const [escolhido, setEscolhido] = useState<'A' | 'B' | null>(null);
+  // `surtoPendente` mora na própria ficha (sincroniza por `characters_privado`, mestre+dono) —
+  // não só um estado local. Sem isso, resolver a escolha por outro caminho (a própria ficha,
+  // na aba Personagens) não avisava este rolador: `resultado` local continuava com o roll
+  // velho e os botões "escolher este" ficavam clicáveis pra sempre, deixando escolher nos
+  // dois lugares (achado 29/08). A escolha em si não duplicava de verdade —
+  // `resolverEscolhaSurtoPendente` já é no-op sem pendência — mas a UI mentia, mostrando uma
+  // escolha ainda em aberto que já tinha sido resolvida.
+  const pendente = ficha.surtoPendente;
 
   const rolarSurto = () => {
     setRolando(true);
     setResultado(null);
     setEscolhido(null);
-    useStore.setState((s) => {
-      const { [ficha.id]: _, ...resto } = s.escolhasSurtoPendentes;
-      return { escolhasSurtoPendentes: resto };
-    });
+    atualizarFicha(ficha.id, { surtoPendente: undefined });
     rolar(
       [{ sides: 20, qty: 2 }],
       (grupos) => {
@@ -76,13 +81,8 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
                 modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
               },
             ],
+            surtoPendente: { nomeFicha: ficha.nome ?? 'Personagem', entradaA: r.entradaA, entradaB: r.entradaB },
           });
-          useStore.setState((s) => ({
-            escolhasSurtoPendentes: {
-              ...s.escolhasSurtoPendentes,
-              [ficha.id]: { nomeFicha: ficha.nome ?? 'Personagem', entradaA: r.entradaA, entradaB: r.entradaB },
-            },
-          }));
           registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} — escolha pendente`, ficha.id, 'publica');
         }
       },
@@ -116,7 +116,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
         </div>
       )}
 
-      {resultado && !resultado.mesmoNumero && (
+      {resultado && !resultado.mesmoNumero && (pendente || escolhido) && (
         <div className="campos-grid" style={{ marginTop: '0.75rem' }}>
           {(['A', 'B'] as const).map((lado) => {
             const entrada = lado === 'A' ? resultado.entradaA : resultado.entradaB;

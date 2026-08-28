@@ -5,7 +5,6 @@ import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, 
 import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
 import { caixasIntersectam, subtrairCaixa } from '../features/mapa/fowGeometria';
 import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
-import type { EscolhaSurtoPendente } from './types';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
 import { marcarLocalErro, marcarLocalOk } from '../lib/statusMesa';
 import { validarTiposEstado } from './validarImportacao';
@@ -69,9 +68,6 @@ interface EstadoEfemero {
   /** timestamp do último burst do sistema de ruído — dispara em qualquer queda de Sanidade e ao
    *  rolar na tabela de Surto; RuidoOverlay observa isso pro burst de 1,5s (arte.md). */
   ultimoBurstRuidoEm: number | null;
-  /** quando um Surto dispara com os dois d20 diferentes, fica pendente até o mestre escolher
-   *  qual entrada vigora (regras.md: "o jogador escolhe qual acontece") — chaveado por fichaId. */
-  escolhasSurtoPendentes: Record<string, EscolhaSurtoPendente>;
 }
 
 interface Acoes {
@@ -593,7 +589,6 @@ export const useStore = create<Store>()(
     (set, get) => ({
       ...criarEstadoInicial(),
       ultimoBurstRuidoEm: null,
-      escolhasSurtoPendentes: {},
 
       adicionarFicha: () => {
         const ficha = criarFichaVazia(get().fichas.length);
@@ -710,13 +705,10 @@ export const useStore = create<Store>()(
                           modo: s.sessaoPublica.modoCombate ? 'combate' : 'cena',
                         },
                       ],
+                      surtoPendente: { nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB },
                     }
                   : f,
               ),
-              escolhasSurtoPendentes: {
-                ...s.escolhasSurtoPendentes,
-                [id]: { nomeFicha: ficha.nome || 'Personagem', entradaA: resultado.entradaA, entradaB: resultado.entradaB },
-              },
             }));
           }
         } else {
@@ -743,33 +735,30 @@ export const useStore = create<Store>()(
       },
 
       resolverEscolhaSurtoPendente: (fichaId, lado) => {
-        const pendente = get().escolhasSurtoPendentes[fichaId];
+        const pendente = get().fichas.find((f) => f.id === fichaId)?.surtoPendente;
         if (!pendente) return;
         const entrada = lado === 'A' ? pendente.entradaA : pendente.entradaB;
-        set((s) => {
-          const { [fichaId]: _, ...resto } = s.escolhasSurtoPendentes;
-          return {
-            fichas: s.fichas.map((f) =>
-              f.id === fichaId
-                ? {
-                    ...f,
-                    surtosAtivos: (() => {
-                      const arr = f.surtosAtivos ?? [];
-                      let idx = -1;
-                      for (let i = arr.length - 1; i >= 0; i--) {
-                        if (arr[i].escolha === null) { idx = i; break; }
-                      }
-                      if (idx === -1) return arr;
-                      const copia = [...arr];
-                      copia[idx] = { ...copia[idx], escolha: entrada.nome };
-                      return copia;
-                    })(),
-                  }
-                : f,
-            ),
-            escolhasSurtoPendentes: resto,
-          };
-        });
+        set((s) => ({
+          fichas: s.fichas.map((f) =>
+            f.id === fichaId
+              ? {
+                  ...f,
+                  surtosAtivos: (() => {
+                    const arr = f.surtosAtivos ?? [];
+                    let idx = -1;
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                      if (arr[i].escolha === null) { idx = i; break; }
+                    }
+                    if (idx === -1) return arr;
+                    const copia = [...arr];
+                    copia[idx] = { ...copia[idx], escolha: entrada.nome };
+                    return copia;
+                  })(),
+                  surtoPendente: undefined,
+                }
+              : f,
+          ),
+        }));
         get().registrarLog(
           'surto',
           `${pendente.nomeFicha} · Surto · escolhido: ${entrada.nome} — ${entrada.descricao}`,

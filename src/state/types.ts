@@ -114,6 +114,15 @@ export interface Ficha {
   observacaoCombate: string;
 
   surtosAtivos: SurtoAtivo[];
+
+  /** Escolha de Surto em aberto (dois d20 diferentes, aguardando qual entrada vigora) — mora na
+   *  ficha (não num map à parte no store) de propósito: assim ela sincroniza por
+   *  `characters_privado` igual o resto da ficha, e o mestre vê as duas opções na aba
+   *  Personagens de QUALQUER personagem, não só no navegador de quem rolou (achado 29/08 — o
+   *  campo antigo, `escolhasSurtoPendentes` no store, nunca saía do navegador que rolou).
+   *  Campo aditivo opcional (mesmo padrão de `periciasFavoritas`) — ausente = nada pendente,
+   *  sem migração. */
+  surtoPendente?: EscolhaSurtoPendente;
 }
 
 export interface NpcAcao {

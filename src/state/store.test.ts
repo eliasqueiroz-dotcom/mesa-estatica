@@ -120,7 +120,7 @@ describe('ajustarSanidadeAtual', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.5);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     vi.restoreAllMocks();
-    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeDefined();
+    expect(useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente).toBeDefined();
   });
 
   it('cria entrada com escolha pendente quando d20 diferem', () => {
@@ -128,16 +128,16 @@ describe('ajustarSanidadeAtual', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.5);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     vi.restoreAllMocks();
-    const pendente = useStore.getState().escolhasSurtoPendentes[id];
+    const pendente = useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente;
     expect(pendente).toBeDefined();
-    expect(pendente.entradaA).not.toEqual(pendente.entradaB);
+    expect(pendente!.entradaA).not.toEqual(pendente!.entradaB);
   });
 
   it('d20 iguais: resolve direto, sem pendência de escolha — o resultado já entra em surtosAtivos', () => {
     const id = adicionarFicha(10);
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // mesmo valor pros dois d20 → "mesmoNumero"
     useStore.getState().ajustarSanidadeAtual(id, 4);
-    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeUndefined();
+    expect(useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente).toBeUndefined();
     const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
     expect(ficha.surtosAtivos).toHaveLength(1);
     expect(ficha.surtosAtivos[0].escolha).not.toBeNull();
@@ -191,25 +191,25 @@ describe('resolverEscolhaSurtoPendente', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     vi.restoreAllMocks();
-    const pendente = useStore.getState().escolhasSurtoPendentes[id];
+    const pendente = useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente;
     expect(pendente).toBeDefined();
     useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
     const ficha = useStore.getState().fichas.find((f) => f.id === id)!;
-    expect(ficha.surtosAtivos[ficha.surtosAtivos.length - 1].escolha).toBe(pendente.entradaA.nome);
+    expect(ficha.surtosAtivos[ficha.surtosAtivos.length - 1].escolha).toBe(pendente!.entradaA.nome);
   });
 
   it('não duplica entradas', () => {
     const id = adicionarFicha(10);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
-    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeUndefined();
+    expect(useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente).toBeUndefined();
   });
 
   it('limpa escolha pendente após resolver', () => {
     const id = adicionarFicha(10);
     useStore.getState().ajustarSanidadeAtual(id, 4);
     useStore.getState().resolverEscolhaSurtoPendente(id, 'A');
-    expect(useStore.getState().escolhasSurtoPendentes[id]).toBeUndefined();
+    expect(useStore.getState().fichas.find((f) => f.id === id)?.surtoPendente).toBeUndefined();
   });
 
   it('não quebra se não há pendente', () => {
@@ -228,15 +228,20 @@ describe('resolverEscolhaSurtoPendente', () => {
 
     it('resolverEscolhaSurtoPendente não quebra se surtosAtivos for undefined', () => {
       const id = adicionarFicha(10);
-      useStore.setState({
-        escolhasSurtoPendentes: {
-          [id]: {
-            nomeFicha: 'Teste',
-            entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
-            entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
-          },
-        },
-      });
+      useStore.setState((s) => ({
+        fichas: s.fichas.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                surtoPendente: {
+                  nomeFicha: 'Teste',
+                  entradaA: TABELA_SURTO.find((e) => e.d20 === 1)!,
+                  entradaB: TABELA_SURTO.find((e) => e.d20 === 20)!,
+                },
+              }
+            : f,
+        ),
+      }));
       expect(() => useStore.getState().resolverEscolhaSurtoPendente(id, 'A')).not.toThrow();
     });
 

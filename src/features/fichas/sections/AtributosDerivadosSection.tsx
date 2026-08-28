@@ -24,7 +24,7 @@ export default function AtributosDerivadosSection({ ficha, onChange }: SecaoFich
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
-  const escolhaSurtoPendente = useStore((s) => s.escolhasSurtoPendentes[ficha.id] ?? null);
+  const escolhaSurtoPendente = ficha.surtoPendente ?? null;
   const resolverEscolhaSurtoPendente = useStore((s) => s.resolverEscolhaSurtoPendente);
   const [alertas, setAlertas] = useState<string[]>([]);
 
