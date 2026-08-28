@@ -39,8 +39,8 @@ Por que não o `@3d-dice/dice-box` (Babylon), usado antes: **só a versão three
 
 - **`src/rules/` é TS puro, sem React/Three** — testável com vitest, e é onde mora a fidelidade ao `regras.md`.
 - **Abas não desmontam**: o shell controla `visibility`/`pointer-events`, nunca render condicional. Desmontar zera o `useState` dos roladores e dispara o cleanup do `useDiceBox` (que faz `replaceChildren()` na bandeja — o dado sumia).
-- **Persistência**: zustand/persist com `version` + `migrate`; toda mudança de shape bumpa `SCHEMA_VERSION` (`factories.ts`) e ganha bloco `if (versaoAnterior < N)`.
-- **Público vs. privado**: o que só o mestre vê fica em `sessaoPrivada` e leva badge "privado" na UI. Roladores leem a DT da cena via `useDtDaCena()` sem exibir o número.
+- **Persistência**: zustand/persist com `version` + `migrate`; toda mudança de shape bumpa `SCHEMA_VERSION` (`factories.ts`) e ganha bloco `if (versaoAnterior < N)` — **exceto** um campo novo genuinamente opcional e aditivo (`campo?: T`, ausente = comportamento antigo, sem precisar tratar nada especial na leitura), que pode entrar sem bump nem migração; precedente: `Ficha.periciasFavoritas`, depois `Ficha.surtoPendente`.
+- **Público vs. privado**: o que só o mestre vê fica em `sessaoPrivada` (ou, por personagem, no lado privado de `characters_privado` — ex.: `Ficha.surtoPendente`) e leva badge "privado" na UI. O app não decide sucesso/falha de teste sozinho (nem Sanidade nem perícia comum) — mostra o resultado bruto e o mestre compara com a DT que tiver em mente.
 - **Export/Import JSON é obrigatório** — localStorage é frágil (limpeza de navegador, perfil errado). Imagem de mapa como dataURL tem limite (~5MB): comprimida a ~1600px na importação.
 
 ## Dados, tokens e performance

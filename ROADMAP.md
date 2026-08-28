@@ -41,6 +41,10 @@ Cada uma custou um bug real em produção ou ao vivo numa sessão.
 
 `assinarStatusCanalComRefetch` (ver invariante acima) foi ligado nos módulos combat-críticos (fichas, npcs, iniciativa, sessão pública, tokens, FoW, mapa) e nos 6 hooks de hidratação do jogador — não nos módulos de baixa prioridade (`midiaFaixasSync`, `soundpadSync`, `midiaEstadoSync`, `logRollsSync`): autocorrigem no próximo evento (trilha/efeito/log não são bloqueantes pra jogar), decisão consciente de escopo, não esquecimento. Retomar se sobrar tempo antes do 29/08.
 
+### Pendência conhecida — push de ficha inteira não faz merge (29/08)
+
+`empurrarFicha` (`fichasSync.ts`) grava a ficha inteira a partir do snapshot local a cada push — não é um merge por campo no servidor. Se dois clientes editarem a MESMA ficha quase ao mesmo tempo (ex.: mestre e o próprio jogador rolando Surto pro mesmo personagem dentro da mesma janela de debounce), quem sincronizar por último apaga silenciosamente a mudança do outro. Achado revisando o refactor de `surtoPendente` (que passou a viver na ficha, sincronizado — antes só existia no navegador de quem rolou, imune a essa corrida por construção), mas o problema é mais antigo e mais amplo: vale pra qualquer campo da ficha editado por dois lados ao mesmo tempo, não só Surto. Corrigir de verdade exige uma function no Postgres que aplique a mudança de forma atômica (lê+grava no mesmo passo, sem depender do snapshot do cliente) — mesmo padrão que `registrar_tentativa_mestre` (migração 0024) já usa pra outro caso. Não faz sentido abrir essa migração só por causa do Surto; retomar se o padrão de conflito aparecer em mais de um lugar.
+
 ## Próximos passos — confiabilidade pós-publicação
 
 O app nasceu local; agora tem URL pública. Auditoria (tratamento de erro, RLS, build/deploy) levantou os gaps abaixo.

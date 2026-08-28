@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { calcularExpiraSurto, personagemEstaEmSurto, resolverSurto, surtosAtivosNaSessao } from './surto';
+import {
+  calcularExpiraSurto,
+  escolhaSurtoPorId,
+  indiceSurtoPendente,
+  personagemEstaEmSurto,
+  resolverSurto,
+  surtosAtivosNaSessao,
+} from './surto';
 import type { EstadoSessaoParaSurto } from './surto';
 
 describe('resolverSurto', () => {
@@ -106,5 +113,60 @@ describe('surtosAtivosNaSessao', () => {
     expect(ativos).toHaveLength(1);
     expect(ativos[0].id).toBe('1');
     expect(personagemEstaEmSurto(surtos, sessaoCombate)).toBe(ativos.length > 0);
+  });
+});
+
+describe('indiceSurtoPendente', () => {
+  it('array vazio -> -1', () => {
+    expect(indiceSurtoPendente([])).toBe(-1);
+  });
+
+  it('sem nenhum escolha:null -> -1', () => {
+    const surtos = [{ id: '1', expiraEm: 1, escolha: 'Fuga cega', modo: 'cena' as const }];
+    expect(indiceSurtoPendente(surtos)).toBe(-1);
+  });
+
+  it('acha o índice do escolha:null mais recente, não o primeiro', () => {
+    const surtos = [
+      { id: '1', expiraEm: 1, escolha: null, modo: 'cena' as const },
+      { id: '2', expiraEm: 2, escolha: 'Fuga cega', modo: 'cena' as const },
+      { id: '3', expiraEm: 3, escolha: null, modo: 'cena' as const },
+    ];
+    expect(indiceSurtoPendente(surtos)).toBe(2);
+  });
+});
+
+describe('escolhaSurtoPorId', () => {
+  it('array vazio -> null', () => {
+    expect(escolhaSurtoPorId([], 'x')).toBeNull();
+  });
+
+  it('id não encontrado -> null', () => {
+    const surtos = [{ id: '1', expiraEm: 1, escolha: 'Fuga cega', modo: 'cena' as const }];
+    expect(escolhaSurtoPorId(surtos, '2')).toBeNull();
+  });
+
+  it('ainda pendente (escolha: null) -> null', () => {
+    const surtos = [{ id: '1', expiraEm: 1, escolha: null, modo: 'cena' as const }];
+    expect(escolhaSurtoPorId(surtos, '1')).toBeNull();
+  });
+
+  it('devolve a escolha já gravada pro id certo', () => {
+    const surtos = [
+      { id: '1', expiraEm: 1, escolha: 'Fuga cega', modo: 'cena' as const },
+      { id: '2', expiraEm: 2, escolha: null, modo: 'cena' as const },
+    ];
+    expect(escolhaSurtoPorId(surtos, '1')).toBe('Fuga cega');
+  });
+
+  it('não confunde com um surto ANTERIOR que caiu na mesma entrada da tabela — só o id importa', () => {
+    // Duas rolagens diferentes do mesmo personagem podem sortear a mesma entrada (só 20
+    // possíveis). Buscar por nome (em vez de id) acharia essa escolha antiga e mostraria
+    // "escolhido" numa rolagem nova ainda pendente — por isso a busca é sempre por id.
+    const surtos = [
+      { id: 'antigo', expiraEm: 1, escolha: 'Fuga cega', modo: 'cena' as const },
+      { id: 'novo', expiraEm: 2, escolha: null, modo: 'cena' as const },
+    ];
+    expect(escolhaSurtoPorId(surtos, 'novo')).toBeNull();
   });
 });

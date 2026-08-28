@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TABELA_TRAUMAS } from '../../../rules/data/traumas';
 import { useStore } from '../../../state/store';
 import type { TraumaFicha } from '../../../state/types';
@@ -17,6 +17,14 @@ export default function TraumasSection({ ficha, onChange, souMestre }: SecaoFich
    *  de arma em ArmasSection.tsx (lá faz sentido persistir, comparando ataque após ataque; aqui
    *  é só uma resposta rápida de "caiu isso"). */
   const [ultimoSorteio, setUltimoSorteio] = useState<{ d20: number; nome: string } | null>(null);
+  // Guarda o timer em voo — sem isso, sortear duas vezes dentro de `DURACAO_RESULTADO_MS`
+  // agendava dois `setTimeout` independentes; o primeiro (mais velho) disparava e apagava o
+  // resultado do SEGUNDO sorteio um segundo antes da hora, já que nada limpava o anterior
+  // (achado na revisão de 29/08).
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
 
   const atualizar = (id: string, patch: Partial<TraumaFicha>) => {
     onChange({ traumas: ficha.traumas.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
@@ -58,7 +66,8 @@ export default function TraumasSection({ ficha, onChange, souMestre }: SecaoFich
     adicionar(entrada);
     registrarLog('trauma', `${ficha.nome || 'Personagem'} · sorteou trauma na tabela: d20=${d20} — ${entrada.nome}`, ficha.id, visibilidade);
     setUltimoSorteio({ d20, nome: entrada.nome });
-    setTimeout(() => setUltimoSorteio(null), DURACAO_RESULTADO_MS);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setUltimoSorteio(null), DURACAO_RESULTADO_MS);
   };
 
   return (

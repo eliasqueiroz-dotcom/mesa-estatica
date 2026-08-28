@@ -61,3 +61,28 @@ export function surtosAtivosNaSessao(surtosAtivos: SurtoAtivo[], sessao: EstadoS
 export function personagemEstaEmSurto(surtosAtivos: SurtoAtivo[], sessao: EstadoSessaoParaSurto): boolean {
   return surtosAtivosNaSessao(surtosAtivos, sessao).length > 0;
 }
+
+/** Índice do surto ativo mais recente ainda sem escolha (`escolha === null`) — é nele que
+ *  resolver uma escolha pendente deve gravar o resultado. -1 se não houver nenhum. Extraído do
+ *  que era uma IIFE inline em `resolverEscolhaSurtoPendente` (store.ts), pra não duplicar a
+ *  mesma varredura de novo em outro lugar. */
+export function indiceSurtoPendente(surtosAtivos: SurtoAtivo[]): number {
+  const arr = surtosAtivos ?? [];
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (arr[i].escolha === null) return i;
+  }
+  return -1;
+}
+
+/** Escolha já gravada (ou `null` se ainda pendente/não encontrado) do surto com este `id`
+ *  específico — usada pra mostrar qual lado realmente venceu segundo o que está gravado na
+ *  ficha, em vez de confiar num "cliquei aqui" puramente local. Busca por `id` (não por nome
+ *  de `entradaA`/`entradaB`) de propósito: um personagem acumula vários surtos na sessão, e
+ *  duas rolagens diferentes podem sortear a MESMA entrada da tabela — bater só pelo nome
+ *  acharia uma escolha antiga de um surto anterior e mostraria "escolhido" numa rolagem que
+ *  ainda nem foi resolvida. Sem isso, dois clientes (mestre e o próprio jogador, por exemplo)
+ *  tentando resolver a MESMA escolha quase ao mesmo tempo também podiam deixar o lado que
+ *  PERDEU a corrida marcado como "escolhido" na própria tela (achado 29/08). */
+export function escolhaSurtoPorId(surtosAtivos: SurtoAtivo[], surtoId: string): string | null {
+  return (surtosAtivos ?? []).find((s) => s.id === surtoId)?.escolha ?? null;
+}

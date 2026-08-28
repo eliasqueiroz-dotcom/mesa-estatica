@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
-import { calcularExpiraSurto, resolverSurto, type ResultadoSurto } from '../../rules/surto';
+import { calcularExpiraSurto, escolhaSurtoPorId, resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 
@@ -33,8 +33,9 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
   const sessaoPublica = useStore((s) => s.sessaoPublica);
 
   const [rolando, setRolando] = useState(false);
-  const [resultado, setResultado] = useState<ResultadoSurto | null>(null);
-  const [escolhido, setEscolhido] = useState<'A' | 'B' | null>(null);
+  // `surtoId` é o id da entrada criada em `surtosAtivos` por ESTE roll — usado depois pra achar
+  // a escolha de verdade gravada na ficha (ver `escolhaConfirmada` abaixo), não só um flag local.
+  const [resultado, setResultado] = useState<(ResultadoSurto & { surtoId: string }) | null>(null);
   // `surtoPendente` mora na própria ficha (sincroniza por `characters_privado`, mestre+dono) —
   // não só um estado local. Sem isso, resolver a escolha por outro caminho (a própria ficha,
   // na aba Personagens) não avisava este rolador: `resultado` local continuava com o roll
@@ -43,18 +44,25 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
   // `resolverEscolhaSurtoPendente` já é no-op sem pendência — mas a UI mentia, mostrando uma
   // escolha ainda em aberto que já tinha sido resolvida.
   const pendente = ficha.surtoPendente;
+  // Qual lado REALMENTE venceu, segundo o que está gravado na ficha — não um "cliquei aqui"
+  // local. Sem isso, dois clientes (o mestre e o próprio jogador, por exemplo) tentando
+  // resolver a mesma escolha quase ao mesmo tempo podiam deixar o lado que perdeu a corrida
+  // marcado como "escolhido" na própria tela, mesmo o servidor tendo gravado o outro lado
+  // (achado 29/08).
+  const escolhaConfirmada =
+    resultado && !resultado.mesmoNumero ? escolhaSurtoPorId(ficha.surtosAtivos ?? [], resultado.surtoId) : null;
 
   const rolarSurto = () => {
     setRolando(true);
     setResultado(null);
-    setEscolhido(null);
     atualizarFicha(ficha.id, { surtoPendente: undefined });
     rolar(
       [{ sides: 20, qty: 2 }],
       (grupos) => {
         const [d20A, d20B] = grupos[0].rolls.map((r) => r.value);
         const r = resolverSurto(d20A, d20B);
-        setResultado(r);
+        const surtoId = crypto.randomUUID();
+        setResultado({ ...r, surtoId });
         setRolando(false);
         dispararBurstRuido();
         if (r.mesmoNumero) {
@@ -62,7 +70,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
             surtosAtivos: [
               ...(ficha.surtosAtivos ?? []),
               {
-                id: crypto.randomUUID(),
+                id: surtoId,
                 expiraEm: calcularExpiraSurto(sessaoPublica),
                 escolha: r.entradaA.nome,
                 modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
@@ -75,7 +83,7 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
             surtosAtivos: [
               ...(ficha.surtosAtivos ?? []).filter((s) => s.escolha !== null),
               {
-                id: crypto.randomUUID(),
+                id: surtoId,
                 expiraEm: calcularExpiraSurto(sessaoPublica),
                 escolha: null,
                 modo: sessaoPublica.modoCombate ? 'combate' : 'cena',
@@ -94,7 +102,6 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
 
   const escolher = (lado: 'A' | 'B') => {
     if (!resultado) return;
-    setEscolhido(lado);
     resolverEscolhaSurtoPendente(ficha.id, lado);
     registrarLog('surto', `${ficha.nome || 'Personagem'} · escolheu lado ${lado} do surto`, ficha.id, 'publica');
   };
@@ -116,11 +123,12 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
         </div>
       )}
 
-      {resultado && !resultado.mesmoNumero && (pendente || escolhido) && (
+      {resultado && !resultado.mesmoNumero && (pendente || escolhaConfirmada) && (
         <div className="campos-grid" style={{ marginTop: '0.75rem' }}>
           {(['A', 'B'] as const).map((lado) => {
             const entrada = lado === 'A' ? resultado.entradaA : resultado.entradaB;
             const d20 = lado === 'A' ? resultado.d20A : resultado.d20B;
+            const jaEscolhida = escolhaConfirmada === entrada.nome;
             return (
               <div
                 key={lado}
@@ -129,15 +137,15 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
                   flexDirection: 'column',
                   alignItems: 'flex-start',
                   gap: '0.4rem',
-                  borderColor: escolhido === lado ? 'var(--rede)' : undefined,
+                  borderColor: jaEscolhida ? 'var(--rede)' : undefined,
                 }}
               >
                 <span>
                   d20={d20} — <strong>{entrada.nome}</strong>
                 </span>
                 <span style={{ fontFamily: 'var(--font-body)' }}>{entrada.descricao}</span>
-                <button className="acento" onClick={() => escolher(lado)} disabled={escolhido !== null}>
-                  {escolhido === lado ? 'escolhido' : 'escolher este'}
+                <button className="acento" onClick={() => escolher(lado)} disabled={!!escolhaConfirmada}>
+                  {jaEscolhida ? 'escolhido' : 'escolher este'}
                 </button>
               </div>
             );

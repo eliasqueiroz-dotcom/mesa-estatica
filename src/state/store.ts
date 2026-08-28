@@ -4,7 +4,7 @@ import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
 import { caixasIntersectam, subtrairCaixa } from '../features/mapa/fowGeometria';
-import { calcularExpiraSurto, resolverSurto } from '../rules/surto';
+import { calcularExpiraSurto, indiceSurtoPendente, resolverSurto } from '../rules/surto';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
 import { marcarLocalErro, marcarLocalOk } from '../lib/statusMesa';
 import { validarTiposEstado } from './validarImportacao';
@@ -759,25 +759,13 @@ export const useStore = create<Store>()(
         if (!pendente) return;
         const entrada = lado === 'A' ? pendente.entradaA : pendente.entradaB;
         set((s) => ({
-          fichas: s.fichas.map((f) =>
-            f.id === fichaId
-              ? {
-                  ...f,
-                  surtosAtivos: (() => {
-                    const arr = f.surtosAtivos ?? [];
-                    let idx = -1;
-                    for (let i = arr.length - 1; i >= 0; i--) {
-                      if (arr[i].escolha === null) { idx = i; break; }
-                    }
-                    if (idx === -1) return arr;
-                    const copia = [...arr];
-                    copia[idx] = { ...copia[idx], escolha: entrada.nome };
-                    return copia;
-                  })(),
-                  surtoPendente: undefined,
-                }
-              : f,
-          ),
+          fichas: s.fichas.map((f) => {
+            if (f.id !== fichaId) return f;
+            const arr = f.surtosAtivos ?? [];
+            const idx = indiceSurtoPendente(arr);
+            const surtosAtivos = idx === -1 ? arr : arr.map((s2, i) => (i === idx ? { ...s2, escolha: entrada.nome } : s2));
+            return { ...f, surtosAtivos, surtoPendente: undefined };
+          }),
         }));
         get().registrarLog(
           'surto',
