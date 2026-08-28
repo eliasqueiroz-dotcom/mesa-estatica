@@ -64,13 +64,17 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
   };
 
   const selecionarAntecedente = (id: string) => {
+    if (id === 'custom') {
+      onChange({ antecedenteId: 'custom' });
+      return;
+    }
     const def = ANTECEDENTES.find((a) => a.id === id);
     if (!def) {
-      onChange({ antecedenteId: null });
+      onChange({ antecedenteId: null, antecedenteCustom: '' });
       return;
     }
     const anterior = ANTECEDENTES.find((a) => a.id === ficha.antecedenteId);
-    onChange({ antecedenteId: id });
+    onChange({ antecedenteId: id, antecedenteCustom: '' });
     const preencher = window.confirm(
       `Preencher kit, perícias, pergunta e gancho de "${def.nome}"? Isso sobrescreve o que veio do antecedente anterior (kit, Contato/Recurso, Pergunta que te define e Gancho).`,
     );
@@ -153,8 +157,19 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
                   {a.nome}
                 </option>
               ))}
+              <option value="custom">Outro (escrever)</option>
             </select>
           </div>
+          {ficha.antecedenteId === 'custom' && (
+            <div>
+              <label htmlFor="ficha-antecedente-custom">Antecedente (personalizado)</label>
+              <input
+                id="ficha-antecedente-custom"
+                value={ficha.antecedenteCustom}
+                onChange={(e) => onChange({ antecedenteCustom: e.target.value })}
+              />
+            </div>
+          )}
           <div>
             <label>Cor do token</label>
             <SeletorCor valor={ficha.corVisual} onEscolher={(cor) => onChange({ corVisual: cor })} />

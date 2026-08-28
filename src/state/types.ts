@@ -71,6 +71,8 @@ export interface Ficha {
   nome: string;
   jogador: string;
   antecedenteId: string | null;
+  /** texto livre usado quando antecedenteId === 'custom' (antecedente fora dos 8 presets). */
+  antecedenteCustom: string;
   motivo: string;
   perguntaQueTeDefine: string;
   respostaPergunta: string;

@@ -68,15 +68,18 @@ const APELIDOS_ATRIBUTO: Record<string, Atributo> = Object.fromEntries(
 );
 for (const a of ATRIBUTOS) APELIDOS_ATRIBUTO[normalizar(a.nome)] = a.id;
 
-function casarAntecedente(valor: string | undefined, avisos: string[]): string | null {
+function casarAntecedente(
+  valor: string | undefined,
+  avisos: string[],
+): { id: string; custom?: string } | null {
   if (!valor || !valor.trim()) return null;
   const alvo = normalizar(valor);
   const porId = ANTECEDENTES.find((a) => a.id === alvo);
-  if (porId) return porId.id;
+  if (porId) return { id: porId.id };
   const porNome = ANTECEDENTES.find((a) => normalizar(a.nome) === alvo || normalizar(a.nome).includes(alvo) || alvo.includes(normalizar(a.nome)));
-  if (porNome) return porNome.id;
-  avisos.push(`antecedente "${valor}" não reconhecido — deixado em branco.`);
-  return null;
+  if (porNome) return { id: porNome.id };
+  avisos.push(`antecedente "${valor}" não reconhecido — usado como texto livre.`);
+  return { id: 'custom', custom: valor.trim() };
 }
 
 function casarPericiaId(chave: string, avisos: string[]): string | null {
@@ -137,8 +140,11 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
     else avisos.push(`cor "${dados.corVisual}" não é um hex válido — mantida a cor padrão.`);
   }
 
-  const antecedenteId = casarAntecedente(dados.antecedente, avisos);
-  if (antecedenteId) patch.antecedenteId = antecedenteId;
+  const antecedente = casarAntecedente(dados.antecedente, avisos);
+  if (antecedente) {
+    patch.antecedenteId = antecedente.id;
+    if (antecedente.custom !== undefined) patch.antecedenteCustom = antecedente.custom;
+  }
 
   const atributos: Record<Atributo, number> = { vigor: 0, agilidade: 0, intelecto: 0, percepcao: 0, presenca: 0, vontade: 0 };
   if (dados.atributos) {

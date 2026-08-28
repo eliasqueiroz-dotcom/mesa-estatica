@@ -546,6 +546,12 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
     const { indiceAtualTurno: _descartado, ...resto } = estado.sessaoPublica;
     estado.sessaoPublica = { ...resto, turnoAtualId: iniciativa[indice]?.id ?? null };
   }
+  // v32 → v33: antecedenteId ganha o sentinel 'custom' (Antecedente por texto livre, fora dos
+  // 8 presets) — antecedenteCustom guarda esse texto.
+  if (versaoAnterior < 33 && estado.fichas) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    estado.fichas = (estado.fichas as any[]).map((f: any) => ({ antecedenteCustom: '', ...f }));
+  }
   return estado as Store;
 }
 

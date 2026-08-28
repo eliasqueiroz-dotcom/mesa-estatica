@@ -32,6 +32,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     nome: '',
     jogador: '',
     antecedenteId: null,
+    antecedenteCustom: '',
     motivo: '',
     perguntaQueTeDefine: '',
     respostaPergunta: '',
@@ -152,7 +153,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {

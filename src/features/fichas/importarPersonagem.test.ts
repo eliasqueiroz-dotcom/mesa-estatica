@@ -23,9 +23,10 @@ describe('converterFichaImportada', () => {
     );
   });
 
-  it('antecedente não reconhecido gera aviso e fica de fora do patch', () => {
+  it('antecedente não reconhecido vira texto livre (custom) com aviso', () => {
     const { patch, avisos } = converterFichaImportada({ antecedente: 'Detetive particular' }, 20);
-    expect(patch.antecedenteId).toBeUndefined();
+    expect(patch.antecedenteId).toBe('custom');
+    expect(patch.antecedenteCustom).toBe('Detetive particular');
     expect(avisos.some((a) => a.includes('Detetive particular'))).toBe(true);
   });
 

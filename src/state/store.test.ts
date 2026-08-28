@@ -1343,7 +1343,8 @@ describe('migrate', () => {
   it('estado já na versão atual passa sem alterações inesperadas', () => {
     const fichaAtual = { id: 'f1', nome: 'Helena', foto: 'data:image/jpeg;base64,x', surtosAtivos: [] };
     const estado = migrate({ fichas: [fichaAtual], npcs: [] }, 23);
-    expect(estado.fichas[0]).toEqual(fichaAtual);
+    // v33 acrescenta antecedenteCustom (default '') a qualquer ficha vinda de antes dela.
+    expect(estado.fichas[0]).toEqual({ ...fichaAtual, antecedenteCustom: '' });
   });
 
   it('v23 → v24: injeta pistas vazio quando ausente', () => {
@@ -1461,6 +1462,11 @@ describe('migrate', () => {
   it('v31 → v32: índice fora da lista (ou lista ausente) vira turnoAtualId null', () => {
     const estado = migrate({ sessaoPublica: { modoCombate: false, indiceAtualTurno: 0, rodada: 1 } }, 31);
     expect(estado.sessaoPublica.turnoAtualId).toBeNull();
+  });
+
+  it('v32 → v33: injeta antecedenteCustom vazio em fichas existentes', () => {
+    const estado = migrate({ fichas: [{ id: 'f1', nome: 'Helena', antecedenteId: 'ex-policial' }] }, 32);
+    expect(estado.fichas[0]).toMatchObject({ antecedenteId: 'ex-policial', antecedenteCustom: '' });
   });
 });
 

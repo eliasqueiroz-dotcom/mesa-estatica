@@ -9,7 +9,7 @@
 |---|---|
 | Nome | texto |
 | Jogador(a) | texto |
-| Antecedente | select (os 8 do guia — ao escolher, oferecer preencher perícias + kit do preset; nunca sobrescrever sem confirmar) |
+| Antecedente | select (os 8 do guia + "Outro (escrever)" — ao escolher um preset, oferecer preencher perícias + kit; nunca sobrescrever sem confirmar; "Outro" libera campo de texto livre) |
 | Motivo | texto ("por que você investiga o que todos fingem não ver") |
 | Pergunta que te define + resposta | texto |
 

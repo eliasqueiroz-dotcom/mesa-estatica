@@ -35,7 +35,8 @@ function tabelaSimples(cabecalho: string[], linhas: string[][]): Table {
  *  round-trip perfeito (o app não lê de volta o próprio .docx diretamente), mas o texto sai
  *  organizado o bastante pra IA de conversão reconhecer cada campo sem ambiguidade. */
 export function gerarDocumentoFicha(ficha: Ficha, basePV: BasePV): Document {
-  const antecedente = ANTECEDENTES.find((a) => a.id === ficha.antecedenteId);
+  const nomeAntecedente =
+    ficha.antecedenteId === 'custom' ? ficha.antecedenteCustom : ANTECEDENTES.find((a) => a.id === ficha.antecedenteId)?.nome;
   const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
   const sanidadeMaxima = calcularSanidadeMaxima(ficha.atributos.vontade);
   const defesa = calcularDefesa(ficha.atributos.agilidade, ficha.equipamentoModificadorDefesa);
@@ -43,7 +44,7 @@ export function gerarDocumentoFicha(ficha: Ficha, basePV: BasePV): Document {
   const paragrafos: (Paragraph | Table)[] = [
     new Paragraph({ text: ficha.nome || 'sem nome', heading: HeadingLevel.TITLE }),
     linha('Jogador(a)', ficha.jogador),
-    linha('Antecedente', antecedente?.nome ?? '—'),
+    linha('Antecedente', nomeAntecedente || '—'),
     linha('Motivo', ficha.motivo),
     linha('Pergunta que te define', ficha.perguntaQueTeDefine),
     linha('Resposta', ficha.respostaPergunta),
