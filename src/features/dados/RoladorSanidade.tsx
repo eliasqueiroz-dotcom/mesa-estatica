@@ -54,9 +54,20 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
   const [fichaId, setFichaId] = useState('');
   const [gatilhoId, setGatilhoId] = useState<GatilhoSanidade>('perturbador');
   const [rolando, setRolando] = useState(false);
-  const [resultado, setResultado] = useState<{ d20: number; perdaRolada: number; aplicado: { sucesso: boolean; perda: number } | null } | null>(
-    null,
-  );
+  // Guarda de qual personagem/gatilho a rolagem era, capturado no momento de rolar — sem
+  // isso, "confirmar" lia o `ficha`/`gatilho` ATUAIS (derivados do dropdown), não os de
+  // quando o dado caiu: trocar o personagem selecionado (ou o gatilho) entre rolar e
+  // confirmar aplicava a perda de Sanidade — e registrava o log — no personagem/gatilho
+  // errado, silenciosamente (achado na revisão de 29/08).
+  const [resultado, setResultado] = useState<{
+    fichaId: string;
+    fichaNome: string;
+    gatilhoNome: string;
+    gatilhoDado: string;
+    d20: number;
+    perdaRolada: number;
+    aplicado: { sucesso: boolean; perda: number } | null;
+  } | null>(null);
   const [privado, setPrivado] = useState(true);
   const visibilidade = privado ? 'privada' as const : 'publica' as const;
 
@@ -67,9 +78,20 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
     if (!ficha) return;
     setRolando(true);
     const perdaTermo = parseDado(gatilho.dado);
+    const fichaIdDoRoll = ficha.id;
+    const fichaNomeDoRoll = ficha.nome || 'Personagem';
+    const gatilhoDoRoll = gatilho;
     rolar([{ sides: 20, qty: 1 }, perdaTermo], (grupos) => {
       const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
-      setResultado({ d20, perdaRolada, aplicado: null });
+      setResultado({
+        fichaId: fichaIdDoRoll,
+        fichaNome: fichaNomeDoRoll,
+        gatilhoNome: gatilhoDoRoll.nome,
+        gatilhoDado: gatilhoDoRoll.dado,
+        d20,
+        perdaRolada,
+        aplicado: null,
+      });
       setRolando(false);
     }, 'ruido', ficha.id, 'sanidade');
   };
@@ -79,24 +101,26 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
   // clica o resultado. Mesmo padrão de `RoladorSanidadeJogador.tsx` já usava do lado do
   // jogador ("aguarde o mestre confirmar quanto perde de verdade").
   const confirmarResultado = (sucesso: boolean) => {
-    if (!ficha || !resultado || resultado.aplicado) return;
+    if (!resultado || resultado.aplicado) return;
+    const fichaAlvo = fichas.find((f) => f.id === resultado.fichaId);
+    if (!fichaAlvo) return; // personagem removido entre o roll e a confirmação
     const perda = calcularPerdaSanidade(resultado.perdaRolada, sucesso);
     setResultado({ ...resultado, aplicado: { sucesso, perda } });
     registrarLog(
       'sanidade',
-      `${ficha.nome || 'Personagem'} · rolagem de Sanidade · gatilho "${gatilho.nome}" → d20=${resultado.d20}, ${gatilho.dado}=${resultado.perdaRolada} · ${sucesso ? 'sucesso' : 'falha'}, perde ${perda}`,
-      ficha.id,
+      `${resultado.fichaNome} · rolagem de Sanidade · gatilho "${resultado.gatilhoNome}" → d20=${resultado.d20}, ${resultado.gatilhoDado}=${resultado.perdaRolada} · ${sucesso ? 'sucesso' : 'falha'}, perde ${perda}`,
+      fichaAlvo.id,
       visibilidade,
     );
     registrarRoll({
-      origem: ficha.nome || 'Personagem',
-      personagemId: ficha.id,
-      formula: `d20 + ${gatilho.dado}`,
+      origem: resultado.fichaNome,
+      personagemId: fichaAlvo.id,
+      formula: `d20 + ${resultado.gatilhoDado}`,
       total: resultado.d20,
       bruto: resultado.d20,
       visibilidade,
     });
-    ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
+    ajustarSanidadeAtual(fichaAlvo.id, fichaAlvo.sanidadeAtual - perda);
   };
 
   return (
@@ -140,7 +164,8 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
       {resultado && !resultado.aplicado && (
         <div className="alerta-banner mono" style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <span>
-            d20={resultado.d20} · rolou {resultado.perdaRolada} de Sanidade — compare com a DT que tiver em mente e confirme
+            {resultado.fichaNome} · d20={resultado.d20} · rolou {resultado.perdaRolada} de Sanidade — compare com a DT que
+            tiver em mente e confirme
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button onClick={() => confirmarResultado(true)}>sucesso — perde {Math.floor(resultado.perdaRolada / 2)}</button>
@@ -159,8 +184,8 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
           }}
         >
           <span>
-            d20={resultado.d20} — {resultado.aplicado.sucesso ? 'sucesso' : 'falha'} · rolou {resultado.perdaRolada} de
-            Sanidade, perdeu {resultado.aplicado.perda}
+            {resultado.fichaNome} · d20={resultado.d20} — {resultado.aplicado.sucesso ? 'sucesso' : 'falha'} · rolou{' '}
+            {resultado.perdaRolada} de Sanidade, perdeu {resultado.aplicado.perda}
           </span>
         </div>
       )}

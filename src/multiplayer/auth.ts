@@ -177,17 +177,28 @@ async function checarVinculo(): Promise<boolean> {
   } catch {
     return false; // sem acesso a storage — não dá pra confirmar nada
   }
-  if (!tokenSalvo) return false;
+  if (!tokenSalvo) return false; // nunca teve token — não vinculado de verdade, não é falha ambígua
 
   const resultado = await vincularComoMestre(tokenSalvo);
   if (resultado.ok) return true;
 
   if (resultado.tokenInvalido) {
+    // 403 definitivo — token realmente rotacionado/inválido. Só aqui é seguro dizer
+    // "não vinculado": descarta o token salvo e devolve `false`, deixando o `GateOverlay`
+    // trancar de novo.
     try {
       localStorage.removeItem(CHAVE_TOKEN_MESTRE);
     } catch {
       // sem acesso a storage — nada a limpar
     }
+    return false;
   }
-  return false;
+
+  // Falha ambígua (rede, 429 de rate limit, sessão) — o comentário de `verificarVinculoMestre`
+  // acima já promete que isso "não conta" pra destrancar de novo, mas até aqui só a limpeza do
+  // token era condicional a `tokenInvalido`; o retorno caía pra `false` de qualquer jeito,
+  // fazendo `GateOverlay` trancar a tela de um mestre já validado por causa de uma instabilidade
+  // passageira (achado na revisão de 29/08). Mantém como estava — token continua salvo, sessão
+  // continua contando como vinculada — em vez de derrubar quem já estava jogando.
+  return true;
 }
