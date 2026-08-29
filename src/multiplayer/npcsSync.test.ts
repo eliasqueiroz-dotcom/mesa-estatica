@@ -86,6 +86,7 @@ describe('paraNpcPublico', () => {
       silhueta: 'guarda',
       foto: null,
       visivel: true,
+      notas: npc.notas,
     });
   });
 });

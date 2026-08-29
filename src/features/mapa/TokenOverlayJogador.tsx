@@ -14,12 +14,14 @@ interface Props {
   cor: string;
   foto: string | null;
   silhueta: string | null;
-  /** null = é o próprio PC (mostra detalhes); qualquer string = restrito */
+  /** null = é o próprio PC (mostra detalhes); qualquer string = restrito (exceto NPC, ver `tipo`) */
   idFora: string | null;
+  tipo?: 'pc' | 'npc';
+  notas?: string;
   onFechar: () => void;
 }
 
-export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhueta, idFora, onFechar }: Props) {
+export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhueta, idFora, tipo, notas, onFechar }: Props) {
   const basePV = useStore((s) => s.config.basePV);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const ajustarSanidadeAtual = useStore((s) => s.ajustarSanidadeAtual);
@@ -93,6 +95,10 @@ export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhu
               />
             </div>
           </>
+        ) : tipo === 'npc' ? (
+          <p className="vazio" style={{ margin: '0.5rem 0', fontStyle: notas ? 'italic' : undefined }}>
+            {notas || 'sem notas.'}
+          </p>
         ) : (
           <p className="vazio" style={{ textAlign: 'center', margin: '1.5rem 0' }}>
             informação restrita ao mestre

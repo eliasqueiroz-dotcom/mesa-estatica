@@ -11,6 +11,19 @@
   gap: 0.5rem;
 }
 
+.npc-card__secao {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--concrete-2);
+}
+
+.npc-card__secao-titulo {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
 .iniciativa-tabela td,
 .iniciativa-tabela th {
   text-align: left;

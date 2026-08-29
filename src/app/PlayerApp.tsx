@@ -355,7 +355,7 @@ export default function PlayerApp() {
               <p className="vazio">nada revelado ainda.</p>
             ) : (
               npcs.map((n) => (
-                <NpcPublicaView key={n.id} nome={n.nome} corVisual={n.corVisual} visivel={n.visivel} foto={n.foto} silhueta={n.silhueta} />
+                <NpcPublicaView key={n.id} nome={n.nome} corVisual={n.corVisual} visivel={n.visivel} foto={n.foto} silhueta={n.silhueta} notas={n.notas} />
               ))
             )}
           </div>

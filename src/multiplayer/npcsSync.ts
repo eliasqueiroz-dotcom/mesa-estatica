@@ -50,6 +50,7 @@ export interface NpcPublico {
   silhueta: string | null;
   foto: string | null;
   visivel: boolean;
+  notas: string;
 }
 
 export const paraLinhaPublico = (n: Npc): LinhaPublico => ({
@@ -91,6 +92,7 @@ export const paraNpcPublico = (r: LinhaPublico): NpcPublico => ({
   silhueta: r.silhueta ?? null,
   foto: r.foto ?? null,
   visivel: r.visivel,
+  notas: r.notas,
 });
 
 async function buscarEMontar(cliente: Cliente, id: string): Promise<Npc | null> {

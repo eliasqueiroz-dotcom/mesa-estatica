@@ -89,15 +89,16 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         sanidadeCritica,
         surtosAtivos: minhaFicha.surtosAtivos,
         tipo: 'pc' as const,
+        notas: undefined as string | undefined,
       };
     }
     const ficha = outrasFichas.find((f) => f.id === id);
     if (ficha) {
-      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const };
+      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const, notas: undefined as string | undefined };
     }
     const npc = npcs.find((n) => n.id === id);
     if (npc) {
-      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const };
+      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const, notas: npc.notas as string | undefined };
     }
     return null;
   };
@@ -270,6 +271,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             cor={p.cor}
             foto={p.foto}
             silhueta={p.silhueta}
+            tipo={p.tipo}
+            notas={p.notas}
             idFora={souEu ? null : overlay.participanteId}
             onFechar={() => setOverlay(null)}
           />

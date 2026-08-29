@@ -4,6 +4,7 @@ import { corPv, useIniciativa } from '../../hooks/useIniciativa';
 import { comprimirImagemAvatar } from '../../lib/comprimirImagem';
 import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
+import { ARMAS } from '../../rules/data/armas';
 import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { NpcAcao } from '../../state/types';
@@ -153,6 +154,14 @@ export default function NpcsTab() {
     atualizarNpc(npcId, { acoes: npc.acoes.filter((a) => a.id !== acaoId) });
   };
 
+  const adicionarAcaoDoArsenal = (npcId: string, nomeArma: string) => {
+    const def = ARMAS.find((a) => a.nome === nomeArma);
+    const npc = npcs.find((n) => n.id === npcId);
+    if (!def || !npc) return;
+    const nova: NpcAcao = { id: crypto.randomUUID(), nome: def.nome, bonus: 0, dano: def.dano };
+    atualizarNpc(npcId, { acoes: [...(npc.acoes ?? []), nova] });
+  };
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '1rem', alignItems: 'start' }}>
       <div className="secao">
@@ -250,75 +259,100 @@ export default function NpcsTab() {
                         </span>
                       </div>
 
-                      <div className="npc-card__grid">
-                        <div>
-                          <label htmlFor={`npc-pv-${n.id}`}>PV atual</label>
-                          <input id={`npc-pv-${n.id}`} type="number" value={n.pvAtual} onChange={(e) => atualizarNpc(n.id, { pvAtual: Number(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                          <label htmlFor={`npc-pvmax-${n.id}`}>PV máximo</label>
-                          <input id={`npc-pvmax-${n.id}`} type="number" value={n.pvMaximo} onChange={(e) => atualizarNpc(n.id, { pvMaximo: Number(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                          <label htmlFor={`npc-defesa-${n.id}`}>Defesa</label>
-                          <input id={`npc-defesa-${n.id}`} type="number" value={n.defesa} onChange={(e) => atualizarNpc(n.id, { defesa: Number(e.target.value) || 0 })} />
-                        </div>
-                        <div>
-                          <label htmlFor={`npc-agi-${n.id}`}>Agilidade</label>
-                          <input id={`npc-agi-${n.id}`} type="number" value={n.agilidade} onChange={(e) => atualizarNpc(n.id, { agilidade: Number(e.target.value) || 0 })} />
+                      <div className="npc-card__secao" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+                        <span className="label npc-card__secao-titulo">estatísticas</span>
+                        <div className="npc-card__grid">
+                          <div>
+                            <label htmlFor={`npc-pv-${n.id}`}>PV atual</label>
+                            <input id={`npc-pv-${n.id}`} type="number" value={n.pvAtual} onChange={(e) => atualizarNpc(n.id, { pvAtual: Number(e.target.value) || 0 })} />
+                          </div>
+                          <div>
+                            <label htmlFor={`npc-pvmax-${n.id}`}>PV máximo</label>
+                            <input id={`npc-pvmax-${n.id}`} type="number" value={n.pvMaximo} onChange={(e) => atualizarNpc(n.id, { pvMaximo: Number(e.target.value) || 0 })} />
+                          </div>
+                          <div>
+                            <label htmlFor={`npc-defesa-${n.id}`}>Defesa</label>
+                            <input id={`npc-defesa-${n.id}`} type="number" value={n.defesa} onChange={(e) => atualizarNpc(n.id, { defesa: Number(e.target.value) || 0 })} />
+                          </div>
+                          <div>
+                            <label htmlFor={`npc-agi-${n.id}`}>Agilidade</label>
+                            <input id={`npc-agi-${n.id}`} type="number" value={n.agilidade} onChange={(e) => atualizarNpc(n.id, { agilidade: Number(e.target.value) || 0 })} />
+                          </div>
                         </div>
                       </div>
 
-                      <textarea
-                        placeholder="notas do mestre (privadas — nunca vazam pros jogadores)"
-                        value={n.notasMestre ?? ''}
-                        onChange={(e) => atualizarNpc(n.id, { notasMestre: e.target.value })}
-                        style={{ marginTop: '0.3rem', minHeight: '2.5em', borderColor: 'var(--ruido-dim)' }}
-                      />
+                      <div className="npc-card__secao">
+                        <span className="label npc-card__secao-titulo">identidade</span>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <span className="vazio" style={{ fontSize: 11, minWidth: 52 }}>categoria</span>
+                          <input
+                            type="text"
+                            placeholder="ex: Sentinela, Anomalia..."
+                            value={n.categoria ?? ''}
+                            onChange={(e) => atualizarNpc(n.id, { categoria: e.target.value })}
+                            style={{ flex: 1, fontSize: 11 }}
+                          />
+                        </div>
 
-                      <textarea
-                        placeholder="notas — comportamento, gatilho, o que ele quer"
-                        value={n.notas}
-                        onChange={(e) => atualizarNpc(n.id, { notas: e.target.value })}
-                        style={{ marginTop: '0.3rem', minHeight: '2.5em' }}
-                      />
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.4rem' }}>
+                          <span className="vazio" style={{ fontSize: 11, minWidth: 52 }}>foto</span>
+                          <Avatar nome={n.nome} cor={n.corVisual} foto={n.foto} silhueta={n.silhueta} bordaCor={n.corVisual} tamanho={36} />
+                          <label className="mapa-upload-botao" style={{ fontSize: 10 }}>
+                            {comprimindoFotoIds.has(n.id) ? 'comprimindo…' : n.foto ? 'trocar' : 'carregar'}
+                            <input type="file" accept="image/*" hidden onChange={handleFoto(n.id)} disabled={comprimindoFotoIds.has(n.id)} />
+                          </label>
+                          {n.foto && (
+                            <button className="icone-botao" onClick={() => atualizarNpc(n.id, { foto: null })} title="remover foto" style={{ fontSize: 10 }}>
+                              ×
+                            </button>
+                          )}
+                        </div>
 
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.3rem' }}>
-                        <span className="vazio" style={{ fontSize: 11 }}>categoria</span>
-                        <input
-                          type="text"
-                          placeholder="ex: Sentinela, Anomalia..."
-                          value={n.categoria ?? ''}
-                          onChange={(e) => atualizarNpc(n.id, { categoria: e.target.value })}
-                          style={{ flex: 1, fontSize: 11 }}
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.4rem' }}>
+                          <span className="vazio" style={{ fontSize: 11, minWidth: 52 }}>silhueta</span>
+                          <SeletorSilhueta valor={n.silhueta} onEscolher={(slug) => atualizarNpc(n.id, { silhueta: slug })} />
+                        </div>
+                      </div>
+
+                      <div className="npc-card__secao">
+                        <span className="label npc-card__secao-titulo">notas</span>
+                        <textarea
+                          placeholder="notas do mestre (privadas — nunca vazam pros jogadores)"
+                          value={n.notasMestre ?? ''}
+                          onChange={(e) => atualizarNpc(n.id, { notasMestre: e.target.value })}
+                          style={{ minHeight: '2.5em', borderColor: 'var(--ruido-dim)' }}
+                        />
+                        <textarea
+                          placeholder="notas — comportamento, gatilho, o que ele quer (jogadores veem, só leitura)"
+                          value={n.notas}
+                          onChange={(e) => atualizarNpc(n.id, { notas: e.target.value })}
+                          style={{ marginTop: '0.3rem', minHeight: '2.5em' }}
                         />
                       </div>
 
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.3rem' }}>
-                        <span className="vazio" style={{ fontSize: 11 }}>foto</span>
-                        <Avatar nome={n.nome} cor={n.corVisual} foto={n.foto} silhueta={n.silhueta} bordaCor={n.corVisual} tamanho={36} />
-                        <label className="mapa-upload-botao" style={{ fontSize: 10 }}>
-                          {comprimindoFotoIds.has(n.id) ? 'comprimindo…' : n.foto ? 'trocar' : 'carregar'}
-                          <input type="file" accept="image/*" hidden onChange={handleFoto(n.id)} disabled={comprimindoFotoIds.has(n.id)} />
-                        </label>
-                        {n.foto && (
-                          <button className="icone-botao" onClick={() => atualizarNpc(n.id, { foto: null })} title="remover foto" style={{ fontSize: 10 }}>
-                            ×
-                          </button>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginTop: '0.3rem' }}>
-                        <span className="vazio" style={{ fontSize: 11 }}>silhueta</span>
-                        <SeletorSilhueta valor={n.silhueta} onEscolher={(slug) => atualizarNpc(n.id, { silhueta: slug })} />
-                      </div>
-
-                      <div style={{ marginTop: '0.4rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                          <span className="vazio" style={{ fontSize: 11 }}>armas</span>
-                          <button className="icone-botao" onClick={() => abrirNovaAcao(n.id)} style={{ fontSize: 10 }}>
-                            + arma
-                          </button>
+                      <div className="npc-card__secao">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <span className="label npc-card__secao-titulo" style={{ marginBottom: 0 }}>armas</span>
+                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val) adicionarAcaoDoArsenal(n.id, val);
+                              }}
+                              style={{ fontSize: 10 }}
+                            >
+                              <option value="">+ do arsenal…</option>
+                              {ARMAS.map((a) => (
+                                <option key={a.nome} value={a.nome}>
+                                  {a.nome}
+                                </option>
+                              ))}
+                            </select>
+                            <button className="icone-botao" onClick={() => abrirNovaAcao(n.id)} style={{ fontSize: 10 }}>
+                              + arma
+                            </button>
+                          </div>
                         </div>
                         {(n.acoes ?? []).length === 0 && !acaoEditandoId[n.id] ? (
                           <p className="vazio" style={{ fontSize: 10, margin: 0 }}>nenhuma arma definida.</p>
