@@ -5,8 +5,11 @@ import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 
 /** Tempo que "X está rolando…" fica visível — some assim que o dado assenta e o texto vira
  *  resultado (não precisa de graça própria, a transição já é o próprio `aoTerminar`).
- *  ~12s total (física ~2s + graça 10s) pra mesa toda ver o número. */
-const GRACA_RESULTADO_MS = 10000;
+ *  ~18s total (física ~2s + graça 16s) pra mesa toda ver o número — verificado ao vivo com 2
+ *  clientes reais que a rolagem ao vivo chega corretamente (broadcast + recepção funcionam), mas
+ *  10s de graça era curto demais pra alguém trocar de tela (mestre → jogador, ou entre dois
+ *  jogadores) a tempo de notar antes de sumir. */
+const GRACA_RESULTADO_MS = 16000;
 
 /**
  * Reproduz a rolagem de outro jogador (chegou por `rolagemAoVivoSync.ts`) — montado no
@@ -24,7 +27,12 @@ const GRACA_RESULTADO_MS = 10000;
  * não render condicional — mesmo motivo das abas em `App.tsx`): desmontar entre rolagens
  * destruiria a instância e reintroduziria o atraso de inicialização do WebGL.
  */
-export default function RolagemAoVivoPlayer() {
+interface Props {
+  /** true só em `App.tsx` (header do mestre) — ver comentário em `useReproduzirRolagemAoVivo.ts`. */
+  verProprias?: boolean;
+}
+
+export default function RolagemAoVivoPlayer({ verProprias }: Props) {
   const { ready, modo2D, reproduzir } = useDiceBox('dice-ao-vivo', true, 45);
 
   const graceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,7 +60,7 @@ export default function RolagemAoVivoPlayer() {
       setRotulo({ nome: r.origem, cor: r.cor, texto });
       graceRef.current = setTimeout(() => marcarVisivel(false), GRACA_RESULTADO_MS);
     },
-  });
+  }, verProprias);
 
   useEffect(
     () => () => {
@@ -77,8 +85,8 @@ export default function RolagemAoVivoPlayer() {
         <div
           id="dice-ao-vivo"
           style={{
-            width: 56,
-            height: 56,
+            width: 65,
+            height: 65,
             background: 'var(--concrete-0)',
             border: '1px solid var(--concrete-2)',
             flexShrink: 0,

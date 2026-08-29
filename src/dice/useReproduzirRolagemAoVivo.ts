@@ -25,6 +25,12 @@ export function useReproduzirRolagemAoVivo(
   reproduzir: ReturnType<typeof useDiceBox>['reproduzir'],
   pronto: boolean,
   callbacks?: Callbacks,
+  /** true só no header do mestre (`App.tsx`) — o mestre dispara ataque/dano de PC, ações de NPC
+   *  e perícia pela própria tela (`ArmasCombate.tsx`/`PericiasSection.tsx`), então `marcarComoProprio`
+   *  sempre marcaria essas rolagens como seu próprio eco e o mestre nunca veria nada no header.
+   *  O jogador continua se autofiltrando (comportamento inalterado) — só ele rola pela própria
+   *  tela e já vê o dado caindo ali, sem precisar do header repetir. */
+  ignorarFiltroPropria?: boolean,
 ) {
   const atual = useRolagemAoVivoStore((s) => s.atual);
   const jaReproduzidoRef = useRef<string | null>(null);
@@ -34,11 +40,11 @@ export function useReproduzirRolagemAoVivo(
   callbacksRef.current = callbacks;
 
   useEffect(() => {
-    if (!atual || !pronto || atual.id === jaReproduzidoRef.current || ehRolagemPropria(atual.id)) return;
+    if (!atual || !pronto || atual.id === jaReproduzidoRef.current || (!ignorarFiltroPropria && ehRolagemPropria(atual.id))) return;
     jaReproduzidoRef.current = atual.id;
     callbacksRef.current?.aoIniciar?.(atual);
     reproduzirRef.current(atual.termos, atual.valores, { base: atual.colorsetBase, cor: atual.cor }, () => {
       callbacksRef.current?.aoTerminar?.(atual);
     });
-  }, [atual, pronto]);
+  }, [atual, pronto, ignorarFiltroPropria]);
 }

@@ -239,8 +239,23 @@ export function useDiceBox(
 
     const iniciar = async () => {
       await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
+      if (!vivo) return;
       await box.initialize();
-      if (vivo) setReady(true);
+      if (!vivo) {
+        // Componente desmontou (StrictMode dev double-invoke: monta, desmonta, monta de novo)
+        // enquanto `initialize()` rodava — a lib já inseriu o canvas dela no container ANTES
+        // dessa checagem rodar, então a limpeza do cleanup abaixo (que já rodou nesse meio-tempo)
+        // não pegou esse canvas. Sem isso, ele fica órfão ao lado do canvas da instância nova —
+        // dois `<canvas>` sobrepostos no mesmo container, um deles morto (nunca mais recebe
+        // comando de rolar), e só o de baixo (na ordem do DOM) fica visível — sintoma real:
+        // "a mensagem aparece, o dado nunca aparece caindo" no header (`RolagemAoVivoPlayer.tsx`,
+        // o único `useDiceBox` sempre habilitado desde o primeiro render — os outros começam
+        // desabilitados e só ligam depois que o usuário abre a aba/painel, fora da janela de
+        // double-invoke do StrictMode, por isso nunca mostraram esse sintoma).
+        container.replaceChildren();
+        return;
+      }
+      setReady(true);
     };
 
     iniciar().catch((e: unknown) => {
