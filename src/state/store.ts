@@ -1506,7 +1506,6 @@ export const useStore = create<Store>()(
             observacaoCombate: f.observacaoCombate ?? '',
             kitAntecedente: f.kitAntecedente ?? '',
             contatoOuRecurso: f.contatoOuRecurso ?? '',
-            contatoUsadoNesteCaso: f.contatoUsadoNesteCaso ?? false,
             outrosItens: f.outrosItens ?? '',
             acessos: f.acessos ?? 0,
             anestesiaAte: f.anestesiaAte ?? null,

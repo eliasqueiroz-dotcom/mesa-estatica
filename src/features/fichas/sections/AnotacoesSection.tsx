@@ -5,7 +5,7 @@ export default function AnotacoesSection({ ficha, onChange }: SecaoFichaProps) {
     <section className="secao">
       <h3 className="label">Anotações do caso</h3>
       <textarea
-        rows={5}
+        rows={6}
         placeholder="escreva tudo — confie no papel, não na nuvem."
         value={ficha.anotacoes}
         onChange={(e) => onChange({ anotacoes: e.target.value })}
@@ -13,7 +13,7 @@ export default function AnotacoesSection({ ficha, onChange }: SecaoFichaProps) {
       />
       <h3 className="label" style={{ marginTop: '0.8rem' }}>Observações de combate</h3>
       <textarea
-        rows={3}
+        rows={4}
         placeholder="anotações que afetam o combate — ferimentos, condições, etc."
         value={ficha.observacaoCombate ?? ''}
         onChange={(e) => onChange({ observacaoCombate: e.target.value })}

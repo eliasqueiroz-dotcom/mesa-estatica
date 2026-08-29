@@ -108,7 +108,7 @@ export default function IdentidadeSection({ ficha, onChange }: SecaoFichaProps) 
           <div>
             <label>Foto</label>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Avatar nome={ficha.nome} cor={ficha.corVisual} foto={ficha.foto} bordaCor={ficha.corVisual} tamanho={48} />
+              <Avatar nome={ficha.nome} cor={ficha.corVisual} foto={ficha.foto} bordaCor={ficha.corVisual} tamanho={48} ampliavel />
               <label className="mapa-upload-botao" style={{ fontSize: 11 }}>
                 {comprimindo ? 'comprimindo…' : ficha.foto ? 'trocar' : 'carregar'}
                 <input type="file" accept="image/*" hidden onChange={selecionarArquivo} disabled={comprimindo} />

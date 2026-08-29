@@ -15,20 +15,10 @@ export default function EquipamentoSection({ ficha, onChange }: SecaoFichaProps)
           />
         </div>
         <div className="campo-largo">
-          <label htmlFor="eq-contato" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Contato ou Recurso</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <input
-                type="checkbox"
-                checked={ficha.contatoUsadoNesteCaso}
-                onChange={(e) => onChange({ contatoUsadoNesteCaso: e.target.checked })}
-              />
-              usado neste caso
-            </span>
-          </label>
+          <label htmlFor="eq-contato">Contato ou Recurso</label>
           <textarea
             id="eq-contato"
-            rows={2}
+            rows={4}
             value={ficha.contatoOuRecurso}
             onChange={(e) => onChange({ contatoOuRecurso: e.target.value })}
           />
@@ -37,7 +27,7 @@ export default function EquipamentoSection({ ficha, onChange }: SecaoFichaProps)
           <label htmlFor="eq-outros">Outros itens</label>
           <textarea
             id="eq-outros"
-            rows={2}
+            rows={4}
             value={ficha.outrosItens}
             onChange={(e) => onChange({ outrosItens: e.target.value })}
           />

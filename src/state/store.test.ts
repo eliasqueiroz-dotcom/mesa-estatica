@@ -514,7 +514,7 @@ describe('importarJSON', () => {
   });
 
   it('normaliza ficha sem surtosAtivos e campos opcionais', () => {
-    const fichaAntiga = { id: 'f1', corVisual: '#4fc1d4', nome: 'Teste', jogador: '', antecedenteId: null, motivo: '', perguntaQueTeDefine: '', respostaPergunta: '', gancho: '', vinculos: [], atributos: { vigor: 2, agilidade: 1, intelecto: 1, percepcao: 1, presenca: 1, vontade: 1 }, pvAtual: 20, sanidadeAtual: 10, equipamentoModificadorDefesa: 0, determinacao: 1, pericias: {}, traumas: [], kitAntecedente: '', contatoOuRecurso: '', contatoUsadoNesteCaso: false, outrosItens: '', armas: [], reguladores: [], acessos: 0, anestesiaAte: null, dinheiroReal: 500, dinheiroPonto: 800, anotacoes: '' };
+    const fichaAntiga = { id: 'f1', corVisual: '#4fc1d4', nome: 'Teste', jogador: '', antecedenteId: null, motivo: '', perguntaQueTeDefine: '', respostaPergunta: '', gancho: '', vinculos: [], atributos: { vigor: 2, agilidade: 1, intelecto: 1, percepcao: 1, presenca: 1, vontade: 1 }, pvAtual: 20, sanidadeAtual: 10, equipamentoModificadorDefesa: 0, determinacao: 1, pericias: {}, traumas: [], kitAntecedente: '', contatoOuRecurso: '', outrosItens: '', armas: [], reguladores: [], acessos: 0, anestesiaAte: null, dinheiroReal: 500, dinheiroPonto: 800, anotacoes: '' };
     const json = JSON.stringify({
       schemaVersion: 10,
       sessaoPublica: { nomeDaMesa: 'Teste', numeroSessao: 1, clima: 'garoa', hora: '20:00', cenaAtual: 'cena 1', caso: '', localAtual: '', objetivo: '', progresso: { atual: 0, total: 0 }, atmosfera: '', contadorCena: 1, modoCombate: false, indiceAtualTurno: 0, rodada: 1, condicoesCombate: {} },
@@ -541,7 +541,7 @@ describe('importarJSON', () => {
       schemaVersion: 10,
       sessaoPublica: { nomeDaMesa: 'Teste', numeroSessao: 1, clima: 'garoa', hora: '20:00', cenaAtual: 'cena 1', caso: '', localAtual: '', objetivo: '', progresso: { atual: 0, total: 0 }, atmosfera: '', contadorCena: 1, modoCombate: false, indiceAtualTurno: 0, rodada: 1, condicoesCombate: {} },
       sessaoPrivada: { oQueRealmenteAcontece: '', proximoEvento: '', lembretes: [], eventos: [], tensao: 0, ruidoNarrativo: 0, ameaca: 0, estatisticas: { rolagens: 0, surtos: 0, mortes: 0, iniciadaEm: null }, dificuldadeCena: 'media', dificuldadeCenaCustom: 15, selecionadosIniciativa: [] },
-      fichas: [{ id: 'f1', corVisual: '#4fc1d4', nome: 'Teste', jogador: '', antecedenteId: null, motivo: '', perguntaQueTeDefine: '', respostaPergunta: '', gancho: '', vinculos: [], atributos: { vigor: 2, agilidade: 1, intelecto: 1, percepcao: 1, presenca: 1, vontade: 1 }, pvAtual: 20, sanidadeAtual: 10, equipamentoModificadorDefesa: 0, determinacao: 1, pericias: {}, traumas: [], kitAntecedente: '', contatoOuRecurso: '', contatoUsadoNesteCaso: false, outrosItens: '', armas: [], reguladores: [], acessos: 0, anestesiaAte: null, dinheiroReal: 500, dinheiroPonto: 800, anotacoes: '', surtosAtivos: [] }],
+      fichas: [{ id: 'f1', corVisual: '#4fc1d4', nome: 'Teste', jogador: '', antecedenteId: null, motivo: '', perguntaQueTeDefine: '', respostaPergunta: '', gancho: '', vinculos: [], atributos: { vigor: 2, agilidade: 1, intelecto: 1, percepcao: 1, presenca: 1, vontade: 1 }, pvAtual: 20, sanidadeAtual: 10, equipamentoModificadorDefesa: 0, determinacao: 1, pericias: {}, traumas: [], kitAntecedente: '', contatoOuRecurso: '', outrosItens: '', armas: [], reguladores: [], acessos: 0, anestesiaAte: null, dinheiroReal: 500, dinheiroPonto: 800, anotacoes: '', surtosAtivos: [] }],
       fichaAtivaId: null,
       npcs: [],
       iniciativa: [],

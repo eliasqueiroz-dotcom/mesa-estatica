@@ -99,7 +99,6 @@ export interface Ficha {
 
   kitAntecedente: string;
   contatoOuRecurso: string;
-  contatoUsadoNesteCaso: boolean;
   outrosItens: string;
 
   armas: ArmaFicha[];

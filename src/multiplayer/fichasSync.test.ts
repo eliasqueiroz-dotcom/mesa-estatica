@@ -181,7 +181,6 @@ function fichaRemotaPrivada(id: string) {
       traumas: [],
       kitAntecedente: '',
       contatoOuRecurso: '',
-      contatoUsadoNesteCaso: false,
       outrosItens: '',
       armas: [],
       reguladores: [],

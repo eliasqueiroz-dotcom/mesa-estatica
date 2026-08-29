@@ -30,7 +30,6 @@ export interface FichaImportavel {
   traumas?: { nome?: string; gatilho?: string; resposta?: string; virouCicatriz?: boolean }[];
   kitAntecedente?: string;
   contatoOuRecurso?: string;
-  contatoUsadoNesteCaso?: boolean;
   outrosItens?: string;
   armas?: { nome?: string; bonusAtaque?: string; dano?: string; alcance?: string; nota?: string }[];
   kitInvestigacao?: { nome?: string; nota?: string }[];
@@ -130,7 +129,6 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
   if (dados.gancho) patch.gancho = dados.gancho;
   if (dados.kitAntecedente) patch.kitAntecedente = dados.kitAntecedente;
   if (dados.contatoOuRecurso) patch.contatoOuRecurso = dados.contatoOuRecurso;
-  if (typeof dados.contatoUsadoNesteCaso === 'boolean') patch.contatoUsadoNesteCaso = dados.contatoUsadoNesteCaso;
   if (dados.outrosItens) patch.outrosItens = dados.outrosItens;
   if (dados.anotacoes) patch.anotacoes = dados.anotacoes;
   if (dados.observacaoCombate) patch.observacaoCombate = dados.observacaoCombate;

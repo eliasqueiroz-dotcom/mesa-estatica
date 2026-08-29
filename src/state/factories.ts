@@ -47,7 +47,6 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     traumas: [],
     kitAntecedente: '',
     contatoOuRecurso: '',
-    contatoUsadoNesteCaso: false,
     outrosItens: '',
     armas: [],
     kitInvestigacao: [],
