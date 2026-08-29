@@ -80,7 +80,7 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           : modo === 'pc' && ficha
             ? (ficha.nome || 'Personagem')
             : 'Rolagem livre';
-      const texto = `${origem === 'Rolagem livre' ? '' : `${origem} · `}Rolagem livre · ${notacaoTexto} → ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
+      const texto = `${origem === 'Rolagem livre' ? '' : `${origem} · `}Rolagem livre · ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
       registrarLog('rolagem-livre', texto, personagemId, visibilidade);
 
       if (modo === 'npc' && npc) {
