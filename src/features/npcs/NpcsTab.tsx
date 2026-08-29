@@ -7,6 +7,7 @@ import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { NpcAcao } from '../../state/types';
+import ArmasCombateNpc from '../combate/ArmasCombateNpc';
 import IniciativaPanel from '../iniciativa/IniciativaPanel';
 import './npcs.css';
 import SeletorSilhueta from './SeletorSilhueta';
@@ -314,13 +315,13 @@ export default function NpcsTab() {
 
                       <div style={{ marginTop: '0.4rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                          <span className="vazio" style={{ fontSize: 11 }}>ações</span>
+                          <span className="vazio" style={{ fontSize: 11 }}>armas</span>
                           <button className="icone-botao" onClick={() => abrirNovaAcao(n.id)} style={{ fontSize: 10 }}>
-                            + ação
+                            + arma
                           </button>
                         </div>
                         {(n.acoes ?? []).length === 0 && !acaoEditandoId[n.id] ? (
-                          <p className="vazio" style={{ fontSize: 10, margin: 0 }}>nenhuma ação definida.</p>
+                          <p className="vazio" style={{ fontSize: 10, margin: 0 }}>nenhuma arma definida.</p>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                             {(n.acoes ?? []).map((a) => {
@@ -439,21 +440,7 @@ export default function NpcsTab() {
                         </span>
                       </div>
 
-                      {(n.acoes ?? []).length > 0 && (
-                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
-                          {(n.acoes ?? []).map((a) => (
-                            <button
-                              key={a.id}
-                              className="combate-chip combate-chip--ativa"
-                              onClick={() => iniciativa.usarAcaoNpc(n.id, n.nome || 'NPC', a)}
-                              title={`+${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
-                              style={{ fontSize: 11, cursor: 'pointer' }}
-                            >
-                              🗡 {a.nome}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <ArmasCombateNpc npc={n} />
 
                       {n.notasMestre && (
                         <p className="vazio" style={{ fontSize: 10, margin: '0.1rem 0', color: 'var(--ruido)', fontStyle: 'italic' }}>

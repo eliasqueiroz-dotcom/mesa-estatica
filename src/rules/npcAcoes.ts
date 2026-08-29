@@ -1,52 +1,95 @@
-import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
-import type { EntradaRoll, NpcAcao, TipoLog } from '../state/types';
+import type { RollTermo } from '../dice/useDiceBox';
+import { marcarComoProprio, useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
+import type { EntradaRoll, Npc, NpcAcao, TipoLog } from '../state/types';
+import { resolverDanoArma, type ResultadoDanoArma } from './teste';
 
-type RegistrarLog = (tipo: TipoLog, texto: string, personagemId?: string | null) => void;
+type RegistrarLog = (tipo: TipoLog, texto: string, personagemId?: string | null, visibilidade?: 'publica' | 'privada') => void;
 type RegistrarRoll = (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
 
-/** Rola uma fórmula `NdM`, `NdM+K` ou `NdM-K` (K pode ser negativo). Retorna `null` — nunca 0 —
- *  quando a fórmula não bate com esse padrão, pra quem chama poder avisar no log em vez de
- *  fingir que o dano era zero (ex: uma combinação de dois dados como "1d6+1d4" não é suportada
- *  aqui e precisa ser calculada na mão pelo mestre). */
-function rolarFormulaDano(formula: string, npcId: string): number | null {
-  const m = formula.trim().match(/^(\d+)d(\d+)([+-]\d+)?$/i);
-  if (!m) return null;
-  const qtd = parseInt(m[1], 10);
-  const lados = parseInt(m[2], 10);
-  let soma = rolarDadosComForcados(qtd, lados, npcId, 'dano').reduce((a, b) => a + b, 0);
-  if (m[3]) soma += parseInt(m[3], 10);
-  return Math.max(0, soma);
-}
-
 /**
- * Ação de NPC (chip de combate no mapa/iniciativa/aba NPCs). Sempre grava como rolagem
- * PRIVADA (só o mestre vê) — jogador só enxerga se o mestre "revelar" na aba Log, mesmo
- * padrão dos outros roladores (RoladorTeste/QuickRollOverlay/RolagemLivre já tratam NPC
- * como privado por padrão). O log narrativo continua público, igual aos demais tipos de
- * rolagem — a fronteira de privacidade é sempre o `rollsLog`, nunca o log narrativo.
+ * "Arma"/ação de NPC (chip de combate no mapa/iniciativa/aba NPCs) — mesmo padrão de
+ * `rolarTestePericiaFicha`/`rolarDanoArmaFicha` (armasCombate.ts, testePericia.ts): recebe o d20
+ * JÁ ROLADO na bandeja física de `QuickRollOverlay.tsx` e cuida do resto (cálculo, log,
+ * registro, broadcast). NPC não tem atributo/perícia como PC — o "ataque" já É o bônus fixo
+ * (`NpcAcao.bonus`), somado direto no d20, sem lookup de perícia.
+ *
+ * Substitui a versão antiga (síncrona, sempre privada, sem dado 3D) que existia aqui — agora
+ * roda na mesma bandeja física e store de pedido que as armas de PC, com visibilidade
+ * escolhível (checkbox "privado" em `ArmasCombateNpc.tsx`) em vez de sempre privada.
  */
-export function usarAcaoNpc(
-  npcId: string,
-  nome: string,
-  acao: Omit<NpcAcao, 'id'>,
+export function rolarAtaqueNpc(
+  npc: Npc,
+  nomeAcao: string,
+  bonus: number,
+  d20: number,
   registrarLog: RegistrarLog,
   registrarRoll: RegistrarRoll,
-) {
-  const d20 = rolarDadoComForcados(20, npcId, 'teste');
-  const total = d20 + acao.bonus;
-  const dmg = acao.dano ? rolarFormulaDano(acao.dano, npcId) : null;
-  const partes = [`${nome} · ${acao.nome}`];
-  partes.push(`teste d20${acao.bonus >= 0 ? '+' : ''}${acao.bonus} → ${d20}${acao.bonus >= 0 ? '+' : ''}${acao.bonus} = ${total}`);
-  if (acao.dano) {
-    partes.push(dmg !== null ? `dano ${acao.dano} → ${dmg}` : `dano ${acao.dano} → fórmula não reconhecida, calcule na mão`);
+  visibilidade: 'publica' | 'privada',
+): { texto: string; total: number } {
+  const total = d20 + bonus;
+  const modStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+  const nome = npc.nome || 'NPC';
+  const texto = `1d20: ${d20}${modStr} = ${total}`;
+
+  registrarLog('teste', `${nome} · ${nomeAcao} · ataque → ${texto}`, npc.id, visibilidade);
+  registrarRoll({ origem: nome, personagemId: npc.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
+
+  if (visibilidade === 'publica') {
+    const id = crypto.randomUUID();
+    marcarComoProprio(id);
+    useRolagemAoVivoStore.getState().definirAtual({
+      id,
+      termos: [{ sides: 20, qty: 1 }],
+      valores: [d20],
+      colorsetBase: 'rede',
+      cor: npc.corVisual,
+      origem: nome,
+      tipo: 'teste',
+      bonus,
+    });
   }
-  registrarLog('rolagem-livre', partes.join(' | '), npcId);
+
+  return { texto, total };
+}
+
+/** Dano de "arma"/ação de NPC — sem Vigor (NPC não tem esse atributo) e sem crítico (nunca teve
+ *  gatilho de UI pra isso, igual PC desde que os checkboxes "crít." foram removidos). */
+export function rolarDanoNpcArma(
+  npc: Npc,
+  acao: NpcAcao,
+  termos: RollTermo[],
+  valoresDados: number[],
+  registrarLog: RegistrarLog,
+  registrarRoll: RegistrarRoll,
+  visibilidade: 'publica' | 'privada',
+): ResultadoDanoArma {
+  const resultado = resolverDanoArma(acao, valoresDados, 0, false);
+  const nome = npc.nome || 'NPC';
+
+  registrarLog('dano', `${nome} · ${acao.nome} · ${resultado.texto}`, npc.id, visibilidade);
   registrarRoll({
     origem: nome,
-    personagemId: npcId,
-    formula: `d20${acao.bonus >= 0 ? '+' : ''}${acao.bonus}`,
-    total,
-    bruto: d20,
-    visibilidade: 'privada',
+    personagemId: npc.id,
+    formula: acao.dano,
+    total: resultado.total,
+    bruto: resultado.bruto,
+    visibilidade,
   });
+
+  if (!resultado.erro && visibilidade === 'publica') {
+    const id = crypto.randomUUID();
+    marcarComoProprio(id);
+    useRolagemAoVivoStore.getState().definirAtual({
+      id,
+      termos,
+      valores: valoresDados,
+      colorsetBase: 'rede',
+      cor: npc.corVisual,
+      origem: nome,
+      tipo: 'dano',
+      bonus: resultado.total - valoresDados.reduce((a, b) => a + b, 0),
+    });
+  }
+
+  return resultado;
 }

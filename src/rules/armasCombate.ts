@@ -8,17 +8,19 @@ type RegistrarRoll = (entrada: Omit<EntradaRoll, 'id' | 'timestamp'>) => void;
 
 /**
  * Rolagem de dano de arma de PC feita pela aba Combate (`ArmasCombate.tsx`) — mesmo espírito de
- * `usarAcaoNpc` em `npcAcoes.ts`: recebe os dados JÁ ROLADOS (quem chama decide se foi
+ * `rolarDanoNpcArma` em `npcAcoes.ts`: recebe os dados JÁ ROLADOS (quem chama decide se foi
  * `rolar()`/`reproduzir()` do `useDiceBox`) e cuida do resto (cálculo, log, registro).
  *
  * `visibilidade` vem de quem chama: `ArmasCombate.tsx` calcula com base no `souMestre` que
  * recebeu — jogador rolando a própria arma continua sempre público (comportamento inalterado);
  * mestre rolando por um PC nasce privado por padrão, com checkbox pra tornar público.
  *
- * SEMPRE publica em `rolagemAoVivoStore` (mestre incluído — decisão deliberada desta feature,
- * ver comentário em `rolagemAoVivoStore.ts`): quem estiver conectado, jogador ou mestre, vê o
- * dado caindo no próprio header, não só quem está assistindo a tela do mestre por Discord. Isso
- * é independente da visibilidade do log/rollsLog — a animação do dado não expõe o resultado.
+ * Só publica em `rolagemAoVivoStore` quando `visibilidade === 'publica'` — antes publicava
+ * incondicionalmente (mestre incluído), premissa de que "ação de PC é sempre pública" que não
+ * vale mais desde que existe o checkbox "privado" em `ArmasCombate.tsx`: sem esse guard, uma
+ * rolagem privada ainda animava no header de todo mundo com nome e resultado, mesmo com o log
+ * oculto. O mestre continua vendo o dado cair normalmente — a física roda local na bandeja do
+ * `QuickRollOverlay`, independente do broadcast.
  */
 export function rolarDanoArmaFicha(
   ficha: Ficha,
@@ -44,7 +46,7 @@ export function rolarDanoArmaFicha(
     visibilidade,
   });
 
-  if (!resultado.erro) {
+  if (!resultado.erro && visibilidade === 'publica') {
     const id = crypto.randomUUID();
     marcarComoProprio(id);
     useRolagemAoVivoStore.getState().definirAtual({

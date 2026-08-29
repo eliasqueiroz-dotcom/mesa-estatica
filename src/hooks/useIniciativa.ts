@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { rolarDadoComForcados } from '../dice/registroForcados';
 import { podeUsarPrimeirosSocorros, registrarUsoPrimeirosSocorros, resolverEstabilizar } from '../rules/combate';
 import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
-import { usarAcaoNpc as usarAcaoNpcCompartilhada } from '../rules/npcAcoes';
 import { useCombateUiStore } from '../state/combateUiStore';
 import { useStore } from '../state/store';
 
@@ -184,10 +183,6 @@ export function useIniciativa() {
     };
   };
 
-  const usarAcaoNpc = (npcId: string, nome: string, acao: { nome: string; bonus: number; dano: string }) => {
-    usarAcaoNpcCompartilhada(npcId, nome, acao, registrarLog, registrarRoll);
-  };
-
   const toggleSelecionadoAplicar = toggleSelecionadoAplicarUi;
   const limparSelecaoAplicar = limparSelecaoAplicarUi;
 
@@ -310,7 +305,7 @@ export function useIniciativa() {
     expandidos, adicionarAberto, dragIndex, dropIndex,
     setDragIndex, setDropIndex, setAdicionarAberto,
     toggleSelecionado, toggleTodos, rolarSelecionados, resetar, toggleExpandido,
-    pvDoCombatente, defesaDoCombatente, usarAcaoNpc, registrarLog, registrarRoll,
+    pvDoCombatente, defesaDoCombatente, registrarLog, registrarRoll,
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,

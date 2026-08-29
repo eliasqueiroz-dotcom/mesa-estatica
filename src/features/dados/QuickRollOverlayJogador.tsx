@@ -5,7 +5,9 @@ import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { rolarDanoArmaFicha } from '../../rules/armasCombate';
 import { parseDanoArma } from '../../rules/teste';
+import { rolarTestePericiaFicha } from '../../rules/testePericia';
 import { usePedidoRolagemDanoStore, type PedidoRolagemDano } from '../../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore, type PedidoRolagemTeste } from '../../state/pedidoRolagemTesteStore';
 import { marcarComoProprio, useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
@@ -38,8 +40,11 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
   const [bonus, setBonus] = useState(0);
   const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
   const [resultadoDano, setResultadoDano] = useState<{ nomeArma: string; texto: string; erro: boolean } | null>(null);
+  const [resultadoTeste, setResultadoTeste] = useState<{ rotulo: string; texto: string } | null>(null);
   const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
   const limparPedidoRolagemDano = usePedidoRolagemDanoStore((s) => s.limparPedidoRolagemDano);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
+  const limparPedidoRolagemTeste = usePedidoRolagemTesteStore((s) => s.limparPedidoRolagemTeste);
 
   const pericia = PERICIAS.find((p) => p.id === periciaId)!;
   const atributo = ATRIBUTOS.find((a) => a.id === pericia.atributo)!;
@@ -170,6 +175,24 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
     }
   };
 
+  // Pedido de teste de perícia/ataque de arma vindo de fora (`ArmasCombate.tsx` pro ataque,
+  // `PericiasSection.tsx` pro teste solo) — mesma ponte de `executarPedidoDano` acima, mesma
+  // bandeja física.
+  const executarPedidoTeste = (p: PedidoRolagemTeste) => {
+    const pericia = PERICIAS.find((per) => per.id === p.periciaId);
+    if (!pericia) {
+      limparPedidoRolagemTeste();
+      return;
+    }
+    setResultadoTeste(null);
+    rolar('1d20', (grupos) => {
+      const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+      const r = rolarTestePericiaFicha(ficha, pericia, d20, basePV, registrarLog, registrarRoll, p.visibilidade, p.rotuloArma);
+      setResultadoTeste({ rotulo: p.rotuloArma ?? pericia.nome, texto: r.texto });
+      limparPedidoRolagemTeste();
+    }, 'rede', ficha.id, 'teste');
+  };
+
   const pendenteRef = useRef(false);
   const rolarAtual = modo === 'simples' ? rolarSimples : rolarPericia;
   const rolarAtualRef = useRef(rolarAtual);
@@ -212,6 +235,29 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
       const p = pedidoDanoPendenteRef.current;
       pedidoDanoPendenteRef.current = null;
       executarPedidoDanoRef.current(p);
+    }
+  }, [ready, rolando]);
+
+  // Mesmo padrão acima, pro pedido de teste de perícia/ataque.
+  const pedidoTestePendenteRef = useRef<PedidoRolagemTeste | null>(null);
+  const executarPedidoTesteRef = useRef(executarPedidoTeste);
+  executarPedidoTesteRef.current = executarPedidoTeste;
+
+  useEffect(() => {
+    if (!pedidoTeste) return;
+    if (ready && !rolando) {
+      executarPedidoTesteRef.current(pedidoTeste);
+    } else {
+      pedidoTestePendenteRef.current = pedidoTeste;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoTeste?.id]);
+
+  useEffect(() => {
+    if (ready && !rolando && pedidoTestePendenteRef.current) {
+      const p = pedidoTestePendenteRef.current;
+      pedidoTestePendenteRef.current = null;
+      executarPedidoTesteRef.current(p);
     }
   }, [ready, rolando]);
 
@@ -319,6 +365,14 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
             >
               <span style={{ fontSize: 12, color: resultadoDano.erro ? 'var(--ruido)' : undefined }}>
                 dano · {resultadoDano.nomeArma}: {resultadoDano.texto}
+              </span>
+            </div>
+          )}
+
+          {resultadoTeste && (
+            <div className="alerta-banner mono" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
+              <span style={{ fontSize: 12 }}>
+                {resultadoTeste.rotulo}: {resultadoTeste.texto}
               </span>
             </div>
           )}

@@ -5,7 +5,10 @@ export interface PedidoRolagemDano {
    *  contador `pedidoRolagem` de QuickRollOverlay.tsx: precisa disparar de novo mesmo se, por
    *  coincidência, os outros campos forem iguais ao pedido anterior). */
   id: string;
-  fichaId: string;
+  /** `armaId` é o id da entrada de arma — em `ficha.armas` (PC) ou `npc.acoes` (NPC), conforme
+   *  qual dos dois ids abaixo vem preenchido. Exatamente um dos dois. */
+  fichaId?: string;
+  npcId?: string;
   armaId: string;
   critico: boolean;
   visibilidade: 'publica' | 'privada';

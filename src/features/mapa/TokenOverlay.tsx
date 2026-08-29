@@ -9,7 +9,7 @@ import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
 import { NOMES_TIPO_REGULADOR } from '../fichas/sections/ReguladoresSection';
 import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
-import { usarAcaoNpc } from '../../rules/npcAcoes';
+import ArmasCombateNpc from '../combate/ArmasCombateNpc';
 
 const EMPTY_CONDICOES: string[] = [];
 const EMPTY_DURACAO: Record<string, number> = {};
@@ -98,8 +98,6 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const condicaoDuracao = useStore((s) => s.sessaoPublica.condicaoDuracao?.[id] ?? EMPTY_DURACAO);
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const definirDuracaoCondicao = useStore((s) => s.definirDuracaoCondicao);
-  const registrarLog = useStore((s) => s.registrarLog);
-  const registrarRoll = useStore((s) => s.registrarRoll);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
 
   useEffect(() => {
@@ -260,21 +258,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
             <div style={{ marginBottom: '0.5rem' }}>
             <span className="vazio" style={{ fontSize: 12, color: 'var(--real)' }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
             </div>
-            {(npc.acoes ?? []).length > 0 && (
-              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
-                {(npc.acoes ?? []).map((a) => (
-                  <button
-                    key={a.id}
-                    className="combate-chip combate-chip--ativa"
-                    onClick={() => usarAcaoNpc(npc.id, npc.nome || 'NPC', a, registrarLog, registrarRoll)}
-                    title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
-                    style={{ fontSize: 10, cursor: 'pointer' }}
-                  >
-                    🗡 {a.nome}
-                  </button>
-                ))}
-              </div>
-            )}
+            <ArmasCombateNpc npc={npc} />
             <div className="campos-grid">
               <div>
                 <label htmlFor="ov-npc-pv">PV atual</label>

@@ -16,6 +16,7 @@ import AlertaOverlay from '../features/sessao/AlertaOverlay';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoTab from '../features/sessao/SessaoTab';
 import { usePedidoRolagemDanoStore } from '../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore } from '../state/pedidoRolagemTesteStore';
 import { useStore } from '../state/store';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
 import { iniciarSyncFoW } from '../multiplayer/fowSync';
@@ -289,12 +290,14 @@ export default function App() {
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
   const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
 
-  // chip de dano na aba Combate (ArmasCombate.tsx) pede a rolagem por esse store — abre o
-  // "d20 rápido" sozinho pra física rodar lá (mesma bandeja, sem caixinha própria por card).
+  // chip de dano/ataque na aba Combate (ArmasCombate.tsx) e o d20 de perícia na Ficha
+  // (PericiasSection.tsx) pedem a rolagem por esses stores — abre o "d20 rápido" sozinho pra
+  // física rodar lá (mesma bandeja, sem caixinha própria por card).
   useEffect(() => {
-    if (pedidoDano) setOverlayAberto(true);
-  }, [pedidoDano]);
+    if (pedidoDano || pedidoTeste) setOverlayAberto(true);
+  }, [pedidoDano, pedidoTeste]);
 
   const abrirControle = () => {
     window.open(
@@ -450,7 +453,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <MidiaPlayerGM />
           <SoundpadPlayer />
-          <RolagemAoVivoPlayer />
+          <RolagemAoVivoPlayer verProprias />
           <VinculoMestre />
           <ExportarImportar abrirControle={abrirControle} />
         </div>

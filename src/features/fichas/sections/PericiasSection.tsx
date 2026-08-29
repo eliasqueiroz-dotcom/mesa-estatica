@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { rolarDadosComForcados } from '../../../dice/registroForcados';
-import { calcularPvMaximo, estaFerido } from '../../../rules/derivados';
 import { ATRIBUTOS, PERICIAS, type DefinicaoPericia, type GrauPericia } from '../../../rules/data/pericias';
-import { useStore } from '../../../state/store';
+import { usePedidoRolagemTesteStore } from '../../../state/pedidoRolagemTesteStore';
 import type { SecaoFichaProps } from '../tipos';
 
 const GRAUS: { valor: GrauPericia; label: string }[] = [
@@ -11,14 +9,15 @@ const GRAUS: { valor: GrauPericia; label: string }[] = [
   { valor: 6, label: 'V' },
 ];
 
-/** Cada linha tem um botão de rolagem direta (d20 + atributo + grau, com Ferido aplicado) —
- *  ficha.md já documentava isso, nunca tinha sido implementado. De propósito, sem sucesso/falha
- *  contra a DT da cena — só o total, igual RoladorTesteJogador.tsx; o mestre narra o resultado. */
+/** Cada linha tem um botão de rolagem (d20 + atributo + grau, com Ferido aplicado) — de propósito,
+ *  sem sucesso/falha contra a DT da cena — só o total, igual RoladorTesteJogador.tsx; o mestre
+ *  narra o resultado. A rolagem em si acontece na bandeja física do `QuickRollOverlay`/
+ *  `QuickRollOverlayJogador` (pedida via `pedidoRolagemTesteStore`, mesma ponte que
+ *  `ArmasCombate.tsx` usa pro dano/ataque de arma) — abre o "d20 rápido" sozinho e anima no
+ *  header de todo mundo, exceto rolagem privada do mestre (ver `rolarTestePericiaFicha`). */
 export default function PericiasSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
-  const basePV = useStore((s) => s.config.basePV);
-  const registrarLog = useStore((s) => s.registrarLog);
-  const registrarRoll = useStore((s) => s.registrarRoll);
-  const [resultados, setResultados] = useState<Record<string, string>>({});
+  const pedido = usePedidoRolagemTesteStore((s) => s.pedido);
+  const pedirRolagemTeste = usePedidoRolagemTesteStore((s) => s.pedirRolagemTeste);
   const [privado, setPrivado] = useState(true);
   const visibilidade = souMestre && privado ? 'privada' : 'publica';
 
@@ -27,20 +26,7 @@ export default function PericiasSection({ ficha, onChange, souMestre }: SecaoFic
   };
 
   const rolarPericia = (p: DefinicaoPericia) => {
-    const grauPericia = ficha.pericias[p.id] ?? 0;
-    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-    const [d20] = rolarDadosComForcados(1, 20, ficha.id, 'teste');
-    const nome = ficha.nome || 'Personagem';
-    const atributoNome = ATRIBUTOS.find((a) => a.id === p.atributo)!.nome;
-
-    const penalidadeFerido = ferido && (p.atributo === 'vigor' || p.atributo === 'agilidade') ? -2 : 0;
-    const modificador = ficha.atributos[p.atributo] + grauPericia + penalidadeFerido;
-    const total = d20 + modificador;
-    const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-    registrarLog('teste', `${nome} · teste de perícia ${p.nome}(${atributoNome}) → 1d20: ${d20}${modStr} = ${total}`, ficha.id, visibilidade);
-    registrarRoll({ origem: nome, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
-    setResultados((prev) => ({ ...prev, [p.id]: `d20=${d20}${modStr}=${total}` }));
+    pedirRolagemTeste({ id: crypto.randomUUID(), fichaId: ficha.id, periciaId: p.id, visibilidade });
   };
 
   return (
@@ -71,7 +57,12 @@ export default function PericiasSection({ ficha, onChange, souMestre }: SecaoFic
                   <div key={p.id} className="pericia-linha">
                     <span className="pericia-linha__nome">{p.nome}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <button className="icone-botao" title={`rolar ${atributo.nome}+${p.nome}`} onClick={() => rolarPericia(p)}>
+                      <button
+                        className="icone-botao"
+                        title={`rolar ${atributo.nome}+${p.nome}`}
+                        disabled={pedido !== null}
+                        onClick={() => rolarPericia(p)}
+                      >
                         d20
                       </button>
                       <div className="grau-toggle">
@@ -86,11 +77,6 @@ export default function PericiasSection({ ficha, onChange, souMestre }: SecaoFic
                         ))}
                       </div>
                     </div>
-                    {resultados[p.id] && (
-                      <div className="mono vazio" style={{ fontSize: 10, width: '100%' }}>
-                        {resultados[p.id]}
-                      </div>
-                    )}
                   </div>
                 );
               })}

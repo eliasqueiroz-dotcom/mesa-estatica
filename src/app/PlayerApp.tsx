@@ -33,6 +33,7 @@ import { iniciarSyncRolagemAoVivo } from '../multiplayer/rolagemAoVivoSync';
 import { iniciarSyncSoundpad } from '../multiplayer/soundpadSync';
 import { iniciarSyncTokens } from '../multiplayer/tokensSync';
 import { usePedidoRolagemDanoStore } from '../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore } from '../state/pedidoRolagemTesteStore';
 import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import { useRolagemRapidaSanidadeStore } from '../state/rolagemRapidaSanidadeStore';
 import { useStore } from '../state/store';
@@ -74,12 +75,14 @@ export default function PlayerApp() {
   const rolagemAoVivo = useRolagemAoVivoStore((s) => s.atual);
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
   const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
 
-  // chip de dano na aba Combate (ArmasCombate.tsx) pede a rolagem por esse store — abre o
-  // "d20 rápido" sozinho pra física rodar lá (mesma bandeja, sem caixinha própria por card).
+  // chip de dano/ataque na aba Combate (ArmasCombate.tsx) e o d20 de perícia na Ficha
+  // (PericiasSection.tsx) pedem a rolagem por esses stores — abre o "d20 rápido" sozinho pra
+  // física rodar lá (mesma bandeja, sem caixinha própria por card).
   useEffect(() => {
-    if (pedidoDano) setOverlayAberto(true);
-  }, [pedidoDano]);
+    if (pedidoDano || pedidoTeste) setOverlayAberto(true);
+  }, [pedidoDano, pedidoTeste]);
 
   useHidratarSessaoPublica();
   useHidratarMapaPublico();
@@ -276,7 +279,7 @@ export default function PlayerApp() {
             )}
             {outrasFichas.map((f) => (
               <div key={f.id} className="secao" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Avatar nome={f.nome} cor={f.corVisual} foto={f.foto} bordaCor={f.corVisual} tamanho={40} />
+                <Avatar nome={f.nome} cor={f.corVisual} foto={f.foto} bordaCor={f.corVisual} tamanho={40} ampliavel />
                 <span className="label">{f.nome || 'sem nome'}</span>
               </div>
             ))}

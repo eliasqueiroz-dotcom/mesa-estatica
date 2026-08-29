@@ -1,81 +1,82 @@
-import { describe, expect, it, vi } from 'vitest';
-import { usarAcaoNpc } from './npcAcoes';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { criarNpcVazio } from '../state/factories';
+import { useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
+import type { NpcAcao } from '../state/types';
+import { rolarAtaqueNpc, rolarDanoNpcArma } from './npcAcoes';
 
-describe('usarAcaoNpc', () => {
-  it('registra a rolagem como privada, sempre — GM controla revelar depois', () => {
+const acao = (dano: string, bonus = 3): NpcAcao => ({ id: 'acao-1', nome: 'garra', bonus, dano });
+
+afterEach(() => {
+  useRolagemAoVivoStore.setState({ atual: null, mostrando: false });
+});
+
+describe('rolarAtaqueNpc', () => {
+  it('total = d20 + bônus fixo (sem lookup de perícia/atributo — NPC não tem nenhum dos dois)', () => {
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela' };
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 3, dano: '' }, registrarLog, registrarRoll);
+    const r = rolarAtaqueNpc(npc, 'garra', 5, 12, registrarLog, registrarRoll, 'publica');
 
-    expect(registrarRoll).toHaveBeenCalledTimes(1);
-    expect(registrarRoll.mock.calls[0][0]).toMatchObject({
-      origem: 'Sentinela',
-      personagemId: 'npc-1',
-      visibilidade: 'privada',
-    });
-  });
-
-  it('formula e total refletem d20 + bônus da ação', () => {
-    const registrarLog = vi.fn();
-    const registrarRoll = vi.fn();
-
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 5, dano: '' }, registrarLog, registrarRoll);
-
-    const entrada = registrarRoll.mock.calls[0][0];
-    expect(entrada.formula).toBe('d20+5');
-    expect(entrada.total).toBe(entrada.bruto + 5);
-    expect(entrada.bruto).toBeGreaterThanOrEqual(1);
-    expect(entrada.bruto).toBeLessThanOrEqual(20);
+    expect(r.total).toBe(17);
+    expect(registrarRoll).toHaveBeenCalledWith(
+      expect.objectContaining({ origem: 'Sentinela', personagemId: 'npc-1', formula: 'd20+5', total: 17, bruto: 12, visibilidade: 'publica' }),
+    );
+    expect(registrarLog).toHaveBeenCalledWith('teste', expect.stringContaining('Sentinela · garra · ataque'), 'npc-1', 'publica');
   });
 
   it('bônus negativo formata sem "+" duplicado', () => {
-    const registrarLog = vi.fn();
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela' };
     const registrarRoll = vi.fn();
 
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: -2, dano: '' }, registrarLog, registrarRoll);
+    rolarAtaqueNpc(npc, 'garra', -2, 10, vi.fn(), registrarRoll, 'publica');
 
     expect(registrarRoll.mock.calls[0][0].formula).toBe('d20-2');
   });
 
-  it('log narrativo continua público (sem flag de visibilidade) e recebe o npcId', () => {
+  it('só publica em rolagemAoVivoStore quando pública — privada não anima no header de ninguém', () => {
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela' };
+
+    rolarAtaqueNpc(npc, 'garra', 3, 10, vi.fn(), vi.fn(), 'privada');
+    expect(useRolagemAoVivoStore.getState().atual).toBeNull();
+
+    rolarAtaqueNpc(npc, 'garra', 3, 10, vi.fn(), vi.fn(), 'publica');
+    expect(useRolagemAoVivoStore.getState().atual).toMatchObject({ origem: 'Sentinela', tipo: 'teste', valores: [10], bonus: 3 });
+  });
+});
+
+describe('rolarDanoNpcArma', () => {
+  it('sem Vigor (NPC não tem esse atributo) — total é só a soma dos dados', () => {
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela' };
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '' }, registrarLog, registrarRoll);
+    const r = rolarDanoNpcArma(npc, acao('1d6'), [{ sides: 6, qty: 1 }], [4], registrarLog, registrarRoll, 'publica');
 
-    expect(registrarLog).toHaveBeenCalledWith('rolagem-livre', expect.stringContaining('Sentinela · garra'), 'npc-1');
+    expect(r.total).toBe(4);
+    expect(registrarRoll).toHaveBeenCalledWith(expect.objectContaining({ origem: 'Sentinela', personagemId: 'npc-1', total: 4, bruto: 4, visibilidade: 'publica' }));
+    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Sentinela · garra ·'), 'npc-1', 'publica');
   });
 
-  it('inclui o dano no texto narrativo quando a ação tem fórmula de dano', () => {
-    const registrarLog = vi.fn();
-    const registrarRoll = vi.fn();
+  it('só publica em rolagemAoVivoStore quando pública', () => {
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela', corVisual: '#123456' };
 
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '1d6+2' }, registrarLog, registrarRoll);
+    rolarDanoNpcArma(npc, acao('1d6'), [{ sides: 6, qty: 1 }], [5], vi.fn(), vi.fn(), 'privada');
+    expect(useRolagemAoVivoStore.getState().atual).toBeNull();
 
-    const texto = registrarLog.mock.calls[0][1] as string;
-    expect(texto).toMatch(/dano 1d6\+2 → \d+/);
+    rolarDanoNpcArma(npc, acao('1d6'), [{ sides: 6, qty: 1 }], [5], vi.fn(), vi.fn(), 'publica');
+    expect(useRolagemAoVivoStore.getState().atual).toMatchObject({ origem: 'Sentinela', cor: '#123456', tipo: 'dano', valores: [5], bonus: 0 });
   });
 
-  it('fórmula de dano com modificador negativo (NdM-K) é calculada, não descartada', () => {
+  it('fórmula não reconhecida: loga o erro mas não publica rolagem ao vivo (nada pra animar)', () => {
+    const npc = { ...criarNpcVazio(), id: 'npc-1', nome: 'Sentinela' };
     const registrarLog = vi.fn();
     const registrarRoll = vi.fn();
 
-    vi.spyOn(Math, 'random').mockReturnValue(0); // 1d6-2 → 1-2, clampado em 0
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '1d6-2' }, registrarLog, registrarRoll);
-    vi.restoreAllMocks();
+    const r = rolarDanoNpcArma(npc, acao('especial, ver nota'), [], [], registrarLog, registrarRoll, 'publica');
 
-    const texto = registrarLog.mock.calls[0][1] as string;
-    expect(texto).toContain('dano 1d6-2 → 0');
-  });
-
-  it('fórmula fora do padrão suportado (ex: dois dados combinados) avisa em vez de virar 0 silencioso', () => {
-    const registrarLog = vi.fn();
-    const registrarRoll = vi.fn();
-
-    usarAcaoNpc('npc-1', 'Sentinela', { nome: 'garra', bonus: 0, dano: '1d6+1d4' }, registrarLog, registrarRoll);
-
-    const texto = registrarLog.mock.calls[0][1] as string;
-    expect(texto).toContain('dano 1d6+1d4 → fórmula não reconhecida, calcule na mão');
+    expect(r.erro).toBe(true);
+    expect(registrarRoll).toHaveBeenCalledTimes(1);
+    expect(useRolagemAoVivoStore.getState().atual).toBeNull();
   });
 });

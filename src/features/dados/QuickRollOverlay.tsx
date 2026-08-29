@@ -4,8 +4,11 @@ import { consumirForcados } from '../../dice/forcarRolagem';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { rolarDanoArmaFicha } from '../../rules/armasCombate';
+import { rolarAtaqueNpc, rolarDanoNpcArma } from '../../rules/npcAcoes';
 import { parseDanoArma } from '../../rules/teste';
+import { rolarTestePericiaFicha } from '../../rules/testePericia';
 import { usePedidoRolagemDanoStore, type PedidoRolagemDano } from '../../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore, type PedidoRolagemTeste } from '../../state/pedidoRolagemTesteStore';
 import { useStore } from '../../state/store';
 
 interface QuickRollOverlayProps {
@@ -33,8 +36,11 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
   const [periciaId, setPericiaId] = useState(PERICIAS[0].id);
   const [resultadoRoll, setResultadoRoll] = useState<{ d20: number; modificador: number; total: number } | null>(null);
   const [resultadoDano, setResultadoDano] = useState<{ nomeArma: string; texto: string; erro: boolean } | null>(null);
+  const [resultadoTeste, setResultadoTeste] = useState<{ rotulo: string; texto: string } | null>(null);
   const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
   const limparPedidoRolagemDano = usePedidoRolagemDanoStore((s) => s.limparPedidoRolagemDano);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
+  const limparPedidoRolagemTeste = usePedidoRolagemTesteStore((s) => s.limparPedidoRolagemTeste);
 
   const ficha = fichas.find((f) => f.id === fichaAtivaId) ?? null;
   const npc = npcs.find((n) => n.id === npcId) ?? null;
@@ -126,10 +132,33 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
     }
   };
 
-  // Rolagem de dano de arma pedida de fora (chip em `ArmasCombate.tsx`, aba Combate) — a física
-  // roda nesta bandeja (a mesma do "d20 rápido") em vez da caixinha 40×40 que existia embutida
-  // em cada card de PC (removida — colidia entre instâncias simultâneas, ver `armasCombate.ts`).
+  // Rolagem de dano de arma pedida de fora (chip em `ArmasCombate.tsx`/`ArmasCombateNpc.tsx`) —
+  // a física roda nesta bandeja (a mesma do "d20 rápido") em vez de uma caixinha própria por
+  // card (removida — colidia entre instâncias simultâneas, ver `armasCombate.ts`). NPC não tem
+  // crítico (nunca teve gatilho de UI pra isso), só o ramo de PC usa `p.critico`.
   const executarPedidoDano = (p: PedidoRolagemDano) => {
+    if (p.npcId !== undefined) {
+      const npcAlvo = npcs.find((n) => n.id === p.npcId);
+      const acao = npcAlvo?.acoes.find((a) => a.id === p.armaId);
+      if (!npcAlvo || !acao) {
+        limparPedidoRolagemDano();
+        return;
+      }
+      setResultadoDano(null);
+      const parsed = parseDanoArma(acao.dano);
+      const finalizarNpc = (valoresDados: number[], termos: Parameters<typeof reproduzir>[0]) => {
+        const r = rolarDanoNpcArma(npcAlvo, acao, termos, valoresDados, registrarLog, registrarRoll, p.visibilidade);
+        setResultadoDano({ nomeArma: acao.nome || 'arma', texto: r.texto, erro: r.erro });
+        limparPedidoRolagemDano();
+      };
+      if (!parsed) {
+        finalizarNpc([], []);
+        return;
+      }
+      const termosNpc = [{ sides: parsed.lados, qty: parsed.qtd }];
+      rolar(termosNpc, (grupos) => finalizarNpc(grupos.flatMap((g) => g.rolls.map((r) => r.value)), termosNpc), 'rede', npcAlvo.id, 'dano');
+      return;
+    }
     const fichaAlvo = fichas.find((f) => f.id === p.fichaId);
     const arma = fichaAlvo?.armas.find((a) => a.id === p.armaId);
     if (!fichaAlvo || !arma) {
@@ -154,6 +183,41 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
     } else {
       rolar(termos, (grupos) => finalizar(grupos.flatMap((g) => g.rolls.map((r) => r.value)), termos), 'rede', fichaAlvo.id, 'dano');
     }
+  };
+
+  // Pedido de teste de perícia/ataque vindo de fora (`ArmasCombate.tsx`/`ArmasCombateNpc.tsx` pro
+  // ataque, `PericiasSection.tsx` pro teste solo de PC) — mesma ponte de `executarPedidoDano`
+  // acima, mesma bandeja física. NPC não tem perícia/atributo — `bonusFixo` já é o modificador
+  // pronto, sem lookup nenhum.
+  const executarPedidoTeste = (p: PedidoRolagemTeste) => {
+    if (p.npcId !== undefined) {
+      const npcAlvo = npcs.find((n) => n.id === p.npcId);
+      if (!npcAlvo || p.bonusFixo === undefined) {
+        limparPedidoRolagemTeste();
+        return;
+      }
+      setResultadoTeste(null);
+      rolar('1d20', (grupos) => {
+        const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+        const r = rolarAtaqueNpc(npcAlvo, p.rotuloArma ?? 'ação', p.bonusFixo!, d20, registrarLog, registrarRoll, p.visibilidade);
+        setResultadoTeste({ rotulo: p.rotuloArma ?? npcAlvo.nome, texto: r.texto });
+        limparPedidoRolagemTeste();
+      }, 'rede', npcAlvo.id, 'teste');
+      return;
+    }
+    const fichaAlvo = fichas.find((f) => f.id === p.fichaId);
+    const pericia = PERICIAS.find((per) => per.id === p.periciaId);
+    if (!fichaAlvo || !pericia) {
+      limparPedidoRolagemTeste();
+      return;
+    }
+    setResultadoTeste(null);
+    rolar('1d20', (grupos) => {
+      const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+      const r = rolarTestePericiaFicha(fichaAlvo, pericia, d20, basePV, registrarLog, registrarRoll, p.visibilidade, p.rotuloArma);
+      setResultadoTeste({ rotulo: p.rotuloArma ?? pericia.nome, texto: r.texto });
+      limparPedidoRolagemTeste();
+    }, 'rede', fichaAlvo.id, 'teste');
   };
 
   const pendenteRef = useRef(false);
@@ -200,6 +264,29 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
       const p = pedidoDanoPendenteRef.current;
       pedidoDanoPendenteRef.current = null;
       executarPedidoDanoRef.current(p);
+    }
+  }, [ready, rolando]);
+
+  // Mesmo padrão acima, pro pedido de teste de perícia/ataque.
+  const pedidoTestePendenteRef = useRef<PedidoRolagemTeste | null>(null);
+  const executarPedidoTesteRef = useRef(executarPedidoTeste);
+  executarPedidoTesteRef.current = executarPedidoTeste;
+
+  useEffect(() => {
+    if (!pedidoTeste) return;
+    if (ready && !rolando) {
+      executarPedidoTesteRef.current(pedidoTeste);
+    } else {
+      pedidoTestePendenteRef.current = pedidoTeste;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoTeste?.id]);
+
+  useEffect(() => {
+    if (ready && !rolando && pedidoTestePendenteRef.current) {
+      const p = pedidoTestePendenteRef.current;
+      pedidoTestePendenteRef.current = null;
+      executarPedidoTesteRef.current(p);
     }
   }, [ready, rolando]);
 
@@ -380,6 +467,14 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
             >
               <span style={{ fontSize: 12, color: resultadoDano.erro ? 'var(--ruido)' : undefined }}>
                 dano · {resultadoDano.nomeArma}: {resultadoDano.texto}
+              </span>
+            </div>
+          )}
+
+          {resultadoTeste && (
+            <div className="alerta-banner mono" style={{ marginTop: '0.5rem', justifyContent: 'center' }}>
+              <span style={{ fontSize: 12 }}>
+                {resultadoTeste.rotulo}: {resultadoTeste.texto}
               </span>
             </div>
           )}

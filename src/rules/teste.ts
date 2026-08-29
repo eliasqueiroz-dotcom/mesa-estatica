@@ -129,8 +129,12 @@ export interface ResultadoDanoArma {
  * 3D); esta função só aplica a regra (Vigor em corpo a corpo, crítico usa o máximo do dado) e
  * monta o texto de log. Extraída de `ArmasSection.tsx` (única UI que rolava dano de arma até
  * a aba Combate ganhar o próprio botão) pra não duplicar a mesma lógica nos dois lugares.
+ *
+ * Só lê `arma.dano` — tipo enxurcado pra `Pick<ArmaFicha, 'dano'>` de propósito, pra
+ * `rolarDanoNpcArma` (npcAcoes.ts) poder chamar direto com uma `NpcAcao` (que também tem
+ * `dano: string`) sem precisar fabricar um `ArmaFicha` falso só pros campos que nunca são lidos.
  */
-export function resolverDanoArma(arma: ArmaFicha, valoresDados: number[], vigor: number, critico: boolean): ResultadoDanoArma {
+export function resolverDanoArma(arma: Pick<ArmaFicha, 'dano'>, valoresDados: number[], vigor: number, critico: boolean): ResultadoDanoArma {
   const parsed = parseDanoArma(arma.dano);
   if (!parsed) {
     return { texto: `dano "${arma.dano}" não reconhecido, calcule na mão`, total: 0, bruto: 0, erro: true };

@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from 'react';
-import { CONDICOES_COMBATE } from '../../rules/data/condicoesCombate';
+import { CONDICOES_COMBATE, REGRAS_GERAIS_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { surtosAtivosNaSessao, type EstadoSessaoParaSurto } from '../../rules/surto';
 import { corPv, type useIniciativa } from '../../hooks/useIniciativa';
 import BarraSegmentada from '../fichas/BarraSegmentada';
 import ArmasCombate from '../combate/ArmasCombate';
-import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeLamina, IconeMais } from '../combate/icones';
+import ArmasCombateNpc from '../combate/ArmasCombateNpc';
+import { IconeAdiar, IconeChevron, IconeDado, IconeEscudo, IconeMais } from '../combate/icones';
 
 interface IniciativaPanelProps {
   hook: ReturnType<typeof useIniciativa>;
@@ -31,7 +32,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     expandidos, adicionarAberto, dragIndex, dropIndex,
     setDragIndex, setDropIndex, setAdicionarAberto,
     toggleSelecionado, toggleTodos, rolarSelecionados, resetar, toggleExpandido,
-    pvDoCombatente, defesaDoCombatente, usarAcaoNpc,
+    pvDoCombatente, defesaDoCombatente,
     selecionadosAplicar, toggleSelecionadoAplicar, limparSelecaoAplicar,
     aplicarDanoEmMassa, aplicarCondicaoEmMassa,
     socorristaPorAlvo, definirSocorrista, tentarEstabilizar,
@@ -41,7 +42,8 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
 
   const [danoEmMassa, setDanoEmMassa] = useState('');
   const [condicaoEmMassa, setCondicaoEmMassa] = useState('');
-  const [mostrarGlossario, setMostrarGlossario] = useState(false);
+  const [mostrarRegras, setMostrarRegras] = useState(false);
+  const [mostrarCondicoes, setMostrarCondicoes] = useState(false);
 
   return (
     <>
@@ -74,14 +76,31 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
         </button>
         <button
           className="icone-botao"
-          onClick={() => setMostrarGlossario((v) => !v)}
+          onClick={() => setMostrarRegras((v) => !v)}
           style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)' }}
         >
-          glossário <IconeChevron aberto={mostrarGlossario} />
+          regras <IconeChevron aberto={mostrarRegras} />
+        </button>
+        <button
+          className="icone-botao"
+          onClick={() => setMostrarCondicoes((v) => !v)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)' }}
+        >
+          condições <IconeChevron aberto={mostrarCondicoes} />
         </button>
       </div>
 
-      {mostrarGlossario && (
+      {mostrarRegras && (
+        <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
+          {REGRAS_GERAIS_COMBATE.map((r) => (
+            <p key={r.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
+              <strong style={{ color: 'var(--ink)' }}>{r.titulo}</strong> — {r.texto}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {mostrarCondicoes && (
         <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
           {CONDICOES_COMBATE.map((c) => (
             <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
@@ -145,7 +164,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const emSurto = surtosVisiveis.length > 0;
             const sendoArrastado = dragIndex === i;
             const alvoDrop = dropIndex === i;
-            const npcAcoes = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId)?.acoes ?? [] : [];
+            const npcDoCombatente = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId) ?? null : null;
             const podeAdiar = iniciativa.length > 1 && i < iniciativa.length - 1;
             const critico = !!pv && pv.atual > 0 && pvPct <= 0.25;
             const foraDeCombate = !!pv && pv.atual <= 0;
@@ -322,24 +341,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                         <ArmasCombate ficha={ficha} souMestre />
                       );
                     })()}
-                    {npcAcoes.length > 0 && (
-                      <div style={{ marginBottom: '0.4rem' }}>
-                        <span className="combate-rotulo">ações</span>
-                        <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                          {npcAcoes.map((a) => (
-                            <button
-                              key={a.id}
-                              className="combate-chip combate-chip--ativa"
-                              onClick={() => usarAcaoNpc(e.participanteId, e.nome, a)}
-                              title={`${a.bonus >= 0 ? '+' : ''}${a.bonus}${a.dano ? ` · dano ${a.dano}` : ''}`}
-                              style={{ fontSize: 11, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                            >
-                              <IconeLamina size={10} /> {a.nome}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {npcDoCombatente && <ArmasCombateNpc npc={npcDoCombatente} />}
                     <div style={{ marginBottom: '0.4rem' }}>
                       <span className="combate-rotulo">condições</span>
                       <div className="combate-condicoes">

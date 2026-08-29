@@ -23,6 +23,33 @@ export const CONDICOES_COMBATE: CondicaoCombate[] = [
   { id: 'aguardando', nome: 'Aguardando', efeito: 'Adiou a ação — foi pro fim da ordem desta rodada.', abreviacao: 'AGU' },
 ];
 
+/** Regras gerais de turno/ação/reação pro glossário de combate (regras.md §Combate) — separado
+ *  de `CONDICOES_COMBATE` de propósito: aquele array também alimenta os toggles por combatente
+ *  e os badges de token, então misturar regras gerais ali criaria opções de "ativar condição
+ *  Turno" sem sentido num PC. Cobertura parcial fica de fora (já é a condição "Coberto" acima,
+ *  palavra por palavra); Exposto/Mirando/Estável também já cobrem o efeito numérico — estas
+ *  linhas só descrevem a ação/regra que leva lá. */
+export interface RegraCombate {
+  id: string;
+  titulo: string;
+  texto: string;
+}
+
+export const REGRAS_GERAIS_COMBATE: RegraCombate[] = [
+  { id: 'turno', titulo: 'Turno', texto: '1 Ação + 1 Deslocamento (9 m).' },
+  { id: 'pressionar', titulo: 'Pressionar', texto: '2ª Ação no lugar do Deslocamento — fica Exposto.' },
+  { id: 'reacao-proteger', titulo: 'Reação — Proteger', texto: 'troque de lugar com aliado adjacente (1,5 m) e receba o dano.' },
+  {
+    id: 'acoes',
+    titulo: 'Ações',
+    texto:
+      'Atacar · Manobra (derrubar/desarmar/empurrar: Vigor + Briga vs. Defesa) · Correr (+9 m) · Mirar (+2) · Esconder-se · Intimidar · Primeiros socorros · Acalmar (Presença DT 15 encerra Surto) · Ajudar (+2) · Usar.',
+  },
+  { id: 'fuga', titulo: 'Fuga', texto: '30 m + fora de vista = venceu.' },
+  { id: '0-pv', titulo: '0 PV', texto: 'caído, não morto — Medicina DT 15 estabiliza.' },
+  { id: 'matar', titulo: 'Matar', texto: '-1 Sanidade, sempre.' },
+];
+
 /** Nome curto de uma condição pelo id — pros badges compactos. */
 export function nomeCondicao(id: string): string {
   return CONDICOES_COMBATE.find((c) => c.id === id)?.nome ?? id;

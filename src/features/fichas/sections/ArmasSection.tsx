@@ -18,11 +18,6 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
   const [privado, setPrivado] = useState(true);
   const visibilidade = souMestre && privado ? 'privada' : 'publica';
   const [protecaoSelect, setProtecaoSelect] = useState('');
-  /** "margem 10+ (ou 20 natural)" no ataque — 100% manual (a rolagem de ataque não compara mais
-   *  contra a DT da cena, então não há margem pra pré-marcar sozinho): o mestre marca à mão,
-   *  narrativamente, antes de clicar "dano" pra este disparo específico usar dano máximo em vez
-   *  da rolagem (regras.md). Por linha de arma, não persiste — é um flag de "próxima rolagem". */
-  const [margem10Mais, setMargem10Mais] = useState<Record<string, boolean>>({});
   /** Resultado da última rolagem de dano por arma — mostrado na própria ficha (não só no log),
    *  pro jogador ver na hora sem precisar abrir a aba Log. */
   const [resultados, setResultados] = useState<Record<string, { texto: string; erro: boolean }>>({});
@@ -51,13 +46,8 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
 
   const rolarDano = (arma: ArmaFicha) => {
     const parsed = parseDanoArma(arma.dano);
-    const critico = margem10Mais[arma.id] ?? false;
-    // Em crítico, o dado nem precisa ser rolado de verdade — `resolverDanoArma` usa o máximo do
-    // dado de qualquer jeito (regras.md, margem 10+/20 natural), então rolar só confundiria a
-    // exibição com um valor que não afeta o resultado. Sem `parsed`, não tem quantidade/lados
-    // pra rolar — `resolverDanoArma` cai no próprio branch de erro com a lista vazia.
-    const valoresDados = parsed && !critico ? rolarDadosComForcados(parsed.qtd, parsed.lados, ficha.id, 'dano') : [];
-    const resultado = resolverDanoArma(arma, valoresDados, ficha.atributos.vigor, critico);
+    const valoresDados = parsed ? rolarDadosComForcados(parsed.qtd, parsed.lados, ficha.id, 'dano') : [];
+    const resultado = resolverDanoArma(arma, valoresDados, ficha.atributos.vigor, false);
 
     const nomeArma = arma.nome || 'arma';
     const nomePersonagem = ficha.nome || 'Personagem';
@@ -71,9 +61,6 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
       visibilidade,
     });
     setResultados((prev) => ({ ...prev, [arma.id]: { texto: resultado.texto, erro: resultado.erro } }));
-    // "crít." é flag de "próxima rolagem" (comentário acima) — desarma sozinho depois de
-    // aplicado, senão fica "armado" e infla silenciosamente o próximo ataque normal.
-    setMargem10Mais((prev) => ({ ...prev, [arma.id]: false }));
   };
   const atualizar = (id: string, patch: Partial<ArmaFicha>) => {
     onChange({ armas: ficha.armas.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
@@ -177,17 +164,6 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
                     <button onClick={() => rolarDano(a)} disabled={a.dano.trim() === ''}>
                       dano
                     </button>
-                    <label
-                      title="margem 10+ ou 20 natural no ataque — usa o máximo do dado"
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '11px', cursor: 'pointer' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={margem10Mais[a.id] ?? false}
-                        onChange={(e) => setMargem10Mais((prev) => ({ ...prev, [a.id]: e.target.checked }))}
-                      />
-                      crít.
-                    </label>
                   </div>
                   {resultadosAtaque[a.id] && (
                     <div className="mono" style={{ marginTop: '0.3rem', fontSize: '11px', whiteSpace: 'nowrap', color: 'var(--rede)' }}>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { calcularDefesa, calcularPvMaximo } from '../../rules/derivados';
 import { surtosAtivosNaSessao } from '../../rules/surto';
-import { CONDICOES_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
+import { CONDICOES_COMBATE, REGRAS_GERAIS_COMBATE, nomeCondicao } from '../../rules/data/condicoesCombate';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { useStore } from '../../state/store';
 import type { EntradaIniciativa, Ficha } from '../../state/types';
@@ -31,7 +31,8 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const { modoCombate, turnoAtualId, rodada, contadorCena, condicoesCombate } = sessaoPublica;
 
-  const [mostrarGlossario, setMostrarGlossario] = useState(false);
+  const [mostrarRegras, setMostrarRegras] = useState(false);
+  const [mostrarCondicoes, setMostrarCondicoes] = useState(false);
 
   const ehMeuTurno = (id: string) => id === minhaFicha.id;
   // por id da entrada, não índice: se for a vez de um NPC oculto, a RLS de `iniciativa` nem
@@ -72,16 +73,32 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.4rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem', marginBottom: '0.4rem' }}>
         <button
           className="icone-botao"
-          onClick={() => setMostrarGlossario((v) => !v)}
+          onClick={() => setMostrarRegras((v) => !v)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)', fontSize: 11 }}
         >
-          glossário {mostrarGlossario ? '▾' : '▸'}
+          regras {mostrarRegras ? '▾' : '▸'}
+        </button>
+        <button
+          className="icone-botao"
+          onClick={() => setMostrarCondicoes((v) => !v)}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--ink-dim)', fontSize: 11 }}
+        >
+          condições {mostrarCondicoes ? '▾' : '▸'}
         </button>
       </div>
-      {mostrarGlossario && (
+      {mostrarRegras && (
+        <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
+          {REGRAS_GERAIS_COMBATE.map((r) => (
+            <p key={r.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
+              <strong style={{ color: 'var(--ink)' }}>{r.titulo}</strong> — {r.texto}
+            </p>
+          ))}
+        </div>
+      )}
+      {mostrarCondicoes && (
         <div className="secao" style={{ marginBottom: '0.5rem', background: 'var(--concrete-0)' }}>
           {CONDICOES_COMBATE.map((c) => (
             <p key={c.id} className="vazio" style={{ margin: '0.2rem 0', fontSize: 12 }}>
