@@ -23,6 +23,8 @@ interface Props {
  */
 export default function ArmasCombate({ ficha, souMestre }: Props) {
   const [privado, setPrivado] = useState(true);
+  /** Margem 10+ no ataque (ou 20 natural) = dano máximo do dado (regras.md). Por arma. */
+  const [criticos, setCriticos] = useState<Record<string, boolean>>({});
   const pedido = usePedidoRolagemDanoStore((s) => s.pedido);
   const pedirRolagemDano = usePedidoRolagemDanoStore((s) => s.pedirRolagemDano);
   const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
@@ -39,7 +41,7 @@ export default function ArmasCombate({ ficha, souMestre }: Props) {
   };
 
   const rolarDano = (armaId: string) => {
-    pedirRolagemDano({ id: crypto.randomUUID(), fichaId: ficha.id, armaId, critico: false, visibilidade });
+    pedirRolagemDano({ id: crypto.randomUUID(), fichaId: ficha.id, armaId, critico: criticos[armaId] ?? false, visibilidade });
   };
 
   return (
@@ -82,6 +84,17 @@ export default function ArmasCombate({ ficha, souMestre }: Props) {
             >
               dano
             </button>
+            <label
+              title="margem 10+ no ataque, ou 20 natural — dano máximo"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem', fontSize: 10, cursor: 'pointer', color: 'var(--ink-faint)' }}
+            >
+              <input
+                type="checkbox"
+                checked={criticos[a.id] ?? false}
+                onChange={(e) => setCriticos((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+              />
+              10+
+            </label>
           </span>
         ))}
       </div>

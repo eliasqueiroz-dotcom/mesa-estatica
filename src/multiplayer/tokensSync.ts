@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarThrottlePorChave } from './debounce';
-import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { ehErroPermissaoNegada, executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 import { computarDiffTokens } from './tokensDiff';
 
@@ -61,11 +61,17 @@ const paraToken = (r: LinhaTokenSupabase): TokenMapa => ({
  *  quem só tem permissão de UPDATE.
  *
  *  Faz UPDATE primeiro (o caminho que jogador e mestre têm garantido pro próprio/qualquer
- *  token); só tenta INSERT se zero linhas casarem — ou porque o token é genuinamente novo
- *  (`adicionarTokenMapa`, só na UI do mestre) ou porque a policy de UPDATE já rejeitou por não
- *  ser dono (aí o INSERT nega de novo, `is_gm()`-only, com o mesmo erro de sempre — não regride
- *  nada). */
-function empurrarToken(cliente: NonNullable<typeof supabase>, token: TokenMapa) {
+ *  token); só tenta INSERT se zero linhas casarem E `ehNovo` confirma que este cliente criou o
+ *  token agora (`adicionarTokenMapa`, só na UI do mestre) — nunca pra um token que já existia
+ *  localmente antes deste push (`ehNovo=false`, um move/drag). Sem essa distinção, zero linhas
+ *  também acontece quando OUTRO cliente apagou o token enquanto este tinha um UPDATE em voo
+ *  (ex.: GM remove o token no meio do arrasto de quem está com o dedo nele — `tokensEmArrasto`
+ *  faz o handler de Realtime ignorar o DELETE remoto durante o arrasto, então o próximo tick do
+ *  throttle ainda vê o token localmente); cair pro INSERT nesse caso RESSUSCITA a linha
+ *  apagada, propagando de volta pra todo mundo via Realtime (achado 29/08). Pra um move
+ *  (`ehNovo=false`), zero linhas só pode significar "não existe mais no servidor" — não faz
+ *  nada e deixa o Realtime/refetch reconciliar a remoção local. */
+function empurrarToken(cliente: NonNullable<typeof supabase>, token: TokenMapa, ehNovo: boolean) {
   const linha = paraLinha(token);
   return cliente
     .from('tokens')
@@ -75,6 +81,7 @@ function empurrarToken(cliente: NonNullable<typeof supabase>, token: TokenMapa) 
     .then((resultado): PromiseLike<{ error: unknown }> | { error: unknown } => {
       if (resultado.error) return resultado;
       if (resultado.data && resultado.data.length > 0) return resultado;
+      if (!ehNovo) return { error: null };
       return cliente.from('tokens').insert(linha);
     });
 }
@@ -99,6 +106,12 @@ export function desmarcarTokenEmArrasto(id: string): void {
  *  (`ATRASO_PUSH_MS`) de fato disparar. Sem isso, um evento remoto (eco atrasado, ou outro
  *  cliente) ou um refetch de reconexão nesse meio-tempo reverte a posição recém-solta. */
 const pendencias = new Set<string>();
+
+/** Ids de token que este cliente criou agora (presentes no diff como `!anterior`, ver
+ *  `computarDiffTokens`) e ainda não teve a criação confirmada pelo servidor — só esses podem
+ *  cair no fallback de INSERT em `empurrarToken`. Removido do Set assim que o push confirma
+ *  (sucesso), então qualquer push seguinte pro mesmo id já é tratado como move. */
+const tokensNovos = new Set<string>();
 
 /**
  * Fase A (mesa-estatica-multiplayer-completo.md §11): sincroniza só a posição/existência
@@ -160,18 +173,24 @@ export function iniciarSyncTokens(): () => void {
   void refetchTokens();
 
   const agendarUpsert = criarThrottlePorChave<TokenMapa>(ATRASO_PUSH_MS, (_id, token) => {
+    const ehNovo = tokensNovos.has(_id);
     executarComRetentativa('tokens-sync', token.id, () =>
       Promise.resolve(
-        empurrarToken(cliente, useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token),
+        empurrarToken(cliente, useStore.getState().mapa.tokens.find((t) => t.id === token.id) ?? token, ehNovo),
       ).then((resultado) => {
+        if (!resultado?.error) tokensNovos.delete(_id);
         // só libera o id pro handler de Realtime aceitar eco/remoto de novo DEPOIS que a
         // escrita CONFIRMA (sem erro) — com o throttle disparando a rede de leading edge (na
         // hora, não só ~150ms depois que o arrasto pára), limpar antes de disparar deixava uma
         // janela real: um reconnect ou eco chegando durante o round-trip da escrita pisava numa
         // posição ainda não confirmada no servidor (viu isso quebrar `tokensSync.test.ts` ao
-        // trocar debounce por throttle, 28/08). Em erro, mantém marcado — a store local segue
-        // sendo a fonte mais recente até a retentativa (`filaPendencias.ts`) confirmar.
-        if (!resultado?.error) pendencias.delete(_id);
+        // trocar debounce por throttle, 28/08). Em erro TRANSITÓRIO, mantém marcado — a store
+        // local segue sendo a fonte mais recente até a retentativa (`filaPendencias.ts`)
+        // confirmar. Erro de RLS é PERMANENTE — `filaPendencias.ts` desiste de tentar de novo
+        // (`tratarErroPermanente`), então também libera aqui: sem isso o token ficava marcado
+        // pra sempre e o handler de Realtime/`refetchTokens` ignoravam qualquer atualização
+        // remota legítima dele até a página recarregar (achado 29/08).
+        if (!resultado?.error || ehErroPermissaoNegada(resultado.error)) pendencias.delete(_id);
         return resultado;
       }),
     );
@@ -181,9 +200,13 @@ export function iniciarSyncTokens(): () => void {
     if (aplicandoRemoto || state.mapa.tokens === prevState.mapa.tokens) return;
 
     const { upserts, removidos } = computarDiffTokens(tokensAnteriores, state.mapa.tokens);
+    const idsAnteriores = new Set(tokensAnteriores.map((t) => t.id));
     tokensAnteriores = state.mapa.tokens;
 
     for (const token of upserts) {
+      // token ausente do estado anterior = genuinamente novo (`adicionarTokenMapa`) — só esses
+      // podem cair no fallback de INSERT em `empurrarToken` (ver comentário lá).
+      if (!idsAnteriores.has(token.id)) tokensNovos.add(token.id);
       // marca ANTES de agendar — sem isso, a janela do próprio debounce fica sem rede de
       // segurança nenhuma (ver `marcarEmVoo` em filaPendencias.ts e `pendencias` acima).
       pendencias.add(token.id);
@@ -206,7 +229,10 @@ export function iniciarSyncTokens(): () => void {
       const id = chave.slice(PREFIXO_DELETE.length);
       executarComRetentativa('tokens-sync', chave, () => cliente.from('tokens').delete().eq('id', id));
     } else if (replay) {
-      executarComRetentativa('tokens-sync', chave, () => empurrarToken(cliente, replay));
+      // pendência sobrevivente de reload — não há mais diff local pra saber se era novo ou
+      // move; mantém o comportamento antigo (permite INSERT de fallback) já que esse caminho é
+      // reload-no-meio-do-push, não o race de arrasto ao vivo que motivou o parâmetro `ehNovo`.
+      executarComRetentativa('tokens-sync', chave, () => empurrarToken(cliente, replay, true));
     } else {
       resolverPendencia('tokens-sync', chave);
     }

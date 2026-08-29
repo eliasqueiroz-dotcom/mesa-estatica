@@ -189,7 +189,7 @@ function desmarcarEmVoo(modulo: string, chave: string): void {
  *  `online`/reconexão de canal, sempre falhando do mesmo jeito, e o indicador (`⏳ N pendente`)
  *  sugeria "é só rede" — o jogador nunca descobria que precisava recarregar a página pra
  *  revincular. */
-function ehErroPermissaoNegada(erro: unknown): boolean {
+export function ehErroPermissaoNegada(erro: unknown): boolean {
   return typeof erro === 'object' && erro !== null && (erro as { code?: unknown }).code === '42501';
 }
 

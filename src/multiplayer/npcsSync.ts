@@ -6,6 +6,7 @@ import { criarDebouncePorChave } from './debounce';
 import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { inserirOuAtualizarNaCorrida } from './insercaoConcorrente';
+import { mesclar3Vias } from './merge3Vias';
 import { eraRemocaoExplicita } from './remocaoExplicita';
 
 const PREFIXO_DELETE = 'delete:';
@@ -121,41 +122,66 @@ async function buscarTodos(cliente: Cliente): Promise<Npc[] | null> {
 }
 
 /** Cria as duas linhas (se novo) ou atualiza as existentes — sempre GM (§8: só o mestre
- *  cria/edita NPC), diferente de fichas onde o dono também escreve. */
-async function empurrarNpc(cliente: Cliente, npc: Npc) {
-  const linhaPublico = paraLinhaPublico(npc);
-  const { data: existente } = await cliente.from('npcs_publico').select('id').eq('id', npc.id).maybeSingle();
+ *  cria/edita NPC), diferente de fichas onde o dono também escreve.
+ *
+ * Update: faz merge de 3 vias (`merge3Vias.ts`) contra o remoto recém-buscado, mesmo padrão de
+ * `empurrarFicha` em `fichasSync.ts` — sem isso, duas abas do mestre editando o MESMO NPC (PV
+ * ajustado em combate numa aba, notas/ações editadas na aba NPCs noutra) faziam o push que
+ * "perdesse a corrida" apagar o campo que o outro tinha acabado de confirmar no servidor
+ * (achado 29/08, mesma classe de bug do fix em fichas de 28/08 — nunca tinha sido portado pra
+ * cá). `baselines` guarda a última vez que este cliente sabia que local e remoto coincidiam;
+ * sem baseline ainda (primeiro push desta sessão) usa o local inteiro, mesmo comportamento de
+ * antes deste fix. */
+async function empurrarNpc(cliente: Cliente, npc: Npc, baselines: Map<string, Npc>) {
+  const linhaPublicoLocal = paraLinhaPublico(npc);
 
   // `foto` ainda em base64 (upload pro Storage em voo) nunca vai pro Postgres/Realtime — ver
   // imagemPendente.ts. Insert usa null (troca pela URL real no próximo push); update OMITE a
   // coluna pra não apagar a URL que já estava lá.
-  const fotoPendente = ehDataUrl(linhaPublico.foto);
+  const fotoPendente = ehDataUrl(linhaPublicoLocal.foto);
 
-  if (!existente) {
+  const [{ data: existentePublico }, { data: existentePrivado }] = await Promise.all([
+    cliente.from('npcs_publico').select('*').eq('id', npc.id).maybeSingle(),
+    cliente.from('npcs_privado').select('*').eq('id', npc.id).maybeSingle(),
+  ]);
+
+  if (!existentePublico) {
     // 23505 (chave duplicada) = outro push pra esse mesmo id novo venceu a corrida entre o
     // SELECT acima e este INSERT — cai pra UPDATE em vez de propagar erro (`insercaoConcorrente.ts`,
     // mesmo achado ao vivo em 23/08 que motivou o fix em `fichasSync.ts`).
     await inserirOuAtualizarNaCorrida(
-      () => cliente.from('npcs_publico').insert(fotoPendente ? { ...linhaPublico, foto: null } : linhaPublico),
+      () => cliente.from('npcs_publico').insert(fotoPendente ? { ...linhaPublicoLocal, foto: null } : linhaPublicoLocal),
       () =>
         cliente
           .from('npcs_publico')
-          .update(fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico)
+          .update(fotoPendente ? { ...linhaPublicoLocal, foto: undefined } : linhaPublicoLocal)
           .eq('id', npc.id),
     );
     await inserirOuAtualizarNaCorrida(
       () => cliente.from('npcs_privado').insert({ id: npc.id, notas_mestre: npc.notasMestre }),
       () => cliente.from('npcs_privado').upsert({ id: npc.id, notas_mestre: npc.notasMestre }),
     );
-  } else {
-    const patchPublico = fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico;
-    const { error: erroPublico } = await cliente.from('npcs_publico').update(patchPublico).eq('id', npc.id);
-    if (erroPublico) throw erroPublico;
-    const { error: erroPrivado } = await cliente
-      .from('npcs_privado')
-      .upsert({ id: npc.id, notas_mestre: npc.notasMestre });
-    if (erroPrivado) throw erroPrivado;
+    baselines.set(npc.id, npc);
+    return;
   }
+
+  const baseline = baselines.get(npc.id);
+  const linhaPublico = baseline
+    ? mesclar3Vias(paraLinhaPublico(baseline), linhaPublicoLocal, existentePublico as LinhaPublico)
+    : linhaPublicoLocal;
+  const patchPublico = fotoPendente ? { ...linhaPublico, foto: undefined } : linhaPublico;
+  const { error: erroPublico } = await cliente.from('npcs_publico').update(patchPublico).eq('id', npc.id);
+  if (erroPublico) throw erroPublico;
+
+  const privadoLocal = { id: npc.id, notas_mestre: npc.notasMestre };
+  const privado =
+    baseline && existentePrivado
+      ? mesclar3Vias({ id: baseline.id, notas_mestre: baseline.notasMestre }, privadoLocal, existentePrivado as LinhaPrivado)
+      : privadoLocal;
+  const { error: erroPrivado } = await cliente.from('npcs_privado').upsert(privado);
+  if (erroPrivado) throw erroPrivado;
+
+  baselines.set(npc.id, { ...paraNpcSemNotasMestre(linhaPublico), notasMestre: privado.notas_mestre });
 }
 
 /**
@@ -174,6 +200,19 @@ export function iniciarSyncNpcs(): () => void {
   let aplicandoRemotoContagem = 0;
   let npcsAnteriores = useStore.getState().npcs;
   const pendencias = new Set<string>();
+  // última vez que este cliente sabia que local e remoto coincidiam pra cada NPC — base do
+  // merge de 3 vias em `empurrarNpc` (ver `merge3Vias.ts`).
+  const baselines = new Map<string, Npc>();
+  // Incrementada SÓ pelo subscriber local abaixo, quando detecta uma edição de VERDADE — mesmo
+  // papel de `geracaoLocal` em `fichasSync.ts` (achado 28/08, nunca portado pra cá): comparar a
+  // REFERÊNCIA do NPC (`npcLocalAgora !== npcLocalAntes`) confundia "edição local" com "o canal
+  // IRMÃO já aplicou o remoto" — npcs_publico/npcs_privado disparam DOIS eventos Realtime pra
+  // um ÚNICO push, cada um com seu próprio `aplicarRemoto`; se o primeiro terminasse e trocasse
+  // a referência antes do segundo comparar, o segundo achava (errado) que uma edição local
+  // tinha acontecido e reempurrava — loop exponencial, sem precisar de dois editores (qualquer
+  // push sozinho já dispara os dois eventos quase juntos). Geração é imune a isso porque só o
+  // subscriber (edição de verdade) a incrementa.
+  const geracaoLocal = new Map<string, number>();
 
   // `npcs_publico`/`npcs_privado` disparam DOIS eventos Realtime pra um único push, e cada um
   // chama `aplicarRemoto` independente — mesmo dedup de `fichasSync.ts` (achado revisando o
@@ -193,7 +232,7 @@ export function iniciarSyncNpcs(): () => void {
   const agendarPush = criarDebouncePorChave<Npc>(ATRASO_PUSH_MS, (_id, npc) => {
     pendencias.delete(_id);
     executarComRetentativa('npcs-sync', npc.id, () =>
-      empurrarNpc(cliente, useStore.getState().npcs.find((n) => n.id === npc.id) ?? npc).then(() => ({ error: null })),
+      empurrarNpc(cliente, useStore.getState().npcs.find((n) => n.id === npc.id) ?? npc, baselines).then(() => ({ error: null })),
     );
   });
 
@@ -207,6 +246,7 @@ export function iniciarSyncNpcs(): () => void {
       const anterior = npcsAnteriores.find((n) => n.id === npc.id);
       if (anterior !== npc) {
           pendencias.add(npc.id);
+          geracaoLocal.set(npc.id, (geracaoLocal.get(npc.id) ?? 0) + 1);
           // marca ANTES de agendar — sem isso, a janela do próprio debounce (ATRASO_PUSH_MS)
           // fica sem rede de segurança (mesmo achado de 23/08 que motivou `marcarEmVoo`).
           marcarEmVoo('npcs-sync', npc.id);
@@ -240,33 +280,36 @@ export function iniciarSyncNpcs(): () => void {
         ]).then(([rPublico, rPrivado]) => ({ error: rPublico.error ?? rPrivado.error ?? null })),
       );
     } else if (replay) {
-      executarComRetentativa('npcs-sync', chave, () => empurrarNpc(cliente, replay).then(() => ({ error: null })));
+      executarComRetentativa('npcs-sync', chave, () => empurrarNpc(cliente, replay, baselines).then(() => ({ error: null })));
     } else {
       resolverPendencia('npcs-sync', chave);
     }
   }
 
   const aplicarRemoto = async (id: string) => {
+    // Snapshot ANTES do fetch — mesmo motivo de fichasSync.ts: se uma edição local de VERDADE
+    // acontecer enquanto `buscarEMontar` está em voo, `geracaoLocal` muda (só o subscriber
+    // local, mais abaixo, incrementa) e a gente reagenda o push em vez de deixar o `npcRemoto`
+    // (buscado ANTES dessa edição existir) apagá-la. Comparar a REFERÊNCIA do NPC aqui (como
+    // era antes) tinha o mesmo bug de loop exponencial já corrigido em `fichasSync.ts` 28/08 —
+    // ver comentário de `geracaoLocal` acima.
+    const geracaoAntes = geracaoLocal.get(id) ?? 0;
+    const npcRemoto = await buscarEMontarCompartilhado(id);
+    const geracaoDepois = geracaoLocal.get(id) ?? 0;
+
+    if (geracaoDepois !== geracaoAntes || pendencias.has(id)) {
+      const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
+      if (npcLocalAgora) {
+        marcarEmVoo('npcs-sync', id);
+        agendarPush(id, npcLocalAgora);
+      }
+      return;
+    }
+
+    if (!npcRemoto) return;
+    baselines.set(id, npcRemoto);
     aplicandoRemotoContagem++;
     try {
-      // Snapshot ANTES do fetch — mesmo motivo de fichasSync.ts: se o NPC local mudar enquanto
-      // `buscarEMontar` está em voo (a guarda acima impede o subscriber de agendar push
-      // enquanto isso), o remoto buscado ANTES dessa edição sobrescreveria a edição do mestre
-      // sem nunca reenviá-la. Se mudou, a edição local vence e reagenda o push que a guarda
-      // engoliu.
-      const npcLocalAntes = useStore.getState().npcs.find((n) => n.id === id);
-      const npcRemoto = await buscarEMontarCompartilhado(id);
-      const npcLocalAgora = useStore.getState().npcs.find((n) => n.id === id);
-
-      if (npcLocalAgora !== npcLocalAntes || pendencias.has(id)) {
-        if (npcLocalAgora) {
-          marcarEmVoo('npcs-sync', id);
-          agendarPush(id, npcLocalAgora);
-        }
-        return;
-      }
-
-      if (!npcRemoto) return;
       const s = useStore.getState();
       const existe = s.npcs.some((n) => n.id === id);
       const npcs = existe ? s.npcs.map((n) => (n.id === id ? npcRemoto : n)) : [...s.npcs, npcRemoto];
@@ -286,6 +329,10 @@ export function iniciarSyncNpcs(): () => void {
     if (remotos === null) return;
     aplicandoRemotoContagem++;
     try {
+      // baseline de TODOS os NPCs remotos conhecidos no boot, mesmo os já carregados
+      // localmente — dá ao primeiro push de cada NPC, depois do boot, uma base real pro merge
+      // de 3 vias em vez de cair no fallback "sem baseline" (empurra o local inteiro).
+      for (const remoto of remotos) baselines.set(remoto.id, remoto);
       const s = useStore.getState();
       const idsLocais = new Set(s.npcs.map((n) => n.id));
       const faltando = remotos.filter((n) => !idsLocais.has(n.id));
@@ -308,6 +355,10 @@ export function iniciarSyncNpcs(): () => void {
     if (remotos === null) return;
     aplicandoRemotoContagem++;
     try {
+      // baseline vira o remoto recém-buscado pra TODOS os NPCs, mesmo os preservados por
+      // `pendencias` abaixo (ver `empurrarNpc`/`mesclar3Vias.ts`) — o próximo push precisa
+      // comparar contra o que o servidor tem AGORA, não um baseline antigo.
+      for (const remoto of remotos) baselines.set(remoto.id, remoto);
       const s = useStore.getState();
       const remotosPorId = new Map(remotos.map((n) => [n.id, n]));
       const npcs: Npc[] = [];
