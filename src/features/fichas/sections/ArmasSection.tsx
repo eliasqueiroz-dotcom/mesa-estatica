@@ -1,66 +1,53 @@
 import { useState } from 'react';
-import { rolarDadosComForcados } from '../../../dice/registroForcados';
+import { usePedidoRolagemDanoStore } from '../../../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore } from '../../../state/pedidoRolagemTesteStore';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
 import { PERICIAS } from '../../../rules/data/pericias';
-import { calcularPvMaximo, estaFerido } from '../../../rules/derivados';
-import { parseDanoArma, resolverDanoArma } from '../../../rules/teste';
-import { useStore } from '../../../state/store';
 import type { ArmaFicha } from '../../../state/types';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
-  const basePV = useStore((s) => s.config.basePV);
-  const registrarLog = useStore((s) => s.registrarLog);
-  const registrarRoll = useStore((s) => s.registrarRoll);
   const [arsenalSelect, setArsenalSelect] = useState('');
   // Privado por padrão só faz sentido pro mestre — o jogador rolando a própria arma continua
   // sempre público, sem opção (comportamento inalterado). Ver `souMestre` em `tipos.ts`.
   const [privado, setPrivado] = useState(true);
   const visibilidade = souMestre && privado ? 'privada' : 'publica';
   const [protecaoSelect, setProtecaoSelect] = useState('');
-  /** Resultado da última rolagem de dano por arma — mostrado na própria ficha (não só no log),
-   *  pro jogador ver na hora sem precisar abrir a aba Log. */
-  const [resultados, setResultados] = useState<Record<string, { texto: string; erro: boolean }>>({});
-  /** Resultado da última rolagem de ATAQUE por arma — mesmo espírito do `resultados` acima. */
-  const [resultadosAtaque, setResultadosAtaque] = useState<Record<string, string>>({});
+  /** Margem 10+ no ataque (ou 20 natural) = dano máximo do dado (regras.md). Por arma, marcado
+   *  manualmente após ver o resultado do ataque. */
+  const [margem10Mais, setMargem10Mais] = useState<Record<string, boolean>>({});
+
+  // Ataque/dano rolam pela mesma bandeja física 3D da aba Combate (QuickRollOverlay.tsx/
+  // QuickRollOverlayJogador.tsx, montados perto da raiz) em vez de calcular local e silencioso
+  // — mesmo padrão de `ArmasCombate.tsx`/`PericiasSection.tsx`, unificando toda rolagem fora da
+  // aba Dados num único fluxo (animação pra quem rola + header/log pros demais).
+  const pedido = usePedidoRolagemDanoStore((s) => s.pedido);
+  const pedirRolagemDano = usePedidoRolagemDanoStore((s) => s.pedirRolagemDano);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
+  const pedirRolagemTeste = usePedidoRolagemTesteStore((s) => s.pedirRolagemTeste);
+  // desabilita os botões de rolar enquanto qualquer pedido está em voo — a bandeja física é
+  // compartilhada, uma rolagem de cada vez (mesmo guard de `ArmasCombate.tsx`).
+  const rolagemEmVoo = pedido !== null || pedidoTeste !== null;
 
   const rolarAtaque = (arma: ArmaFicha) => {
     if (!arma.periciaAtaqueId) return;
-    const pericia = PERICIAS.find((p) => p.id === arma.periciaAtaqueId);
-    if (!pericia) return;
-    const grauPericia = ficha.pericias[pericia.id] ?? 0;
-    const pvMaximo = calcularPvMaximo(basePV, ficha.atributos.vigor);
-    const ferido = estaFerido(ficha.pvAtual, pvMaximo);
-    const [d20] = rolarDadosComForcados(1, 20, ficha.id, 'teste');
-    const nomePersonagem = ficha.nome || 'Personagem';
-    const nomeArma = arma.nome || 'arma';
-
-    const penalidadeFerido = ferido && (pericia.atributo === 'vigor' || pericia.atributo === 'agilidade') ? -2 : 0;
-    const modificador = ficha.atributos[pericia.atributo] + grauPericia + penalidadeFerido;
-    const total = d20 + modificador;
-    const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-    registrarLog('teste', `${nomePersonagem} · ${nomeArma} · ataque → 1d20: ${d20}${modStr} = ${total}`, ficha.id, visibilidade);
-    registrarRoll({ origem: nomePersonagem, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
-    setResultadosAtaque((prev) => ({ ...prev, [arma.id]: `d20=${d20}${modStr}=${total}` }));
+    pedirRolagemTeste({
+      id: crypto.randomUUID(),
+      fichaId: ficha.id,
+      periciaId: arma.periciaAtaqueId,
+      rotuloArma: arma.nome || 'arma',
+      visibilidade,
+    });
   };
 
   const rolarDano = (arma: ArmaFicha) => {
-    const parsed = parseDanoArma(arma.dano);
-    const valoresDados = parsed ? rolarDadosComForcados(parsed.qtd, parsed.lados, ficha.id, 'dano') : [];
-    const resultado = resolverDanoArma(arma, valoresDados, ficha.atributos.vigor, false);
-
-    const nomeArma = arma.nome || 'arma';
-    const nomePersonagem = ficha.nome || 'Personagem';
-    registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id, visibilidade);
-    registrarRoll({
-      origem: nomePersonagem,
-      personagemId: ficha.id,
-      formula: arma.dano,
-      total: resultado.total,
-      bruto: resultado.bruto,
+    pedirRolagemDano({
+      id: crypto.randomUUID(),
+      fichaId: ficha.id,
+      armaId: arma.id,
+      critico: margem10Mais[arma.id] ?? false,
       visibilidade,
     });
-    setResultados((prev) => ({ ...prev, [arma.id]: { texto: resultado.texto, erro: resultado.erro } }));
   };
   const atualizar = (id: string, patch: Partial<ArmaFicha>) => {
     onChange({ armas: ficha.armas.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
@@ -158,31 +145,24 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => rolarAtaque(a)} disabled={!a.periciaAtaqueId}>
+                    <button onClick={() => rolarAtaque(a)} disabled={rolagemEmVoo || !a.periciaAtaqueId}>
                       atacar
                     </button>
-                    <button onClick={() => rolarDano(a)} disabled={a.dano.trim() === ''}>
+                    <button onClick={() => rolarDano(a)} disabled={rolagemEmVoo || a.dano.trim() === ''}>
                       dano
                     </button>
-                  </div>
-                  {resultadosAtaque[a.id] && (
-                    <div className="mono" style={{ marginTop: '0.3rem', fontSize: '11px', whiteSpace: 'nowrap', color: 'var(--rede)' }}>
-                      {resultadosAtaque[a.id]}
-                    </div>
-                  )}
-                  {resultados[a.id] && (
-                    <div
-                      className="mono"
-                      style={{
-                        marginTop: '0.3rem',
-                        fontSize: '11px',
-                        whiteSpace: 'nowrap',
-                        color: resultados[a.id].erro ? 'var(--ruido)' : 'var(--rede)',
-                      }}
+                    <label
+                      title="margem 10+ no ataque, ou 20 natural — dano máximo"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '10px', cursor: 'pointer', color: 'var(--ink-faint)' }}
                     >
-                      {resultados[a.id].texto}
-                    </div>
-                  )}
+                      <input
+                        type="checkbox"
+                        checked={margem10Mais[a.id] ?? false}
+                        onChange={(e) => setMargem10Mais((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+                      />
+                      10+
+                    </label>
+                  </div>
                 </td>
                 <td>
                   <button className="icone-botao perigo" onClick={() => remover(a.id)}>
