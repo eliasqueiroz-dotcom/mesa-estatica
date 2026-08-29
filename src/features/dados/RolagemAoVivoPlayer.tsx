@@ -85,8 +85,8 @@ export default function RolagemAoVivoPlayer({ verProprias }: Props) {
         <div
           id="dice-ao-vivo"
           style={{
-            width: 65,
-            height: 65,
+            width: 60,
+            height: 60,
             background: 'var(--concrete-0)',
             border: '1px solid var(--concrete-2)',
             flexShrink: 0,
