@@ -197,15 +197,25 @@ export default function PlayerApp() {
           borderBottom: '1px solid var(--concrete-2)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <h1 style={{ fontSize: '18px', margin: 0, display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', minWidth: 0, flex: '1 1 auto' }}>
+          <h1
+            style={{
+              fontSize: '18px',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.4rem',
+              flexWrap: 'wrap',
+              minWidth: 0,
+            }}
+          >
             <span style={{ color: 'var(--ink-dim)', fontWeight: 400 }}>Estática —</span>
             <span style={{ color: minhaFicha?.corVisual || 'var(--rede)', fontWeight: 700 }}>
               {minhaFicha?.nome || 'Mesa'}
             </span>
           </h1>
           <DesyncIndicadorJogador />
-          <nav style={{ display: 'flex', gap: '0.4rem' }}>
+          <nav style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
             {ABAS.map((a) => {
               const ativa = aba === a.id;
               // aviso discreto (mesmo espírito do botão ATK ciano do CombatOverlay): a aba
@@ -231,7 +241,7 @@ export default function PlayerApp() {
             })}
           </nav>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
           <SoundpadPlayer />
           <RolagemAoVivoPlayer />
           <MidiaPlayerJogador />
