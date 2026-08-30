@@ -175,6 +175,7 @@ Levantamento de features em VTTs maduros (Roll20, Foundry VTT, Fantasy Grounds, 
 - Turn timer no combate (tensão de pacing).
 - Transição de cena (fade to black/vermelho) ao trocar de mapa ou cruzar limiar de Ameaça.
 - Indicador de atividade noutra aba — generalizar o "aviso fora da aba" já mapeado para o dado remoto.
+- Textarea de "observações de combate" auto-crescente no `TokenOverlay.tsx`/`TokenOverlayJogador.tsx` (mapa) — reaproveitar `useAutoResizeTextarea` (`src/hooks/useAutoResizeTextarea.ts`, já usado na ficha desde 30/08) passando um `maxHeight` pra não deixar o card do token gigante.
 
 ### Próxima implementação (a partir de 06/08)
 
