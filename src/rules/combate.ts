@@ -1,5 +1,6 @@
 import type { EntradaLog } from '../state/types';
 import { nomeCondicao } from './data/condicoesCombate';
+import { metade } from './derivados';
 import { resolverTeste, type ResultadoTeste } from './teste';
 
 /** Tipos de log considerados "de combate" pro filtro do rastreador — dano/ajuste de PV,
@@ -64,6 +65,12 @@ export const DT_ESTABILIZAR = 15;
  *  decidir quando "minutos" passaram na ficção. */
 export function estaForaDeCombate(pvAtual: number): boolean {
   return pvAtual <= 0;
+}
+
+/** PV atual <= metade do máximo, em negativo → morto (regras.md §Estados derivados). Ao
+ *  contrário de "fora de combate" (0 PV, estabilizável), não tem volta. */
+export function estaMorto(pvAtual: number, pvMaximo: number): boolean {
+  return pvAtual <= -metade(pvMaximo);
 }
 
 export interface ResultadoEstabilizar {

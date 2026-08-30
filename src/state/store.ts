@@ -76,7 +76,8 @@ interface Acoes {
   removerFicha: (id: string) => void;
   definirFichaAtiva: (id: string | null) => void;
 
-  /** Clampa em [0, máximo], loga o delta no log da sessão. */
+  /** Clampa em [-máximo, máximo] (PV negativo até -máximo é permitido — regra de Morte, ver
+   *  `estaMorto` em rules/combate.ts), loga o delta no log da sessão. */
   ajustarPvAtual: (id: string, novoValor: number) => void;
   /** Igual ao PV, mas também detecta cruzamento da linha (→ Trauma) e perda ≥5 de uma vez (→ Surto). */
   ajustarSanidadeAtual: (id: string, novoValor: number) => AlertaSanidade;
@@ -651,7 +652,7 @@ export const useStore = create<Store>()(
         const ficha = get().fichas.find((f) => f.id === id);
         if (!ficha) return;
         const pvMaximo = calcularPvMaximo(get().config.basePV, ficha.atributos.vigor);
-        const valor = Math.max(0, Math.min(novoValor, pvMaximo));
+        const valor = Math.max(-pvMaximo, Math.min(novoValor, pvMaximo));
         const delta = valor - ficha.pvAtual;
         if (delta === 0) return;
         set((s) => ({ fichas: s.fichas.map((f) => (f.id === id ? { ...f, pvAtual: valor } : f)) }));

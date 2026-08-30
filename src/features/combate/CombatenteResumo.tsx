@@ -1,3 +1,4 @@
+import { estaMorto } from '../../rules/combate';
 import { efeitoCondicao, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { descricaoSurto } from '../../rules/data/surto';
 import { corPv } from '../../hooks/useIniciativa';
@@ -86,6 +87,11 @@ export default function CombatenteResumo({
         </span>
       </div>
 
+      {estaMorto(pvAtual, pvMaximo) && (
+        <div className="mono" style={{ color: 'var(--ruido)', marginBottom: '0.35rem' }}>
+          morto
+        </div>
+      )}
       {editavel && onAjustarPv ? (
         <Stepper label="PV" atual={pvAtual} maximo={pvMaximo} onAjustar={onAjustarPv} />
       ) : (

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Avatar from '../../components/Avatar';
+import { estaMorto } from '../../rules/combate';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PERICIAS } from '../../rules/data/pericias';
 import { descricaoSurto } from '../../rules/data/surto';
@@ -155,6 +156,11 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
               maximo={calcularPvMaximo(basePV, ficha.atributos.vigor)}
               onAjustar={(d) => ajustarPvAtual(ficha.id, ficha.pvAtual + d)}
             />
+            {estaMorto(ficha.pvAtual, calcularPvMaximo(basePV, ficha.atributos.vigor)) && (
+              <div className="mono" style={{ color: 'var(--ruido)', marginTop: '-0.3rem', marginBottom: '0.5rem' }}>
+                morto
+              </div>
+            )}
             <StepperLinha
               label="Sanidade"
               atual={ficha.sanidadeAtual}
@@ -257,6 +263,11 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
             <div style={{ marginBottom: '0.5rem' }}>
             <span className="vazio" style={{ fontSize: 12, color: 'var(--real)' }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
             </div>
+            {estaMorto(npc.pvAtual, npc.pvMaximo) && (
+              <div className="mono" style={{ color: 'var(--ruido)', marginBottom: '0.5rem' }}>
+                morto
+              </div>
+            )}
             <ArmasCombateNpc npc={npc} />
             <div className="campos-grid">
               <div>

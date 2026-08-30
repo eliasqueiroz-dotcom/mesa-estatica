@@ -3,6 +3,7 @@ import type { EntradaLog } from '../state/types';
 import {
   decrementarDuracoesCombate,
   estaForaDeCombate,
+  estaMorto,
   filtrarLogDeCombate,
   gerarResumoCombate,
   podeUsarPrimeirosSocorros,
@@ -22,6 +23,28 @@ describe('estaForaDeCombate', () => {
 
   it('1 PV não é fora de combate', () => {
     expect(estaForaDeCombate(1)).toBe(false);
+  });
+});
+
+describe('estaMorto', () => {
+  it('exatamente na metade negativa do máximo é morto', () => {
+    expect(estaMorto(-5, 10)).toBe(true);
+  });
+
+  it('um acima do limiar não é morto', () => {
+    expect(estaMorto(-4, 10)).toBe(false);
+  });
+
+  it('bem abaixo do limiar continua morto', () => {
+    expect(estaMorto(-10, 10)).toBe(true);
+  });
+
+  it('PV positivo não é morto', () => {
+    expect(estaMorto(5, 10)).toBe(false);
+  });
+
+  it('0 PV não é morto (fora de combate, mas vivo)', () => {
+    expect(estaMorto(0, 10)).toBe(false);
   });
 });
 

@@ -53,6 +53,7 @@ Nenhum Antecedente concede Ocultismo. Veterano só via progressão. Criação: 2
 - **Exposto**: -2 na Defesa.
 - **Caído**: ataques corpo a corpo contra você +2; levantar consome o Deslocamento.
 - **Fora de combate** (0 PV): caído, não morto. Sem socorro morre em minutos. Medicina DT 15 estabiliza; acorda com 1 PV no fim da cena.
+- **Morto** (PV atual ≤ metade do máx., em negativo — ex.: 10 PV máx. → morre em -5 ou menos): estado final, sem estabilização possível.
 
 ## Determinação
 

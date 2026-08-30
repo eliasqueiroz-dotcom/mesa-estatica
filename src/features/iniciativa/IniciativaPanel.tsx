@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { estaMorto } from '../../rules/combate';
 import { CONDICOES_COMBATE, REGRAS_GERAIS_COMBATE } from '../../rules/data/condicoesCombate';
 import { TABELA_SURTO } from '../../rules/data/surto';
 import { surtosAtivosNaSessao, type EstadoSessaoParaSurto } from '../../rules/surto';
@@ -168,6 +169,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const podeAdiar = iniciativa.length > 1 && i < iniciativa.length - 1;
             const critico = !!pv && pv.atual > 0 && pvPct <= 0.25;
             const foraDeCombate = !!pv && pv.atual <= 0;
+            const morto = !!pv && estaMorto(pv.atual, pv.maximo);
             return (
               <div
                 key={e.id}
@@ -267,19 +269,21 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                   >
                     {e.nome}
                   </span>
-                  {(foraDeCombate || critico) && (
+                  {(morto || foraDeCombate || critico) && (
                     <span
                       className="badge"
                       title={
-                        foraDeCombate
-                          ? (ativas.includes('estavel')
-                            ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
-                            : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).')
-                          : 'PV em 25% ou menos do máximo'
+                        morto
+                          ? 'morto — PV chegou à metade negativa do máximo (regras.md).'
+                          : foraDeCombate
+                            ? (ativas.includes('estavel')
+                              ? 'estabilizado (Medicina DT 15) — acorda com 1 PV no fim da cena'
+                              : '0 PV — caído, não morto. Sem socorro, morre em minutos (regras.md).')
+                            : 'PV em 25% ou menos do máximo'
                       }
                       style={{ borderColor: 'var(--ruido)', color: 'var(--ruido)', fontSize: 10, padding: '0.1em 0.35em', flexShrink: 0 }}
                     >
-                      {foraDeCombate ? (ativas.includes('estavel') ? 'estável' : 'fora de combate') : 'crítico'}
+                      {morto ? 'morto' : foraDeCombate ? (ativas.includes('estavel') ? 'estável' : 'fora de combate') : 'crítico'}
                     </span>
                   )}
                   {emSurto && (
