@@ -86,6 +86,7 @@ export interface Ficha {
   pvAtual: number;
   sanidadeAtual: number;
   equipamentoModificadorDefesa: number;
+  equipamentoProtecaoNome: string | null;
 
   determinacao: number; // 0-2
 

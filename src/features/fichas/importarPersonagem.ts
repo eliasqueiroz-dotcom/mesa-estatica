@@ -25,6 +25,7 @@ export interface FichaImportavel {
   pvAtual?: number;
   sanidadeAtual?: number;
   equipamentoModificadorDefesa?: number;
+  equipamentoProtecaoNome?: string;
   determinacao?: number;
   pericias?: Partial<Record<string, string | number>>;
   traumas?: { nome?: string; gatilho?: string; resposta?: string; virouCicatriz?: boolean }[];
@@ -160,6 +161,7 @@ export function converterFichaImportada(dados: FichaImportavel, basePV: BasePV):
   patch.pvAtual = typeof dados.pvAtual === 'number' ? dados.pvAtual : calcularPvMaximo(basePV, atributos.vigor);
   patch.sanidadeAtual = typeof dados.sanidadeAtual === 'number' ? dados.sanidadeAtual : calcularSanidadeMaxima(atributos.vontade);
   if (typeof dados.equipamentoModificadorDefesa === 'number') patch.equipamentoModificadorDefesa = dados.equipamentoModificadorDefesa;
+  if (typeof dados.equipamentoProtecaoNome === 'string') patch.equipamentoProtecaoNome = dados.equipamentoProtecaoNome;
   if (typeof dados.determinacao === 'number') patch.determinacao = Math.max(0, Math.min(2, Math.round(dados.determinacao)));
   if (typeof dados.dinheiroReal === 'number') patch.dinheiroReal = dados.dinheiroReal;
   if (typeof dados.dinheiroPonto === 'number') patch.dinheiroPonto = dados.dinheiroPonto;

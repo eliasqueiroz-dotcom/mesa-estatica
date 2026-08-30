@@ -1512,6 +1512,7 @@ export const useStore = create<Store>()(
             dinheiroReal: f.dinheiroReal ?? 0,
             dinheiroPonto: f.dinheiroPonto ?? 0,
             equipamentoModificadorDefesa: f.equipamentoModificadorDefesa ?? 0,
+            equipamentoProtecaoNome: f.equipamentoProtecaoNome ?? null,
             determinacao: f.determinacao ?? 1,
             pvAtual: f.pvAtual ?? 20,
             sanidadeAtual: f.sanidadeAtual ?? 10,

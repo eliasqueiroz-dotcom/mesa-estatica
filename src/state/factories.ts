@@ -42,6 +42,7 @@ export function criarFichaVazia(corIndex = 0): Ficha {
     pvAtual: 20,
     sanidadeAtual: 10,
     equipamentoModificadorDefesa: 0,
+    equipamentoProtecaoNome: null,
     determinacao: 1,
     pericias: {},
     traumas: [],

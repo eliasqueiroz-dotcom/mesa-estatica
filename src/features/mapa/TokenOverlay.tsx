@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import Avatar from '../../components/Avatar';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
-import { PROTECOES } from '../../rules/data/armas';
 import { PERICIAS } from '../../rules/data/pericias';
 import { descricaoSurto } from '../../rules/data/surto';
 import { surtosAtivosNaSessao } from '../../rules/surto';
@@ -53,10 +52,10 @@ function truncar(texto: string, max: number): string {
 }
 
 
-function resumoProtecao(bonusDefesa: number): string {
-  if (bonusDefesa === 0) return 'nenhuma';
-  const def = PROTECOES.find((p) => p.defesa === bonusDefesa);
-  return def ? `${def.nome} (+${bonusDefesa} defesa)` : `+${bonusDefesa} defesa`;
+function resumoProtecao(ficha: Ficha): string {
+  if (ficha.equipamentoModificadorDefesa === 0) return 'nenhuma';
+  if (ficha.equipamentoProtecaoNome) return `${ficha.equipamentoProtecaoNome} (+${ficha.equipamentoModificadorDefesa} defesa)`;
+  return `+${ficha.equipamentoModificadorDefesa} defesa`;
 }
 
 function resumoRegulador(ficha: Ficha): string {
@@ -248,7 +247,7 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
                   </span>
                 ))}
               </span>
-              <span>proteção: {resumoProtecao(ficha.equipamentoModificadorDefesa)}</span>
+              <span>proteção: {resumoProtecao(ficha)}</span>
             </div>
           </>
         )}

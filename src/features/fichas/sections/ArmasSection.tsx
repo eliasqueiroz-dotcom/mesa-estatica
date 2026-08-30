@@ -80,7 +80,11 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
   const aplicarProtecao = (nomeProtecao: string) => {
     const def = PROTECOES.find((p) => p.nome === nomeProtecao);
     if (!def) return;
-    onChange({ equipamentoModificadorDefesa: def.defesa });
+    onChange({ equipamentoModificadorDefesa: def.defesa, equipamentoProtecaoNome: def.nome });
+  };
+
+  const removerProtecao = () => {
+    onChange({ equipamentoModificadorDefesa: 0, equipamentoProtecaoNome: null });
   };
 
   return (
@@ -199,6 +203,22 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
         <h4 className="label" style={{ margin: 0 }}>
           Proteção
         </h4>
+        {ficha.equipamentoProtecaoNome && (
+          <table className="armas-tabela">
+            <tbody>
+              <tr>
+                <td>{ficha.equipamentoProtecaoNome}</td>
+                <td>+{ficha.equipamentoModificadorDefesa} defesa</td>
+                <td>{PROTECOES.find((p) => p.nome === ficha.equipamentoProtecaoNome)?.nota ?? ''}</td>
+                <td>
+                  <button className="icone-botao perigo" onClick={removerProtecao}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        )}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <select
             value={protecaoSelect}
@@ -220,7 +240,9 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
             <input
               type="number"
               value={ficha.equipamentoModificadorDefesa}
-              onChange={(e) => onChange({ equipamentoModificadorDefesa: Number(e.target.value) || 0 })}
+              onChange={(e) =>
+                onChange({ equipamentoModificadorDefesa: Number(e.target.value) || 0, equipamentoProtecaoNome: null })
+              }
               style={{ width: 72 }}
             />
           </label>
