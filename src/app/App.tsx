@@ -402,7 +402,7 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <GateOverlay />
       <AvisoSupabaseAusente />
-      <RuidoOverlay />
+      <RuidoOverlay incluirSanidade={false} />
       <AlertaOverlay />
       <header
         style={{

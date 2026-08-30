@@ -1602,7 +1602,12 @@ export const useStore = create<Store>()(
       name: 'estatica-mesa',
       storage: createJSONStorage(() => (ehBundleJogador ? semPersistencia : criarStorageComDebounce(localStorage))),
       version: SCHEMA_VERSION,
-      partialize: (state) => state,
+      partialize: (state) => {
+        // ultimoBurstRuidoEm é efêmero (dispara a animação de ruído forte por 1,5s) — persistir
+        // deixava o burst antigo reidratar e disparar de novo em todo refresh da página.
+        const { ultimoBurstRuidoEm: _ultimoBurstRuidoEm, ...resto } = state;
+        return resto;
+      },
       migrate,
     },
   ),
