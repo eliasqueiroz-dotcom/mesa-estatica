@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { rolarDadoComForcados } from '../dice/registroForcados';
+import { formatarLogRolagem } from '../dice/useDiceBox';
 import { podeUsarPrimeirosSocorros, registrarUsoPrimeirosSocorros, resolverEstabilizar } from '../rules/combate';
 import { calcularDefesa, calcularPvMaximo, estaFerido } from '../rules/derivados';
 import { useCombateUiStore } from '../state/combateUiStore';
@@ -238,7 +239,14 @@ export function useIniciativa() {
     const { teste, estabilizou } = resultado;
     registrarLog(
       'teste',
-      `${nomeSocorrista} tenta estabilizar ${alvoNome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${estabilizou ? 'estabilizou' : 'falhou'}`,
+      formatarLogRolagem({
+        quem: nomeSocorrista,
+        tipo: `Estabilizar (Medicina): ${alvoNome}`,
+        grupos: [{ notacao: '1d20', resultados: [teste.d20] }],
+        bonus: teste.modificador,
+        total: teste.total,
+        sufixo: `· ${estabilizou ? 'estabilizou' : 'falhou'}`,
+      }),
       socorrista.id,
       'privada',
     );
@@ -279,7 +287,14 @@ export function useIniciativa() {
     }
     registrarLog(
       'teste',
-      `${nomeSocorrista} tenta primeiros socorros em ${alvo.nome} — Medicina DT 15: ${teste.d20}${teste.modificador >= 0 ? '+' : ''}${teste.modificador} = ${teste.total} · ${resultadoTexto}`,
+      formatarLogRolagem({
+        quem: nomeSocorrista,
+        tipo: `Primeiros Socorros (Medicina): ${alvo.nome}`,
+        grupos: [{ notacao: '1d20', resultados: [teste.d20] }],
+        bonus: teste.modificador,
+        total: teste.total,
+        sufixo: `· ${resultadoTexto}`,
+      }),
       socorrista.id,
       'privada',
     );

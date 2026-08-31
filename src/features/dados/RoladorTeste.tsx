@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
 import { useStore } from '../../state/store';
@@ -76,7 +76,13 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         const formula = `d20${modificador >= 0 ? '+' : ''}${modificador}`;
         registrarLog(
           'teste',
-          `${origem} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modificador >= 0 ? '+' : ''}${modificador} = ${total}`,
+          formatarLogRolagem({
+            quem: origem,
+            tipo: `Teste de Perícia: ${pericia.nome}(${atributo.nome})`,
+            grupos: [{ notacao: '1d20', resultados: [d20] }],
+            bonus: modificador,
+            total,
+          }),
           ficha.id,
           visibilidade,
         );
@@ -100,7 +106,7 @@ export default function RoladorTeste({ ready, rolar }: RoladorTesteProps) {
         const formula = `d20${bonus >= 0 ? '+' : ''}${bonus}`;
         registrarLog(
           'teste',
-          `${origem} · teste → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
+          formatarLogRolagem({ quem: origem, tipo: 'Teste Rápido', grupos: [{ notacao: '1d20', resultados: [d20] }], bonus, total }),
           npc.id,
           visibilidade,
         );

@@ -39,7 +39,7 @@ export default function DadosTabJogador({ ficha, active = true, pedidoRapidoSani
   // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
   // wrapper único em vez de tocar nos 6 call sites de rolar() espalhados pelos roladores abaixo.
   // `bonus` (7º parâmetro, opcional) é o modificador de perícia/atributo — não passa pela
-  // física, só entra no total mostrado pelo aviso ao vivo (formatarNotacaoResultado).
+  // física, só entra no total mostrado pelo aviso ao vivo (formatarHeaderRolagem).
   const rolarEBroadcast = (
     notacao: Parameters<typeof rolar>[0],
     onComplete: Parameters<typeof rolar>[1],

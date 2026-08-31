@@ -1,4 +1,5 @@
 import type { Atributo } from './data/pericias';
+import type { GrupoDados } from '../dice/useDiceBox';
 import type { ArmaFicha } from '../state/types';
 
 export interface ResultadoTeste {
@@ -121,6 +122,12 @@ export interface ResultadoDanoArma {
   total: number;
   bruto: number;
   erro: boolean;
+  /** Grupos de dados prontos pro log padronizado (`formatarLogRolagem`) — vazio quando `erro`
+   *  (nada foi rolado, `texto` já é a mensagem de erro). */
+  grupos: GrupoDados[];
+  /** Modificador plano da arma (o "+K" de "2d6+K"), separado dos dados pra entrar como `bonus`
+   *  no log — Vigor (corpo a corpo) já vem como um grupo próprio, não aqui. */
+  bonus?: number;
 }
 
 /**
@@ -137,7 +144,7 @@ export interface ResultadoDanoArma {
 export function resolverDanoArma(arma: Pick<ArmaFicha, 'dano'>, valoresDados: number[], vigor: number, critico: boolean): ResultadoDanoArma {
   const parsed = parseDanoArma(arma.dano);
   if (!parsed) {
-    return { texto: `dano "${arma.dano}" não reconhecido, calcule na mão`, total: 0, bruto: 0, erro: true };
+    return { texto: `dano "${arma.dano}" não reconhecido, calcule na mão`, total: 0, bruto: 0, erro: true, grupos: [] };
   }
   const { qtd, lados, modificador, corpoACorpo } = parsed;
   const danoMaximoDado = qtd * lados + modificador;
@@ -151,7 +158,22 @@ export function resolverDanoArma(arma: Pick<ArmaFicha, 'dano'>, valoresDados: nu
   const notacaoDado = `${qtd}d${lados}${modificador !== 0 ? `${modificador > 0 ? '+' : ''}${modificador}` : ''}`;
   const parteDado = critico ? `${notacaoDado} → máximo [${rolagemDano}]` : `${notacaoDado} → [${rolagemDano}]`;
   const parteVigor = corpoACorpo ? ` + Vigor [${vigor}]` : '';
-  return { texto: `${parteDado}${parteVigor} · total ${dano}`, total: dano, bruto: rolagemDano, erro: false };
+
+  // Grupos pro log padronizado (`formatarLogRolagem`): em crítico, cada dado "mostra" a face
+  // máxima em vez de valores rolados (não há física por trás — o crítico pula a rolagem);
+  // `bonus` é só o modificador plano da arma (o Vigor entra como grupo próprio, não como bonus).
+  const resultadosDado = critico ? Array(qtd).fill(lados) : valoresDados;
+  const grupos: GrupoDados[] = [{ notacao: `${qtd}d${lados}`, resultados: resultadosDado }];
+  if (corpoACorpo) grupos.push({ notacao: 'Vigor', resultados: [vigor] });
+
+  return {
+    texto: `${parteDado}${parteVigor} · total ${dano}`,
+    total: dano,
+    bruto: rolagemDano,
+    erro: false,
+    grupos,
+    bonus: modificador || undefined,
+  };
 }
 
 export function descricaoResultado(r: ResultadoTeste): string {

@@ -165,6 +165,8 @@ describe('resolverDanoArma', () => {
     expect(r.total).toBe(4);
     expect(r.bruto).toBe(4);
     expect(r.texto).toBe('1d6 → [4] · total 4');
+    expect(r.grupos).toEqual([{ notacao: '1d6', resultados: [4] }]);
+    expect(r.bonus).toBeUndefined();
   });
 
   it('corpo a corpo: soma Vigor ao total, mas o bruto é só o dado', () => {
@@ -172,6 +174,7 @@ describe('resolverDanoArma', () => {
     expect(r.total).toBe(7);
     expect(r.bruto).toBe(4);
     expect(r.texto).toBe('1d6 → [4] + Vigor [3] · total 7');
+    expect(r.grupos).toEqual([{ notacao: '1d6', resultados: [4] }, { notacao: 'Vigor', resultados: [3] }]);
   });
 
   it('com modificador numérico, soma no bruto exibido', () => {
@@ -179,13 +182,17 @@ describe('resolverDanoArma', () => {
     expect(r.bruto).toBe(9); // 3+5+1
     expect(r.total).toBe(9);
     expect(r.texto).toBe('2d6+1 → [9] · total 9');
+    // dados crus separados do modificador plano — grupos soma 8, + bonus 1 = total 9
+    expect(r.grupos).toEqual([{ notacao: '2d6', resultados: [3, 5] }]);
+    expect(r.bonus).toBe(1);
   });
 
-  it('crítico usa o dano máximo do dado, ignora valoresDados', () => {
+  it('crítico usa o dano máximo do dado, ignora valoresDados — grupo mostra a face máxima de cada dado', () => {
     const r = resolverDanoArma(arma('1d6 + Vigor'), [1], 3, true);
     expect(r.bruto).toBe(6);
     expect(r.total).toBe(9); // máximo 6 + Vigor 3
     expect(r.texto).toBe('1d6 → máximo [6] + Vigor [3] · total 9');
+    expect(r.grupos).toEqual([{ notacao: '1d6', resultados: [6] }, { notacao: 'Vigor', resultados: [3] }]);
   });
 
   it('fórmula não reconhecida retorna erro, sem quebrar', () => {
@@ -193,6 +200,7 @@ describe('resolverDanoArma', () => {
     expect(r.erro).toBe(true);
     expect(r.total).toBe(0);
     expect(r.texto).toBe('dano "especial, ver nota" não reconhecido, calcule na mão');
+    expect(r.grupos).toEqual([]);
   });
 });
 

@@ -3,6 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { decrementarDuracoesCombate } from '../rules/combate';
 import { calcularPvMaximo, calcularSanidadeMaxima, cruzouLinhaDescendo, metade, perdeuCincoOuMaisDeUmaVez } from '../rules/derivados';
 import { rolarDadoComForcados, rolarDadosComForcados } from '../dice/registroForcados';
+import { formatarLogRolagem } from '../dice/useDiceBox';
 import { caixasIntersectam, subtrairCaixa } from '../features/mapa/fowGeometria';
 import { calcularExpiraSurto, indiceSurtoPendente, resolverSurto } from '../rules/surto';
 import { inserirNaIniciativa, ordenarIniciativa } from '../rules/teste';
@@ -689,7 +690,13 @@ export const useStore = create<Store>()(
           const [d20A, d20B] = rolarDadosComForcados(2, 20, id, 'surto');
           const resultado = resolverSurto(d20A, d20B);
           if (resultado.mesmoNumero) {
-            logSurtoImediato = `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${resultado.entradaA.nome} — ${resultado.entradaA.descricao}`;
+            logSurtoImediato = formatarLogRolagem({
+              quem: ficha.nome || 'Personagem',
+              tipo: 'Surto',
+              grupos: [{ notacao: '2d20', resultados: [d20A, d20B] }],
+              total: d20A,
+              sufixo: `· o destino insiste: ${resultado.entradaA.nome} — ${resultado.entradaA.descricao}`,
+            });
             set((s) => ({
               fichas: s.fichas.map((f) =>
                 f.id === id
@@ -974,10 +981,13 @@ export const useStore = create<Store>()(
           agilidade: p.agilidade,
         }));
         set({ iniciativa: entradas });
-        get().registrarLog(
-          'iniciativa',
-          `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`,
-        );
+        entradas.forEach((e) => {
+          get().registrarLog(
+            'iniciativa',
+            formatarLogRolagem({ quem: e.nome, tipo: 'Iniciativa', grupos: [{ notacao: '1d20', resultados: [e.d20 ?? 0] }], bonus: e.agilidade, total: e.valor }),
+            e.participanteId,
+          );
+        });
       },
       rolarIniciativa: (participanteIds) => {
         const { fichas, npcs } = get();
@@ -1001,7 +1011,13 @@ export const useStore = create<Store>()(
           agilidade: p.agilidade,
         }));
         set((s) => comIniciativaInserida(s, entradas));
-        get().registrarLog('iniciativa', `iniciativa rolada — ${entradas.map((e) => `${e.nome} ${e.valor}`).join(', ')}`);
+        entradas.forEach((e) => {
+          get().registrarLog(
+            'iniciativa',
+            formatarLogRolagem({ quem: e.nome, tipo: 'Iniciativa', grupos: [{ notacao: '1d20', resultados: [e.d20 ?? 0] }], bonus: e.agilidade, total: e.valor }),
+            e.participanteId,
+          );
+        });
       },
       rolarIniciativaGrupo: (participanteIds) => {
         const { npcs } = get();
@@ -1022,10 +1038,14 @@ export const useStore = create<Store>()(
           agilidade: maiorAgilidade,
         }));
         set((s) => comIniciativaInserida(s, entradas));
-        get().registrarLog(
-          'iniciativa',
-          `iniciativa em grupo — ${grupo.map((n) => n.nome || 'sem nome').join(', ')}: d20+${maiorAgilidade}=${valor}`,
-        );
+        // mesmo d20 pra todos — é literalmente o dado rolado pro grupo inteiro, não um bug.
+        entradas.forEach((e) => {
+          get().registrarLog(
+            'iniciativa',
+            formatarLogRolagem({ quem: e.nome, tipo: 'Iniciativa', grupos: [{ notacao: '1d20', resultados: [d20] }], bonus: maiorAgilidade, total: valor }),
+            e.participanteId,
+          );
+        });
       },
       rerolarIniciativaDe: (participanteId) => {
         const s = get();
@@ -1040,7 +1060,11 @@ export const useStore = create<Store>()(
           .map((e) => (e.participanteId === participanteId ? { ...e, valor: novoValor, d20, agilidade } : e))
           .sort((a, b) => b.valor - a.valor);
         set({ iniciativa: reordenada });
-        get().registrarLog('iniciativa', `${entrada.nome} rerrolou iniciativa — d20+${agilidade}=${novoValor}`);
+        get().registrarLog(
+          'iniciativa',
+          formatarLogRolagem({ quem: entrada.nome, tipo: 'Iniciativa', grupos: [{ notacao: '1d20', resultados: [d20] }], bonus: agilidade, total: novoValor }),
+          participanteId,
+        );
       },
       removerDaIniciativa: (id) =>
         set((s) => {

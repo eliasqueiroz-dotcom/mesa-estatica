@@ -1,6 +1,7 @@
 import type { BasePV } from './data/dificuldades';
 import { ATRIBUTOS, type DefinicaoPericia } from './data/pericias';
 import { calcularPvMaximo, estaFerido } from './derivados';
+import { formatarLogRolagem } from '../dice/useDiceBox';
 import { marcarComoProprio, useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import type { EntradaRoll, Ficha, TipoLog } from '../state/types';
 
@@ -47,10 +48,13 @@ export function rolarTestePericiaFicha(
   const atributoNome = ATRIBUTOS.find((a) => a.id === pericia.atributo)!.nome;
   const texto = `d20=${d20}${modStr}=${total}`;
 
-  const contexto = rotuloArma
-    ? `${rotuloArma} · ataque`
-    : `teste de perícia ${pericia.nome}(${atributoNome})`;
-  registrarLog('teste', `${nomePersonagem} · ${contexto} → 1d20: ${d20}${modStr} = ${total}`, ficha.id, visibilidade);
+  const tipoLog = rotuloArma ? `${rotuloArma}: Ataque` : `Teste de Perícia: ${pericia.nome}(${atributoNome})`;
+  registrarLog(
+    'teste',
+    formatarLogRolagem({ quem: nomePersonagem, tipo: tipoLog, grupos: [{ notacao: '1d20', resultados: [d20] }], bonus: modificador, total }),
+    ficha.id,
+    visibilidade,
+  );
   registrarRoll({ origem: nomePersonagem, personagemId: ficha.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
 
   if (visibilidade === 'publica') {

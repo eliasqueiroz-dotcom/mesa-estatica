@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatarLogRolagem } from '../../../dice/useDiceBox';
 import { TABELA_TRAUMAS } from '../../../rules/data/traumas';
 import { useStore } from '../../../state/store';
 import type { TraumaFicha } from '../../../state/types';
@@ -64,7 +65,18 @@ export default function TraumasSection({ ficha, onChange, souMestre }: SecaoFich
     const d20 = Math.floor(Math.random() * 20) + 1;
     const entrada = TABELA_TRAUMAS.find((t) => t.d20 === d20)!;
     adicionar(entrada);
-    registrarLog('trauma', `${ficha.nome || 'Personagem'} · sorteou trauma na tabela: d20=${d20} — ${entrada.nome}`, ficha.id, visibilidade);
+    registrarLog(
+      'trauma',
+      formatarLogRolagem({
+        quem: ficha.nome || 'Personagem',
+        tipo: 'Sorteio de Trauma',
+        grupos: [{ notacao: '1d20', resultados: [d20] }],
+        total: d20,
+        sufixo: `· ${entrada.nome}`,
+      }),
+      ficha.id,
+      visibilidade,
+    );
     setUltimoSorteio({ d20, nome: entrada.nome });
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => setUltimoSorteio(null), DURACAO_RESULTADO_MS);

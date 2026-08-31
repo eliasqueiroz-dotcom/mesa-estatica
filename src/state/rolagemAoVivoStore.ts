@@ -19,7 +19,7 @@ export interface RolagemAoVivo {
   tipo: TipoRolagemForcada;
   /** modificador plano somado ao(s) dado(s) (perícia+atributo, bônus manual...) — não é um
    *  dado, não passa pela física; só entra no total mostrado pelo aviso ao vivo
-   *  (`formatarNotacaoResultado`). Ausente/undefined quando a rolagem não tem bônus. */
+   *  (`formatarHeaderRolagem`). Ausente/undefined quando a rolagem não tem bônus. */
   bonus?: number;
 }
 

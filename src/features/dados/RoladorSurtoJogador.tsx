@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { calcularExpiraSurto, escolhaSurtoPorId, resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
@@ -77,7 +77,18 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
               },
             ],
           });
-          registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} → ${r.entradaA.nome} (destino insiste)`, ficha.id, 'publica');
+          registrarLog(
+            'surto',
+            formatarLogRolagem({
+              quem: ficha.nome || 'Personagem',
+              tipo: 'Surto',
+              grupos: [{ notacao: '2d20', resultados: [d20A, d20B] }],
+              total: d20A,
+              sufixo: `· o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
+            }),
+            ficha.id,
+            'publica',
+          );
         } else {
           atualizarFicha(ficha.id, {
             surtosAtivos: [
@@ -91,7 +102,8 @@ export default function RoladorSurtoJogador({ ficha, ready, rolar }: Props) {
             ],
             surtoPendente: { nomeFicha: ficha.nome ?? 'Personagem', entradaA: r.entradaA, entradaB: r.entradaB },
           });
-          registrarLog('surto', `${ficha.nome || 'Personagem'} · surto: d20A=${d20A} d20B=${d20B} — escolha pendente`, ficha.id, 'publica');
+          // Sem log aqui — igualado ao mestre (RoladorSurto.tsx), que só loga quando o Surto
+          // resolve (números iguais ou lado escolhido), não quando fica pendente.
         }
       },
       'ruido',

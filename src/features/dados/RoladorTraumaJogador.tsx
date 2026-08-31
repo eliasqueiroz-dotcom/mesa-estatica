@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
@@ -65,7 +65,19 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
         setTeste(r);
         setRolando(false);
         if (r.sucesso) setResolvido(true);
-        registrarLog('trauma', `${ficha.nome || 'Personagem'} · teste de trauma "${trauma.nome}"(Vontade) vs DT${DT_GATILHO} → 1d20: ${r.d20} = ${r.total} · ${r.sucesso ? 'segura' : 'falha'}`, ficha.id, 'publica');
+        registrarLog(
+          'trauma',
+          formatarLogRolagem({
+            quem: ficha.nome || 'Personagem',
+            tipo: `Trauma: ${trauma.nome}`,
+            grupos: [{ notacao: '1d20', resultados: [r.d20] }],
+            bonus: r.modificador,
+            total: r.total,
+            sufixo: r.sucesso ? '· segura' : '· falha — escolha a resposta',
+          }),
+          ficha.id,
+          'publica',
+        );
       },
       'ruido',
       ficha.id,
@@ -83,7 +95,12 @@ export default function RoladorTraumaJogador({ ficha, ready, rolar }: Props) {
       (grupos) => {
         const perda = grupos[0].value;
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
-        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id, 'publica');
+        registrarLog(
+          'trauma',
+          formatarLogRolagem({ quem: ficha.nome || 'Personagem', tipo: `Trauma: ${trauma.nome}`, grupos: [{ notacao: '1d4', resultados: [perda] }], total: perda, sufixo: '· perde Sanidade' }),
+          ficha.id,
+          'publica',
+        );
       },
       'ruido',
       ficha.id,

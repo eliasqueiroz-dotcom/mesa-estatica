@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDiceBox } from '../../dice/useDiceBox';
+import { formatarLogRolagem, useDiceBox } from '../../dice/useDiceBox';
 import { consumirForcados } from '../../dice/forcarRolagem';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -66,8 +66,12 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
       const origem = quem === 'npc' ? (npc?.nome || 'NPC') : (ficha?.nome || 'd20 rápido');
       const id = quem === 'npc' ? (npc?.id ?? null) : (ficha?.id ?? null);
       const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
-      const logMsg = bonus !== 0 ? `${origem} · rolagem rápida (sem perícia/DT) → d20: ${valor}${bonus >= 0 ? '+' : ''}${bonus} = ${total}` : `${origem} · rolagem rápida (sem perícia/DT) → ${total}`;
-      registrarLog('teste', logMsg, id, visibilidade);
+      registrarLog(
+        'teste',
+        formatarLogRolagem({ quem: origem, tipo: 'Rolagem Rápida', grupos: [{ notacao: '1d20', resultados: [valor] }], bonus, total }),
+        id,
+        visibilidade,
+      );
       registrarRoll({
         origem,
         personagemId: id,
@@ -94,7 +98,13 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         const formula = `d20${modificador >= 0 ? '+' : ''}${modificador}`;
         registrarLog(
           'teste',
-          `${ficha.nome || 'Personagem'} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modificador >= 0 ? '+' : ''}${modificador} = ${total}`,
+          formatarLogRolagem({
+            quem: ficha.nome || 'Personagem',
+            tipo: `Teste de Perícia: ${pericia.nome}(${atributo.nome})`,
+            grupos: [{ notacao: '1d20', resultados: [d20] }],
+            bonus: modificador,
+            total,
+          }),
           ficha.id,
           visibilidade,
         );
@@ -116,7 +126,7 @@ export default function QuickRollOverlay({ abaAtual, aberto, onAbertoChange, ped
         const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
         registrarLog(
           'teste',
-          `${npc.nome || 'NPC'} · teste rápido → ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total}`,
+          formatarLogRolagem({ quem: npc.nome || 'NPC', tipo: 'Teste Rápido', grupos: [{ notacao: '1d20', resultados: [d20] }], bonus, total }),
           npc.id,
           visibilidade,
         );

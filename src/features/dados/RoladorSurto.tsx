@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { calcularExpiraSurto, escolhaSurtoPorId, resolverSurto, type ResultadoSurto } from '../../rules/surto';
 import { useStore } from '../../state/store';
 
@@ -74,7 +74,13 @@ export default function RoladorSurto({ ready, rolar }: RoladorSurtoProps) {
         });
         registrarLog(
           'surto',
-          `${ficha.nome || 'Personagem'} · Surto · d20=${d20A}/${d20B} · o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
+          formatarLogRolagem({
+            quem: ficha.nome || 'Personagem',
+            tipo: 'Surto',
+            grupos: [{ notacao: '2d20', resultados: [d20A, d20B] }],
+            total: d20A,
+            sufixo: `· o destino insiste: ${r.entradaA.nome} — ${r.entradaA.descricao}`,
+          }),
           ficha.id,
           visibilidade,
         );

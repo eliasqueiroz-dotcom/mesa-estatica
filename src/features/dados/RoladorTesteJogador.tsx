@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
-import type { RollGroupResult } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult } from '../../dice/useDiceBox';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -63,7 +63,18 @@ export default function RoladorTesteJogador({ ficha, ready, rolar }: Props) {
 
         const nome = ficha.nome || 'Personagem';
         const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-        registrarLog('teste', `${nome} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
+        registrarLog(
+          'teste',
+          formatarLogRolagem({
+            quem: nome,
+            tipo: `Teste de Perícia: ${pericia.nome}(${atributo.nome})`,
+            grupos: [{ notacao: '1d20', resultados: [d20] }],
+            bonus: modificador,
+            total: d20 + modificador,
+          }),
+          ficha.id,
+          'publica',
+        );
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,

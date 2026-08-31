@@ -100,7 +100,56 @@ export function iniciarSyncSessaoPublica(): () => void {
   let aplicandoRemotoContagem = 0;
   const pendente = { valor: false };
 
-  const push = () => cliente.from('sessao_publica').upsert({ id: ID_SESSAO, ...paraLinha(useStore.getState().sessaoPublica) });
+  // Achado ao vivo (30/08): `condicoesCombate`/`condicaoDuracao` também são escritas pela tela
+  // do JOGADOR (toggle da própria condição em CombateJogadorView) — como toda `sessaoPublica`
+  // sobe como uma linha só, um push do mestre disparado por QUALQUER campo (ex.: `avancarTurno`
+  // só muda `turnoAtualId`/`rodada`) carregava a cópia local do mestre desses dois campos, que
+  // podia estar desatualizada se o jogador tivesse acabado de ligar/desligar uma condição sem
+  // esse eco ainda ter voltado pro mestre — sobrescrevendo a condição do jogador (ou de todo
+  // mundo) tanto no Supabase quanto, por consequência, em todo cliente que rebuscar depois
+  // (sobrevive a F5 porque o dado real no banco já foi apagado). `baselineCondicoes` guarda o
+  // último valor desses dois campos que ESTE cliente sabe estar em sincronia com o servidor
+  // (atualizado a cada aplicação de remoto); só reenviamos a cópia local se ela realmente
+  // mudou desde então — senão buscamos o valor mais fresco do banco bem antes do upsert, pra
+  // não pisar numa mudança concorrente de outra aba. Não elimina 100% a corrida (ainda há uma
+  // janela pequena entre o select e o upsert), mas reduz de "até 500ms + latência do Realtime"
+  // pra "um round-trip", e só nesses dois campos — todo o resto da linha mantém o
+  // last-write-wins de sempre (mesa-estatica-multiplayer-completo.md §8).
+  let baselineCondicoes = {
+    condicoesCombate: useStore.getState().sessaoPublica.condicoesCombate,
+    condicaoDuracao: useStore.getState().sessaoPublica.condicaoDuracao,
+  };
+
+  const push = async () => {
+    const atual = useStore.getState().sessaoPublica;
+    const linha = paraLinha(atual);
+
+    const mudouLocalmente =
+      JSON.stringify(atual.condicoesCombate) !== JSON.stringify(baselineCondicoes.condicoesCombate) ||
+      JSON.stringify(atual.condicaoDuracao) !== JSON.stringify(baselineCondicoes.condicaoDuracao);
+
+    if (!mudouLocalmente) {
+      const { data } = await cliente
+        .from('sessao_publica')
+        .select('condicoes_combate, condicao_duracao')
+        .eq('id', ID_SESSAO)
+        .maybeSingle();
+      if (data) {
+        linha.condicoes_combate = data.condicoes_combate;
+        linha.condicao_duracao = data.condicao_duracao ?? {};
+      }
+    }
+
+    const resultado = await cliente.from('sessao_publica').upsert({ id: ID_SESSAO, ...linha });
+    // só assume "em sincronia" com o que ESTE cliente mandou se o upsert realmente confirmou —
+    // atualizar antes (otimista) faria um retry (mesmo `push`, reexecutado por
+    // `executarComRetentativa` até confirmar) buscar de novo o valor do banco na 2ª tentativa em
+    // vez de reenviar a mudança local que falhou.
+    if (mudouLocalmente && !resultado.error) {
+      baselineCondicoes = { condicoesCombate: atual.condicoesCombate, condicaoDuracao: atual.condicaoDuracao };
+    }
+    return resultado;
+  };
 
   const agendarPush = criarDebouncePorChave<SessaoPublica>(ATRASO_PUSH_MS, () => {
     pendente.valor = false;
@@ -138,7 +187,9 @@ export function iniciarSyncSessaoPublica(): () => void {
       }
 
       if (error || !data) return;
-      useStore.setState({ sessaoPublica: paraSessaoPublica(data as Linha) });
+      const remota = paraSessaoPublica(data as Linha);
+      useStore.setState({ sessaoPublica: remota });
+      baselineCondicoes = { condicoesCombate: remota.condicoesCombate, condicaoDuracao: remota.condicaoDuracao };
     } finally {
       aplicandoRemotoContagem--;
     }

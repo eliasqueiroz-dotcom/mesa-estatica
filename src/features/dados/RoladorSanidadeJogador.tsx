@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
 import { useStore } from '../../state/store';
 import type { Ficha } from '../../state/types';
@@ -67,7 +67,17 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar, pedidoRapi
         const { d20, perdaRolada } = extrairResultadosSanidade(grupos, perdaTermo);
         setResultado({ d20, perdaRolada });
         setRolando(false);
-        registrarLog('sanidade', `${ficha.nome || 'Personagem'} · teste de sanidade ${gatilhoAlvo.nome}(Vontade) → 1d20: ${d20}, perda_rolada=${perdaRolada}`, ficha.id, 'publica');
+        registrarLog(
+          'sanidade',
+          formatarLogRolagem({
+            quem: ficha.nome || 'Personagem',
+            tipo: `Sanidade: ${gatilhoAlvo.nome}`,
+            grupos: [{ notacao: '1d20', resultados: [d20] }, { notacao: gatilhoAlvo.dado, resultados: [perdaRolada] }],
+            total: d20,
+          }),
+          ficha.id,
+          'publica',
+        );
       },
       'ruido',
       ficha.id,

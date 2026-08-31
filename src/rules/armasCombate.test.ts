@@ -26,7 +26,7 @@ describe('rolarDanoArmaFicha', () => {
       bruto: 4,
       visibilidade: 'publica',
     });
-    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Ana · faca ·'), ficha.id, 'publica');
+    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Ana - Dano: faca'), ficha.id, 'publica');
   });
 
   it('publica em rolagemAoVivoStore — mestre e jogador, sem exceção (decisão desta feature)', () => {

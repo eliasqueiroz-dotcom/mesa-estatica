@@ -1063,7 +1063,7 @@ describe('iniciativa respeita a fila de forçados', () => {
     useStore.getState().ajustarSanidadeAtual(ficha.id, 4);
 
     const log = useStore.getState().log.find((e) => e.tipo === 'surto');
-    expect(log?.texto).toContain('d20=13/13');
+    expect(log?.texto).toContain('2d20 → [13, 13]');
   });
 });
 
@@ -1085,15 +1085,15 @@ describe('rolarIniciativaGrupo', () => {
     vi.restoreAllMocks();
   });
 
-  it('registra uma entrada de log só, com os nomes do grupo', () => {
+  it('registra uma entrada de log por personagem do grupo (formato padrão)', () => {
     const npcs = [criarNpc('p1', 'Pol1', 2), criarNpc('p2', 'Pol2', 3)];
     useStore.setState({ npcs, iniciativa: [], log: [] });
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     useStore.getState().rolarIniciativaGrupo(['p1', 'p2']);
     const log = useStore.getState().log;
-    expect(log).toHaveLength(1);
-    expect(log[0].texto).toContain('Pol1');
-    expect(log[0].texto).toContain('Pol2');
+    expect(log).toHaveLength(2);
+    expect(log.some((e) => e.texto.includes('Pol1'))).toBe(true);
+    expect(log.some((e) => e.texto.includes('Pol2'))).toBe(true);
     vi.restoreAllMocks();
   });
 

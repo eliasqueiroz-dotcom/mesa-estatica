@@ -1,4 +1,4 @@
-import type { RollTermo } from '../dice/useDiceBox';
+import { formatarLogRolagem, type RollTermo } from '../dice/useDiceBox';
 import { marcarComoProprio, useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import type { EntradaRoll, Npc, NpcAcao, TipoLog } from '../state/types';
 import { resolverDanoArma, type ResultadoDanoArma } from './teste';
@@ -31,7 +31,12 @@ export function rolarAtaqueNpc(
   const nome = npc.nome || 'NPC';
   const texto = `1d20: ${d20}${modStr} = ${total}`;
 
-  registrarLog('teste', `${nome} · ${nomeAcao} · ataque → ${texto}`, npc.id, visibilidade);
+  registrarLog(
+    'teste',
+    formatarLogRolagem({ quem: nome, tipo: `${nomeAcao}: Ataque`, grupos: [{ notacao: '1d20', resultados: [d20] }], bonus, total }),
+    npc.id,
+    visibilidade,
+  );
   registrarRoll({ origem: nome, personagemId: npc.id, formula: `d20${modStr}`, total, bruto: d20, visibilidade });
 
   if (visibilidade === 'publica') {
@@ -66,7 +71,10 @@ export function rolarDanoNpcArma(
   const resultado = resolverDanoArma(acao, valoresDados, 0, false);
   const nome = npc.nome || 'NPC';
 
-  registrarLog('dano', `${nome} · ${acao.nome} · ${resultado.texto}`, npc.id, visibilidade);
+  const textoLog = resultado.erro
+    ? `${nome} - Dano: ${acao.nome} - ${resultado.texto}`
+    : formatarLogRolagem({ quem: nome, tipo: `Dano: ${acao.nome}`, grupos: resultado.grupos, bonus: resultado.bonus, total: resultado.total });
+  registrarLog('dano', textoLog, npc.id, visibilidade);
   registrarRoll({
     origem: nome,
     personagemId: npc.id,

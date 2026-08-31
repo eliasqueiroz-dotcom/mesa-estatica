@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type GrupoDados, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { useStore } from '../../state/store';
 
 const TODAS_AS_FACES = [4, 6, 8, 10, 12, 20, 100];
@@ -70,9 +70,6 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
       setGrupos(resultados);
       setRolando(false);
 
-      const resumo = resultados
-        .map((g) => `${g.qty}d${g.sides} → ${g.value} [${g.rolls.map((r) => r.value).join(', ')}]`)
-        .join(' · ');
       const total = resultados.reduce((soma, g) => soma + g.value, 0);
       const origem =
         modo === 'npc' && npc
@@ -80,8 +77,18 @@ export default function RolagemLivre({ ready, rolar }: RolagemLivreProps) {
           : modo === 'pc' && ficha
             ? (ficha.nome || 'Personagem')
             : 'Rolagem livre';
-      const texto = `${origem === 'Rolagem livre' ? '' : `${origem} · `}Rolagem livre · ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}`;
-      registrarLog('rolagem-livre', texto, personagemId, visibilidade);
+      // "quem rolou" do log padronizado é sempre alguém — sem PC/NPC selecionado, é o mestre
+      // quem está rolando (decisão do usuário), diferente de `origem` (usado só em registrarRoll,
+      // que mantém "Rolagem livre" como já era).
+      const quemLog = modo === 'nenhum' ? 'Mestre' : origem;
+      const bonusRolagem = modo === 'npc' ? bonus : undefined;
+      const gruposLog: GrupoDados[] = resultados.map((g) => ({ notacao: `${g.qty}d${g.sides}`, resultados: g.rolls.map((r) => r.value) }));
+      registrarLog(
+        'rolagem-livre',
+        formatarLogRolagem({ quem: quemLog, tipo: 'Rolagem Livre', grupos: gruposLog, bonus: bonusRolagem, total: total + (bonusRolagem ?? 0) }),
+        personagemId,
+        visibilidade,
+      );
 
       if (modo === 'npc' && npc) {
         const totalComBonus = total + bonus;

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { calcularPerdaSanidade } from '../../rules/sanidade';
 import { PERDA_SANIDADE, type GatilhoSanidade } from '../../rules/data/dificuldades';
 import { useStore } from '../../state/store';
@@ -108,7 +108,16 @@ export default function RoladorSanidade({ ready, rolar }: RoladorSanidadeProps) 
     setResultado({ ...resultado, aplicado: { sucesso, perda } });
     registrarLog(
       'sanidade',
-      `${resultado.fichaNome} · rolagem de Sanidade · gatilho "${resultado.gatilhoNome}" → d20=${resultado.d20}, ${resultado.gatilhoDado}=${resultado.perdaRolada} · ${sucesso ? 'sucesso' : 'falha'}, perde ${perda}`,
+      formatarLogRolagem({
+        quem: resultado.fichaNome,
+        tipo: `Sanidade: ${resultado.gatilhoNome}`,
+        grupos: [
+          { notacao: '1d20', resultados: [resultado.d20] },
+          { notacao: resultado.gatilhoDado, resultados: [resultado.perdaRolada] },
+        ],
+        total: resultado.d20,
+        sufixo: `· ${sucesso ? 'sucesso' : 'falha'}, perde ${perda}`,
+      }),
       fichaAlvo.id,
       visibilidade,
     );

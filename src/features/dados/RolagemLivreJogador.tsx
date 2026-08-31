@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type GrupoDados, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { useStore } from '../../state/store';
 
 const TODAS_AS_FACES = [4, 6, 8, 10, 12, 20, 100];
@@ -48,15 +48,16 @@ export default function RolagemLivreJogador({ fichaId, ready, rolar }: RolagemLi
       setGrupos(resultados);
       setRolando(false);
 
-      const resumo = resultados
-        .map((g) => `${g.qty}d${g.sides} → ${g.value} [${g.rolls.map((r) => r.value).join(', ')}]`)
-        .join(' · ');
       const total = resultados.reduce((soma, g) => soma + g.value, 0);
       const totalComBonus = total + bonus;
       const notacaoTexto = termos.map((t) => `${t.quantidade}d${t.faces}`).join(' + ');
-      const textoBonus = bonus !== 0 ? ` + bônus ${bonus} = ${totalComBonus}` : '';
-      const texto = `${fichaNome ? `${fichaNome} · ` : ''}Rolagem livre · ${resumo}${resultados.length > 1 ? ` · total ${total}` : ''}${textoBonus}`;
-      registrarLog('rolagem-livre', texto, fichaId, 'publica');
+      const gruposLog: GrupoDados[] = resultados.map((g) => ({ notacao: `${g.qty}d${g.sides}`, resultados: g.rolls.map((r) => r.value) }));
+      registrarLog(
+        'rolagem-livre',
+        formatarLogRolagem({ quem: fichaNome || 'Personagem', tipo: 'Rolagem Livre', grupos: gruposLog, bonus: bonus || undefined, total: totalComBonus }),
+        fichaId,
+        'publica',
+      );
 
       registrarRoll({
         origem: fichaNome || 'Rolagem livre',

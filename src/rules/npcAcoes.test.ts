@@ -22,7 +22,7 @@ describe('rolarAtaqueNpc', () => {
     expect(registrarRoll).toHaveBeenCalledWith(
       expect.objectContaining({ origem: 'Sentinela', personagemId: 'npc-1', formula: 'd20+5', total: 17, bruto: 12, visibilidade: 'publica' }),
     );
-    expect(registrarLog).toHaveBeenCalledWith('teste', expect.stringContaining('Sentinela · garra · ataque'), 'npc-1', 'publica');
+    expect(registrarLog).toHaveBeenCalledWith('teste', expect.stringContaining('Sentinela - garra: Ataque'), 'npc-1', 'publica');
   });
 
   it('bônus negativo formata sem "+" duplicado', () => {
@@ -55,7 +55,7 @@ describe('rolarDanoNpcArma', () => {
 
     expect(r.total).toBe(4);
     expect(registrarRoll).toHaveBeenCalledWith(expect.objectContaining({ origem: 'Sentinela', personagemId: 'npc-1', total: 4, bruto: 4, visibilidade: 'publica' }));
-    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Sentinela · garra ·'), 'npc-1', 'publica');
+    expect(registrarLog).toHaveBeenCalledWith('dano', expect.stringContaining('Sentinela - Dano: garra'), 'npc-1', 'publica');
   });
 
   it('só publica em rolagemAoVivoStore quando pública', () => {

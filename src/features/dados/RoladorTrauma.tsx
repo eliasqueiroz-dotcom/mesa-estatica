@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ColorsetId } from '../../dice/colorsets';
 import type { TipoRolagemForcada } from '../../dice/registroForcados';
-import type { RollGroupResult, RollTermo } from '../../dice/useDiceBox';
+import { formatarLogRolagem, type RollGroupResult, type RollTermo } from '../../dice/useDiceBox';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { resolverTeste, type ResultadoTeste } from '../../rules/teste';
 import { useStore } from '../../state/store';
@@ -60,26 +60,20 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
       });
       setTeste(r);
       setRolando(false);
-      if (r.sucesso) {
-        setResolvido(true);
-        registrarLog(
-          'trauma',
-          `${ficha.nome || 'Personagem'} · gatilho "${trauma.nome}" · Vontade vs DT${DT_GATILHO} → ${d20}${
-            r.modificador >= 0 ? '+' : ''
-          }${r.modificador} = ${r.total} · segura`,
-          ficha.id,
-          visibilidade,
-        );
-      } else {
-        registrarLog(
-          'trauma',
-          `${ficha.nome || 'Personagem'} · gatilho "${trauma.nome}" · Vontade vs DT${DT_GATILHO} → ${d20}${
-            r.modificador >= 0 ? '+' : ''
-          }${r.modificador} = ${r.total} · falha — escolha a resposta`,
-          ficha.id,
-          visibilidade,
-        );
-      }
+      if (r.sucesso) setResolvido(true);
+      registrarLog(
+        'trauma',
+        formatarLogRolagem({
+          quem: ficha.nome || 'Personagem',
+          tipo: `Trauma: ${trauma.nome}`,
+          grupos: [{ notacao: '1d20', resultados: [d20] }],
+          bonus: r.modificador,
+          total: r.total,
+          sufixo: r.sucesso ? '· segura' : '· falha — escolha a resposta',
+        }),
+        ficha.id,
+        visibilidade,
+      );
     }, 'ruido', ficha.id);
   };
 
@@ -93,7 +87,12 @@ export default function RoladorTrauma({ ready, rolar }: RoladorTraumaProps) {
       [{ sides: 4, qty: 1 }],
       (grupos) => {
         const perda = grupos[0].value;
-        registrarLog('trauma', `${ficha.nome || 'Personagem'} · trauma "${trauma.nome}" · perde 1d4 (${perda}) de Sanidade`, ficha.id, visibilidade);
+        registrarLog(
+          'trauma',
+          formatarLogRolagem({ quem: ficha.nome || 'Personagem', tipo: `Trauma: ${trauma.nome}`, grupos: [{ notacao: '1d4', resultados: [perda] }], total: perda, sufixo: '· perde Sanidade' }),
+          ficha.id,
+          visibilidade,
+        );
         ajustarSanidadeAtual(ficha.id, ficha.sanidadeAtual - perda);
       },
       'ruido',

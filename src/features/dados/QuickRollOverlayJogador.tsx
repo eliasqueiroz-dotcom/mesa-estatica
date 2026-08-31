@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
+import { formatarLogRolagem, normalizarTermos, useDiceBox } from '../../dice/useDiceBox';
 import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
 import { calcularPvMaximo, estaFerido } from '../../rules/derivados';
 import { ATRIBUTOS, PERICIAS } from '../../rules/data/pericias';
@@ -52,7 +52,7 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
   // transmite a rolagem pra mesa toda ver o dado caindo (rolagemAoVivoStore/rolagemAoVivoSync) —
   // mesmo wrapper de DadosTabJogador.tsx, aqui só com os dois call sites locais. `bonusRolagem`
   // (6º parâmetro, opcional) é o modificador de perícia/atributo — não passa pela física, só
-  // entra no total mostrado pelo aviso ao vivo (formatarNotacaoResultado).
+  // entra no total mostrado pelo aviso ao vivo (formatarHeaderRolagem).
   const rolarEBroadcast = (
     notacao: Parameters<typeof rolar>[0],
     onComplete: Parameters<typeof rolar>[1],
@@ -96,8 +96,12 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
 
         const nome = ficha.nome || 'd20 rápido';
         const formula = bonus !== 0 ? `d20+${bonus}` : 'd20';
-        const logMsg = bonus !== 0 ? `${nome} · rolagem rápida → d20: ${valor}${bonus >= 0 ? '+' : ''}${bonus} = ${total}` : `${nome} · rolagem rápida → ${total}`;
-        registrarLog('teste', logMsg, ficha.id, 'publica');
+        registrarLog(
+          'teste',
+          formatarLogRolagem({ quem: nome, tipo: 'Rolagem Rápida', grupos: [{ notacao: '1d20', resultados: [valor] }], bonus, total }),
+          ficha.id,
+          'publica',
+        );
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,
@@ -129,7 +133,18 @@ export default function QuickRollOverlayJogador({ ficha, abaAtual, aberto, onAbe
 
         const nome = ficha.nome || 'Personagem';
         const modStr = modificador >= 0 ? `+${modificador}` : `${modificador}`;
-        registrarLog('teste', `${nome} · teste de perícia ${pericia.nome}(${atributo.nome}) → 1d20: ${d20}${modStr} = ${d20 + modificador}`, ficha.id, 'publica');
+        registrarLog(
+          'teste',
+          formatarLogRolagem({
+            quem: nome,
+            tipo: `Teste de Perícia: ${pericia.nome}(${atributo.nome})`,
+            grupos: [{ notacao: '1d20', resultados: [d20] }],
+            bonus: modificador,
+            total: d20 + modificador,
+          }),
+          ficha.id,
+          'publica',
+        );
         registrarRoll({
           origem: nome,
           personagemId: ficha.id,

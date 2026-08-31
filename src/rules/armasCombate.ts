@@ -1,4 +1,4 @@
-import type { RollTermo } from '../dice/useDiceBox';
+import { formatarLogRolagem, type RollTermo } from '../dice/useDiceBox';
 import { marcarComoProprio, useRolagemAoVivoStore } from '../state/rolagemAoVivoStore';
 import type { ArmaFicha, EntradaRoll, Ficha, TipoLog } from '../state/types';
 import { resolverDanoArma, type ResultadoDanoArma } from './teste';
@@ -36,7 +36,10 @@ export function rolarDanoArmaFicha(
   const nomePersonagem = ficha.nome || 'Personagem';
   const nomeArma = arma.nome || 'arma';
 
-  registrarLog('dano', `${nomePersonagem} · ${nomeArma} · ${resultado.texto}`, ficha.id, visibilidade);
+  const textoLog = resultado.erro
+    ? `${nomePersonagem} - Dano: ${nomeArma} - ${resultado.texto}`
+    : formatarLogRolagem({ quem: nomePersonagem, tipo: `Dano: ${nomeArma}`, grupos: resultado.grupos, bonus: resultado.bonus, total: resultado.total });
+  registrarLog('dano', textoLog, ficha.id, visibilidade);
   registrarRoll({
     origem: nomePersonagem,
     personagemId: ficha.id,
