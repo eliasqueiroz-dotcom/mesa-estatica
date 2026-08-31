@@ -100,6 +100,17 @@ export default function MidiaPlayerGM() {
     const idxAtual = ordenadas.findIndex((f) => f.id === s.midia.faixaAtualId);
 
     if (s.midia.modoLoop === 'faixa') {
+      // reinicia direto no handler do evento nativo `ended`, sem esperar o round-trip
+      // store → render → useEffect (linhas 42-85) — faixa/tocando não mudam de *valor* aqui
+      // (já eram os mesmos antes de terminar), só o timestamp, então esse round-trip era a
+      // ÚNICA coisa disparando o replay; em alguns navegadores isso falhava silenciosamente.
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        void audio.play().catch((erro) => {
+          if (erro?.name === 'NotAllowedError') setBloqueado(true);
+        });
+      }
       s.atualizarEstadoMidia({ posicaoSegundos: 0, tocando: true });
       return;
     }
