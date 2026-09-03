@@ -8,7 +8,7 @@ import IniciativaPanel from '../iniciativa/IniciativaPanel';
 
 export default function CombatOverlay() {
   const iniciativa = useIniciativa();
-  const { modoCombate, turnoAtualId, avancarTurno } = iniciativa;
+  const { modoCombate, turnoAtualId, avancarTurno, voltarTurno } = iniciativa;
   const numeroSessao = useStore((s) => s.sessaoPublica.numeroSessao);
 
   const [aberto, setAberto] = useState(false);
@@ -93,11 +93,14 @@ export default function CombatOverlay() {
       if (e.key === ' ' || e.key.toLowerCase() === 'n') {
         e.preventDefault();
         avancarTurno();
+      } else if (e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        voltarTurno();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [modoCombate, avancarTurno]);
+  }, [modoCombate, avancarTurno, voltarTurno]);
 
   const indiceAtual = iniciativa.iniciativa.findIndex((e) => e.id === turnoAtualId);
   const combatenteAtual = modoCombate && indiceAtual >= 0 ? iniciativa.iniciativa[indiceAtual] : null;
@@ -170,6 +173,14 @@ export default function CombatOverlay() {
               <span className="vazio"> · próximo: {proximoCombatente.nome}</span>
             )}
           </div>
+          <button
+            className="icone-botao"
+            onClick={voltarTurno}
+            title="turno anterior (p)"
+            style={{ fontSize: 13, padding: '0.3em 0.7em', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <IconeSeta size={13} style={{ transform: 'rotate(180deg)' }} /> anterior
+          </button>
           <button
             className="icone-botao acento"
             onClick={avancarTurno}

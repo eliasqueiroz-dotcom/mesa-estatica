@@ -47,6 +47,7 @@ export function useIniciativa() {
   const reordenarIniciativa = useStore((s) => s.reordenarIniciativa);
   const iniciarModoCombate = useStore((s) => s.iniciarModoCombate);
   const avancarTurno = useStore((s) => s.avancarTurno);
+  const voltarTurno = useStore((s) => s.voltarTurno);
   const encerrarModoCombate = useStore((s) => s.encerrarModoCombate);
   const ajustarPvAtual = useStore((s) => s.ajustarPvAtual);
   const atualizarNpc = useStore((s) => s.atualizarNpc);
@@ -314,7 +315,7 @@ export function useIniciativa() {
     condicoesCombate, condicaoDuracao, definirDuracaoCondicao, fichas, npcs, basePV,
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
-    iniciarModoCombate, avancarTurno, encerrarModoCombate,
+    iniciarModoCombate, avancarTurno, voltarTurno, encerrarModoCombate,
     alternarCondicaoCombate,
     participantesDisponiveis, disponiveis, todosSelecionados, nenhumSelecionado, adicionarDisponiveis,
     expandidos, adicionarAberto, dragIndex, dropIndex,

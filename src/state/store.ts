@@ -139,6 +139,9 @@ interface Acoes {
   iniciarModoCombate: () => void;
   /** Passa pro próximo em `iniciativa`; dá a volta soma 1 em `rodada`. */
   avancarTurno: () => void;
+  /** Volta pro turno anterior; dá a volta subtrai 1 em `rodada`. Não desfaz a duração de
+   *  condição decrementada pelo `avancarTurno` correspondente — reverte só posição/rodada. */
+  voltarTurno: () => void;
   /** Só para de checar a trava — não zera `iniciativa`/`rodada` (mesa-estatica-multiplayer-completo.md Parte I §6.3); limpa `condicoesCombate`. */
   encerrarModoCombate: () => void;
   /** Liga/desliga uma condição de combate (`CONDICOES_COMBATE`) num combatente. */
@@ -1133,6 +1136,18 @@ export const useStore = create<Store>()(
             ? decrementarDuracoesCombate(s.sessaoPublica.condicoesCombate, s.sessaoPublica.condicaoDuracao ?? {}, participanteAtual)
             : { condicoesCombate: s.sessaoPublica.condicoesCombate, condicaoDuracao: s.sessaoPublica.condicaoDuracao };
           return { sessaoPublica: { ...s.sessaoPublica, turnoAtualId: s.iniciativa[proximo].id, rodada, condicoesCombate, condicaoDuracao } };
+        }),
+      voltarTurno: () =>
+        set((s) => {
+          const total = s.iniciativa.length;
+          if (total === 0) return s;
+          const indiceAtual = s.iniciativa.findIndex((e) => e.id === s.sessaoPublica.turnoAtualId);
+          const anterior = indiceAtual > 0 ? indiceAtual - 1 : total - 1;
+          // reverte só posição/rodada — não desfaz `decrementarDuracoesCombate` do avanço
+          // anterior (duração já expirada não volta), aceito de propósito: o caso de uso real é
+          // "cliquei próximo por engano", não um undo fiel de todo o estado de combate.
+          const rodada = indiceAtual === 0 ? Math.max(1, s.sessaoPublica.rodada - 1) : s.sessaoPublica.rodada;
+          return { sessaoPublica: { ...s.sessaoPublica, turnoAtualId: s.iniciativa[anterior].id, rodada } };
         }),
       encerrarModoCombate: () =>
         set((s) => ({

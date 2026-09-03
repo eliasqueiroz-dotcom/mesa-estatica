@@ -27,7 +27,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
     condicoesCombate, condicaoDuracao, fichas, npcs,
     selecionadosIniciativa,
     removerDaIniciativa, reordenarIniciativa, rerolarIniciativaDe,
-    iniciarModoCombate, avancarTurno, encerrarModoCombate,
+    iniciarModoCombate, avancarTurno, voltarTurno, encerrarModoCombate,
     alternarCondicaoCombate, definirDuracaoCondicao,
     disponiveis, todosSelecionados, nenhumSelecionado, adicionarDisponiveis,
     expandidos, adicionarAberto, dragIndex, dropIndex,
@@ -59,9 +59,14 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
         {modoCombate ? (
           <>
             {!ocultarBotaoProximo && (
-              <button className="icone-botao acento" onClick={avancarTurno}>
-                próximo
-              </button>
+              <>
+                <button className="icone-botao" onClick={voltarTurno} title="voltar pro turno anterior">
+                  anterior
+                </button>
+                <button className="icone-botao acento" onClick={avancarTurno}>
+                  próximo
+                </button>
+              </>
             )}
             <button className="icone-botao perigo" onClick={encerrarModoCombate}>
               encerrar

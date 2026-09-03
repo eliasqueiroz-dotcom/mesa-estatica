@@ -866,6 +866,62 @@ describe('rerolarIniciativaDe', () => {
   });
 });
 
+describe('avancarTurno/voltarTurno', () => {
+  const iniciativaABC = () => [
+    { id: 'e1', participanteId: 'a', tipo: 'npc' as const, nome: 'A', valor: 20 },
+    { id: 'e2', participanteId: 'b', tipo: 'npc' as const, nome: 'B', valor: 15 },
+    { id: 'e3', participanteId: 'c', tipo: 'npc' as const, nome: 'C', valor: 10 },
+  ];
+
+  it('voltarTurno reverte pro participante anterior sem mudar rodada no meio dela', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABC(),
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e2', rodada: 3 }, // 'b' está na vez
+    }));
+    useStore.getState().voltarTurno();
+    const s = useStore.getState();
+    expect(s.sessaoPublica.turnoAtualId).toBe('e1');
+    expect(s.sessaoPublica.rodada).toBe(3);
+  });
+
+  it('voltarTurno do primeiro da lista dá a volta pro último e decrementa a rodada', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABC(),
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e1', rodada: 3 }, // 'a' (1º) está na vez
+    }));
+    useStore.getState().voltarTurno();
+    const s = useStore.getState();
+    expect(s.sessaoPublica.turnoAtualId).toBe('e3');
+    expect(s.sessaoPublica.rodada).toBe(2);
+  });
+
+  it('voltarTurno na rodada 1 não deixa a rodada ir a 0', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABC(),
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e1', rodada: 1 },
+    }));
+    useStore.getState().voltarTurno();
+    expect(useStore.getState().sessaoPublica.rodada).toBe(1);
+  });
+
+  it('avancarTurno seguido de voltarTurno volta pra mesma pessoa e rodada', () => {
+    useStore.setState((s) => ({
+      iniciativa: iniciativaABC(),
+      sessaoPublica: { ...s.sessaoPublica, turnoAtualId: 'e3', rodada: 2 }, // 'c' (último) está na vez
+    }));
+    useStore.getState().avancarTurno(); // volta pro início, rodada 3
+    expect(useStore.getState().sessaoPublica).toMatchObject({ turnoAtualId: 'e1', rodada: 3 });
+    useStore.getState().voltarTurno();
+    expect(useStore.getState().sessaoPublica).toMatchObject({ turnoAtualId: 'e3', rodada: 2 });
+  });
+
+  it('iniciativa vazia não quebra nenhum dos dois', () => {
+    useStore.setState((s) => ({ iniciativa: [], sessaoPublica: { ...s.sessaoPublica, turnoAtualId: null } }));
+    expect(() => useStore.getState().voltarTurno()).not.toThrow();
+    expect(() => useStore.getState().avancarTurno()).not.toThrow();
+  });
+});
+
 describe('removerDaIniciativa', () => {
   const iniciativaABCD = () => [
     { id: 'e1', participanteId: 'a', tipo: 'npc' as const, nome: 'A', valor: 20 },
