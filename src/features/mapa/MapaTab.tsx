@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
-import { calcularSanidadeMaxima } from '../../rules/derivados';
+import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
+import { estaForaDeCombate, estaMorto } from '../../rules/combate';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
@@ -58,6 +59,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const atualizarGrade = useStore((s) => s.atualizarGrade);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
+  const basePV = useStore((s) => s.config.basePV);
   const adicionarTokenMapa = useStore((s) => s.adicionarTokenMapa);
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
   const removerTokenMapa = useStore((s) => s.removerTokenMapa);
@@ -114,10 +116,10 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
   const participantePorId = (id: string) => {
     const ficha = fichas.find((f) => f.id === id);
-    if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, ficha };
+    if (ficha) return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, ficha, npc: null as null };
     const npc = npcs.find((n) => n.id === id);
-    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, ficha: null as null };
-    return { nome: '?', cor: COR_NPC_PADRAO, foto: null as string | null, silhueta: null as string | null, ficha: null as null };
+    if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, ficha: null as null, npc };
+    return { nome: '?', cor: COR_NPC_PADRAO, foto: null as string | null, silhueta: null as string | null, ficha: null as null, npc: null as null };
   };
 
   const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,7 +275,13 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const surtoEscolha = surtosVisiveis.find((s) => s.escolha !== null)?.escolha ?? null;
     const turnoAtivo = participanteNaVez === t.participanteId;
     const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
-    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, nome: p.nome, foto: p.foto, silhueta: p.silhueta };
+    const pvAtual = p.ficha?.pvAtual ?? p.npc?.pvAtual;
+    const pvMaximo = p.ficha ? calcularPvMaximo(basePV, p.ficha.atributos.vigor) : p.npc?.pvMaximo;
+    // "desacordado"/"morto" combinam o cálculo automático de PV (rules/combate.ts) com o toggle
+    // manual do mestre (CONDICOES_COMBATE) — o mestre pode marcar mesmo quando o PV não bate.
+    const desacordado = (pvAtual !== undefined && estaForaDeCombate(pvAtual)) || condicoes.includes('desacordado');
+    const morto = (pvAtual !== undefined && pvMaximo !== undefined && estaMorto(pvAtual, pvMaximo)) || condicoes.includes('morto');
+    return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, desacordado, morto, nome: p.nome, foto: p.foto, silhueta: p.silhueta };
   });
 
   const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
@@ -375,6 +383,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
         {tokensVisuais.map((t) => {
           const partesTitulo = [t.nome];
+          if (t.morto) partesTitulo.push('morto');
+          else if (t.desacordado) partesTitulo.push('desacordado');
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
           if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
           const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
@@ -385,6 +395,8 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
               className="mapa-token"
               data-surto={t.surtoAtivo}
               data-turno={t.turnoAtivo}
+              data-morto={t.morto}
+              data-desacordado={!t.morto && t.desacordado}
               style={{ left: esq, top: topo, borderColor: t.cor }}
               onPointerDown={iniciarArrastoToken(t.id)}
               title={partesTitulo.join(' — ')}

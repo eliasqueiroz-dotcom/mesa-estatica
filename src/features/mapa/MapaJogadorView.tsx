@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
-import { calcularSanidadeMaxima } from '../../rules/derivados';
+import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
+import { estaForaDeCombate, estaMorto } from '../../rules/combate';
 import { badgeCondicoes, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
@@ -34,6 +35,7 @@ interface Props {
 export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, iniciativa }: Props) {
   const mapa = useStore((s) => s.mapa);
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
+  const basePV = useStore((s) => s.config.basePV);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
   const contadorCena = useStore((s) => s.sessaoPublica.contadorCena);
   const rodada = useStore((s) => s.sessaoPublica.rodada);
@@ -90,15 +92,21 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         surtosAtivos: minhaFicha.surtosAtivos,
         tipo: 'pc' as const,
         notas: undefined as string | undefined,
+        // PV é privado (fichaSplit.ts) — só dá pra calcular automático na PRÓPRIA ficha;
+        // outro PC só mostra "morto"/"desacordado" se o mestre marcar manualmente.
+        pvAtual: minhaFicha.pvAtual as number | undefined,
+        pvMaximo: calcularPvMaximo(basePV, minhaFicha.atributos.vigor) as number | undefined,
       };
     }
     const ficha = outrasFichas.find((f) => f.id === id);
     if (ficha) {
-      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const, notas: undefined as string | undefined };
+      return { nome: ficha.nome || 'sem nome', cor: ficha.corVisual, foto: ficha.foto, silhueta: null as string | null, sanidadeCritica: false, surtosAtivos: [], tipo: 'pc' as const, notas: undefined as string | undefined, pvAtual: undefined as number | undefined, pvMaximo: undefined as number | undefined };
     }
     const npc = npcs.find((n) => n.id === id);
     if (npc) {
-      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const, notas: npc.notas as string | undefined };
+      // PV de NPC é privado (`npcs_publico` não expõe — npcsSync.ts) — "morto"/"desacordado"
+      // de NPC no mapa do jogador só existe via marcação manual do mestre (condicoesCombate).
+      return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, sanidadeCritica: false, surtosAtivos: [], tipo: 'npc' as const, notas: npc.notas as string | undefined, pvAtual: undefined as number | undefined, pvMaximo: undefined as number | undefined };
     }
     return null;
   };
@@ -113,6 +121,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
       const turnoAtivo = participanteNaVez === t.participanteId;
       const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
       const podeMover = t.participanteId === minhaFicha.id;
+      const desacordado = (p.pvAtual !== undefined && estaForaDeCombate(p.pvAtual)) || condicoes.includes('desacordado');
+      const morto = (p.pvAtual !== undefined && p.pvMaximo !== undefined && estaMorto(p.pvAtual, p.pvMaximo)) || condicoes.includes('morto');
       return {
         id: t.id,
         participanteId: t.participanteId,
@@ -127,6 +137,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         surtoEscolha,
         turnoAtivo,
         condicoes,
+        desacordado,
+        morto,
         nome: p.nome,
         podeMover,
       };
@@ -231,6 +243,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
 
         {tokensVisuais.map((t) => {
           const partesTitulo = [t.nome];
+          if (t.morto) partesTitulo.push('morto');
+          else if (t.desacordado) partesTitulo.push('desacordado');
           if (t.podeMover) partesTitulo.push('seu token — arraste pra mover');
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
           if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
@@ -242,6 +256,8 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
               className="mapa-token"
               data-surto={t.surtoAtivo}
               data-turno={t.turnoAtivo}
+              data-morto={t.morto}
+              data-desacordado={!t.morto && t.desacordado}
               style={{ left: esq, top: topo, borderColor: t.cor, cursor: t.podeMover ? 'grab' : 'pointer' }}
               onPointerDown={t.podeMover ? iniciarArrasto : undefined}
               onClick={t.podeMover ? undefined : () => setOverlay({ tipo: t.tipo, participanteId: t.participanteId })}

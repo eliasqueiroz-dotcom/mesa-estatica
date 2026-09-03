@@ -21,6 +21,12 @@ export const CONDICOES_COMBATE: CondicaoCombate[] = [
   { id: 'surpresa', nome: 'Surpresa', efeito: 'Não age na 1ª rodada e fica Exposto.', abreviacao: 'SUR' },
   { id: 'estavel', nome: 'Estável', efeito: 'Socorrido (Medicina DT 15) a 0 PV — acorda com 1 PV no fim da cena.', abreviacao: 'EST' },
   { id: 'aguardando', nome: 'Aguardando', efeito: 'Adiou a ação — foi pro fim da ordem desta rodada.', abreviacao: 'AGU' },
+  // marcação manual do mestre, independente do PV — "fora de combate"/"morto" já são calculados
+  // sozinhos a partir do PV (rules/combate.ts: estaForaDeCombate/estaMorto), mas o mestre também
+  // precisa poder marcar (ex.: nocauteado por outro meio, morte narrativa sem seguir a fórmula).
+  // Token do mapa e rastreador de combate combinam os dois: cálculo automático OU este toggle.
+  { id: 'desacordado', nome: 'Desacordado', efeito: 'Fora de combate — inconsciente, sem ação.', abreviacao: 'DES' },
+  { id: 'morto', nome: 'Morto', efeito: 'Marcação manual do mestre — não depende do PV.', abreviacao: 'MOR' },
 ];
 
 /** Regras gerais de turno/ação/reação pro glossário de combate (regras.md §Combate) — separado

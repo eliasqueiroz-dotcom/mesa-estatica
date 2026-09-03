@@ -173,8 +173,10 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
             const npcDoCombatente = e.tipo === 'npc' ? npcs.find((n) => n.id === e.participanteId) ?? null : null;
             const podeAdiar = iniciativa.length > 1 && i < iniciativa.length - 1;
             const critico = !!pv && pv.atual > 0 && pvPct <= 0.25;
-            const foraDeCombate = !!pv && pv.atual <= 0;
-            const morto = !!pv && estaMorto(pv.atual, pv.maximo);
+            // "desacordado"/"morto" também podem ser marcados manualmente pelo mestre
+            // (CONDICOES_COMBATE), independente do PV bater com a regra — union, não substitui.
+            const foraDeCombate = (!!pv && pv.atual <= 0) || ativas.includes('desacordado');
+            const morto = (!!pv && estaMorto(pv.atual, pv.maximo)) || ativas.includes('morto');
             return (
               <div
                 key={e.id}

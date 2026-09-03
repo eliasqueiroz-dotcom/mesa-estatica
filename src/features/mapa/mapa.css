@@ -159,6 +159,34 @@
   outline-offset: 3px;
 }
 
+/* Fora de combate (0 PV OU marcação manual do mestre — MapaTab.tsx/MapaJogadorView.tsx já
+   combinam os dois) — token dessaturado e apagado, sem cobrir o avatar. */
+.mapa-token[data-desacordado='true'] {
+  filter: grayscale(0.85);
+  opacity: 0.6;
+}
+
+/* Morto (PV na metade negativa OU marcação manual) — precedência sobre "desacordado" (o
+   componente já garante que os dois `data-*` nunca vêm juntos): dessaturação total + caveira
+   por cima, pra distinguir de "só caído/estabilizável" à distância. */
+.mapa-token[data-morto='true'] {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.mapa-token[data-morto='true']::after {
+  content: '☠';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--ink);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
 /* Condições de combate ativas — canto inferior-esquerdo, oposto ao × de remover. Mostra a
    abreviação (3 letras) da 1ª condição ativa + "+N" se houver mais (badgeCondicoes,
    condicoesCombate.ts) — um número sozinho não dizia QUAL condição, só quantas; hover no
