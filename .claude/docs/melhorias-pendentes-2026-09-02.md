@@ -34,16 +34,13 @@ Achado importante durante a implementação: o Vite **promove `<script type="mod
 
 ## 4. Dado do jogador no header em vez de abrir QuickRollOverlay
 
-**Plano, não implementado ainda.**
+**Implementado nesta rodada.**
 
-Hoje: os botões de ataque/dano/perícia (`ArmasSection.tsx`, `PericiasSection.tsx`) disparam `pedidoRolagemDano`/`pedidoRolagemTeste`, que forçam `setOverlayAberto(true)` (`PlayerApp.tsx:84`, espelho em `App.tsx:299` pro mestre). A física do dado 3D só existe dentro do `QuickRollOverlayJogador` porque o `<div id="dice-overlay-jogador">` só é montado com `aberto=true`. O header (`RolagemAoVivoPlayer.tsx`) já fica sempre montado, mas hoje só **reproduz** rolagens de outros jogadores — nunca **rola** fisicamente algo novo, e filtra a própria rolagem por design (`useReproduzirRolagemAoVivo.ts:28-33` — a premissa original era que o overlay já mostrava pro próprio jogador).
+`RolagemAoVivoPlayer.tsx` ganhou uma prop opcional `ficha` (só passada em `PlayerApp.tsx`, nunca em `App.tsx`/mestre) — quando presente, a mesma bandeja sempre-montada (`dice-ao-vivo`) que já reproduzia rolagens de outros jogadores passa também a **executar** (`rolar()`, física de verdade) os pedidos de dano/teste da própria ficha (`pedidoRolagemDanoStore`/`pedidoRolagemTesteStore`), migrados de `QuickRollOverlayJogador.tsx`. `PlayerApp.tsx` parou de forçar `setOverlayAberto(true)` nesses pedidos — o popup "d20 rápido" (atalho "R") continua existindo do jeito que estava, só perdeu a lógica de dano/teste que não era dele.
 
-O broadcast pra mesa toda **já funciona** hoje (`rolarDanoArmaFicha`/`rolarTestePericiaFicha` já chamam `marcarComoProprio` + `definirAtual`) — o gap é só de onde a física/animação roda no lado de quem rolou.
+Achado que simplificou a migração: `rolarDanoArmaFicha`/`rolarTestePericiaFicha` (`rules/armasCombate.ts`, `rules/testePericia.ts`) **já cuidavam** de log/registro/broadcast pra `rolagemAoVivoStore` sozinhas — não foi preciso duplicar essa parte. E o filtro `ehRolagemPropria` (`useReproduzirRolagemAoVivo.ts`) não precisou de nenhum ajuste: como a física agora roda direto neste componente (não mais via `reproduzir`/replay), o filtro que ignora o próprio broadcast continua correto — evita que a MESMA rolagem seja animada duas vezes (uma pela execução direta, outra pelo replay do próprio eco).
 
-Passos recomendados:
-1. Parar de forçar `setOverlayAberto(true)` em `pedidoDano`/`pedidoTeste` de ataque/dano/perícia (manter só pro atalho "R" de rolagem livre, que é intencionalmente overlay).
-2. Mover a física de `executarPedidoDano`/`executarPedidoTeste` (`QuickRollOverlayJogador.tsx:167-209`) pra dentro da bandeja sempre-montada `dice-ao-vivo` do `RolagemAoVivoPlayer.tsx` (hoje só chama `reproduzir`; passaria a também `rolar` fisicamente o pedido do próprio jogador) — ou extrair um hook compartilhado entre os dois componentes.
-3. Ajustar o filtro `ehRolagemPropria`/`ignorarFiltroPropria` (`useReproduzirRolagemAoVivo.ts:33`) pra que, com a física migrada, o resultado realmente apareça no header do próprio jogador.
+Guard important: `executarPedidoDano`/`executarPedidoTeste` e os efeitos que os disparam checam `if (!ficha) return` — sem isso, a instância do MESTRE (`App.tsx`, que também renderiza `RolagemAoVivoPlayer`) reagiria aos próprios `pedidoRolagemDanoStore`/`pedidoRolagemTesteStore` (usados por `QuickRollOverlay.tsx`, mestre-side) e executaria a física duas vezes.
 
 ## 5. Botão "anterior" no combate
 

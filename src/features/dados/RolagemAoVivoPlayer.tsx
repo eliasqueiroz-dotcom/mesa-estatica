@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatarHeaderRolagem, type GrupoDados, type RollTermo, useDiceBox } from '../../dice/useDiceBox';
 import { useReproduzirRolagemAoVivo } from '../../dice/useReproduzirRolagemAoVivo';
+import { resolverRolagemJogador } from '../../multiplayer/rolagemRemota';
+import { rolarDanoArmaFicha } from '../../rules/armasCombate';
+import { PERICIAS } from '../../rules/data/pericias';
+import { parseDanoArma } from '../../rules/teste';
+import { rolarTestePericiaFicha } from '../../rules/testePericia';
+import { usePedidoRolagemDanoStore, type PedidoRolagemDano } from '../../state/pedidoRolagemDanoStore';
+import { usePedidoRolagemTesteStore, type PedidoRolagemTeste } from '../../state/pedidoRolagemTesteStore';
 import { useRolagemAoVivoStore } from '../../state/rolagemAoVivoStore';
+import { useStore } from '../../state/store';
+import type { Ficha } from '../../state/types';
 
 /** Fatia `valores` (achatado, na ordem dos termos) pelos `qty` de cada termo — reconstrói os
  *  grupos que `formatarHeaderRolagem` espera a partir do shape plano do broadcast. */
@@ -41,10 +50,26 @@ const GRACA_RESULTADO_MS = 16000;
 interface Props {
   /** true só em `App.tsx` (header do mestre) — ver comentário em `useReproduzirRolagemAoVivo.ts`. */
   verProprias?: boolean;
+  /** presente só em `PlayerApp.tsx` — a própria ficha do jogador. Habilita esta bandeja a também
+   *  EXECUTAR (não só reproduzir) os pedidos de dano/teste de ataque/perícia da própria ficha
+   *  (`pedidoRolagemDanoStore`/`pedidoRolagemTesteStore`, vindos de `ArmasSection.tsx`/
+   *  `ArmasCombate.tsx`/`PericiasSection.tsx`) — antes rodavam em `QuickRollOverlayJogador.tsx`,
+   *  que precisava se auto-abrir só pra existir o container da física. Migrado pra cá (03/09,
+   *  melhorias-pendentes-2026-09-02.md §4) pra a própria rolagem do jogador aparecer no header
+   *  igual a rolagem de qualquer outro jogador, sem popup forçado. Sem essa prop (mestre), essas
+   *  duas stores continuam intocadas — pertencem a `QuickRollOverlay.tsx` do lado do mestre. */
+  ficha?: Ficha;
 }
 
-export default function RolagemAoVivoPlayer({ verProprias }: Props) {
-  const { ready, modo2D, reproduzir } = useDiceBox('dice-ao-vivo', true, 45);
+export default function RolagemAoVivoPlayer({ verProprias, ficha }: Props) {
+  const { ready, rolando, modo2D, rolar, reproduzir } = useDiceBox('dice-ao-vivo', true, 45, ficha ? resolverRolagemJogador : undefined);
+  const basePV = useStore((s) => s.config.basePV);
+  const registrarLog = useStore((s) => s.registrarLog);
+  const registrarRoll = useStore((s) => s.registrarRoll);
+  const pedidoDano = usePedidoRolagemDanoStore((s) => s.pedido);
+  const limparPedidoRolagemDano = usePedidoRolagemDanoStore((s) => s.limparPedidoRolagemDano);
+  const pedidoTeste = usePedidoRolagemTesteStore((s) => s.pedido);
+  const limparPedidoRolagemTeste = usePedidoRolagemTesteStore((s) => s.limparPedidoRolagemTeste);
 
   const graceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [visivel, setVisivel] = useState(false);
@@ -72,6 +97,109 @@ export default function RolagemAoVivoPlayer({ verProprias }: Props) {
       graceRef.current = setTimeout(() => marcarVisivel(false), GRACA_RESULTADO_MS);
     },
   }, verProprias);
+
+  // Pedido de dano de arma da própria ficha (chip em ArmasCombate.tsx/botão em ArmasSection.tsx)
+  // — a física roda nesta MESMA bandeja sempre-montada (não mais numa própria escondida atrás de
+  // `aberto`). `rolarDanoArmaFicha` já cuida de log/registro/broadcast pra mesa toda; aqui só
+  // falta mostrar o resultado no PRÓPRIO header (o broadcast é auto-filtrado da reprodução por
+  // `ehRolagemPropria`, de propósito — replay duplicaria a animação que já rodou aqui).
+  const executarPedidoDano = (p: PedidoRolagemDano) => {
+    if (!ficha) return;
+    const arma = ficha.armas.find((a) => a.id === p.armaId);
+    if (!arma) {
+      limparPedidoRolagemDano();
+      return;
+    }
+    if (graceRef.current) clearTimeout(graceRef.current);
+    setRotulo({ cor: ficha.corVisual, texto: `${ficha.nome || 'jogador'} está rolando…` });
+    marcarVisivel(true);
+    const finalizar = (valoresDados: number[], termos: RollTermo[]) => {
+      const r = rolarDanoArmaFicha(ficha, arma, termos, valoresDados, p.critico, registrarLog, registrarRoll, p.visibilidade);
+      setRotulo({ cor: ficha.corVisual, texto: `dano · ${arma.nome || 'arma'}: ${r.texto}` });
+      graceRef.current = setTimeout(() => marcarVisivel(false), GRACA_RESULTADO_MS);
+      limparPedidoRolagemDano();
+    };
+    const parsed = parseDanoArma(arma.dano);
+    if (!parsed) {
+      finalizar([], []);
+      return;
+    }
+    const termos = [{ sides: parsed.lados, qty: parsed.qtd }];
+    if (p.critico) {
+      const valoresMaximos = Array(parsed.qtd).fill(parsed.lados);
+      reproduzir(termos, valoresMaximos, { base: 'rede', cor: ficha.corVisual }, () => finalizar(valoresMaximos, termos));
+    } else {
+      rolar(termos, (grupos) => finalizar(grupos.flatMap((g) => g.rolls.map((r) => r.value)), termos), 'rede', ficha.id, 'dano');
+    }
+  };
+
+  // Pedido de teste de perícia/ataque de arma da própria ficha — mesma ponte de
+  // `executarPedidoDano` acima, mesma bandeja física.
+  const executarPedidoTeste = (p: PedidoRolagemTeste) => {
+    if (!ficha) return;
+    const pericia = PERICIAS.find((per) => per.id === p.periciaId);
+    if (!pericia) {
+      limparPedidoRolagemTeste();
+      return;
+    }
+    if (graceRef.current) clearTimeout(graceRef.current);
+    setRotulo({ cor: ficha.corVisual, texto: `${ficha.nome || 'jogador'} está rolando…` });
+    marcarVisivel(true);
+    rolar('1d20', (grupos) => {
+      const d20 = grupos[0]?.rolls[0]?.value ?? 0;
+      const r = rolarTestePericiaFicha(ficha, pericia, d20, basePV, registrarLog, registrarRoll, p.visibilidade, p.rotuloArma);
+      setRotulo({ cor: ficha.corVisual, texto: `${p.rotuloArma ?? pericia.nome}: ${r.texto}` });
+      graceRef.current = setTimeout(() => marcarVisivel(false), GRACA_RESULTADO_MS);
+      limparPedidoRolagemTeste();
+    }, 'rede', ficha.id, 'teste');
+  };
+
+  // Mesmo padrão de fila de pendência de `QuickRollOverlayJogador.tsx` (de onde isso foi
+  // migrado): se o pedido chegar com a bandeja ainda ocupada, guarda e dispara sozinho assim que
+  // ela libera — nenhum clique se perde.
+  const pedidoDanoPendenteRef = useRef<PedidoRolagemDano | null>(null);
+  const executarPedidoDanoRef = useRef(executarPedidoDano);
+  executarPedidoDanoRef.current = executarPedidoDano;
+
+  useEffect(() => {
+    if (!ficha || !pedidoDano) return;
+    if (ready && !rolando) {
+      executarPedidoDanoRef.current(pedidoDano);
+    } else {
+      pedidoDanoPendenteRef.current = pedidoDano;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ficha, pedidoDano?.id]);
+
+  useEffect(() => {
+    if (ficha && ready && !rolando && pedidoDanoPendenteRef.current) {
+      const p = pedidoDanoPendenteRef.current;
+      pedidoDanoPendenteRef.current = null;
+      executarPedidoDanoRef.current(p);
+    }
+  }, [ficha, ready, rolando]);
+
+  const pedidoTestePendenteRef = useRef<PedidoRolagemTeste | null>(null);
+  const executarPedidoTesteRef = useRef(executarPedidoTeste);
+  executarPedidoTesteRef.current = executarPedidoTeste;
+
+  useEffect(() => {
+    if (!ficha || !pedidoTeste) return;
+    if (ready && !rolando) {
+      executarPedidoTesteRef.current(pedidoTeste);
+    } else {
+      pedidoTestePendenteRef.current = pedidoTeste;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ficha, pedidoTeste?.id]);
+
+  useEffect(() => {
+    if (ficha && ready && !rolando && pedidoTestePendenteRef.current) {
+      const p = pedidoTestePendenteRef.current;
+      pedidoTestePendenteRef.current = null;
+      executarPedidoTesteRef.current(p);
+    }
+  }, [ficha, ready, rolando]);
 
   useEffect(
     () => () => {
