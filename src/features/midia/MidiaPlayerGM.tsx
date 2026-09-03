@@ -54,7 +54,15 @@ export default function MidiaPlayerGM() {
     if (remoto) {
       const esperado = calcularPosicaoEsperada(midia);
       if (precisaResincronizar(audio.currentTime, esperado)) audio.currentTime = esperado;
-    } else {
+    } else if (audio.currentTime !== midia.posicaoSegundos) {
+      // igualdade exata, sem tolerância — um seek manual de verdade (barra de progresso em
+      // MidiaTab.tsx) quase nunca bate exatamente com o currentTime de ponto flutuante corrente,
+      // então nunca é suprimido; só evita reatribuir um valor já idêntico (ex.: o restart de
+      // loop de faixa, que `aoTerminar` já deixou em currentTime=0 antes deste efeito rodar de
+      // novo por causa do bump de `atualizadoEm`). Reatribuir currentTime com uma `play()` ainda
+      // em voo é gatilho documentado de rejeição por interrupção — nem este efeito nem
+      // `aoTerminar` tratavam nada além de NotAllowedError, então a rejeição sumia em silêncio e
+      // o loop simplesmente parava (achado 03/09, melhorias-pendentes-2026-09-02.md).
       audio.currentTime = midia.posicaoSegundos;
     }
 
@@ -67,15 +75,21 @@ export default function MidiaPlayerGM() {
 
     if (midia.tocando) {
       if (trocou) audio.volume = 0;
-      audio.play().then(
-        () => {
-          setBloqueado(false);
-          if (trocou) fadeVolume(audio, volumeAlvo, FADE_TROCA_MS, fadeTokenRef);
-        },
-        (erro) => {
-          if (erro?.name === 'NotAllowedError') setBloqueado(true);
-        },
-      );
+      // só chama play() se ainda não estiver tocando — uma troca de faixa de verdade já reseta
+      // `paused` pra true (reatribuir `.src` roda o "media element load algorithm" da spec), então
+      // o guard não impede o play() de acontecer; só evita a 2ª chamada redundante competindo com
+      // a que `aoTerminar` já disparou direto no handler `ended` (loop de faixa).
+      if (audio.paused) {
+        audio.play().then(
+          () => {
+            setBloqueado(false);
+            if (trocou) fadeVolume(audio, volumeAlvo, FADE_TROCA_MS, fadeTokenRef);
+          },
+          (erro) => {
+            if (erro?.name === 'NotAllowedError') setBloqueado(true);
+          },
+        );
+      }
     } else if (trocou) {
       fadeVolume(audio, 0, FADE_TROCA_MS, fadeTokenRef, () => audio.pause());
     } else {
@@ -107,9 +121,15 @@ export default function MidiaPlayerGM() {
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = 0;
-        void audio.play().catch((erro) => {
-          if (erro?.name === 'NotAllowedError') setBloqueado(true);
-        });
+        // sinaliza sucesso aqui também — com o guard de `paused` no efeito passivo (linhas
+        // 68-84), ele deixa de rodar de novo depois de um restart de loop bem-sucedido, então
+        // não sobra mais ninguém pra limpar `bloqueado` se ele estivesse true no momento do restart.
+        void audio.play().then(
+          () => setBloqueado(false),
+          (erro) => {
+            if (erro?.name === 'NotAllowedError') setBloqueado(true);
+          },
+        );
       }
       s.atualizarEstadoMidia({ posicaoSegundos: 0, tocando: true });
       return;
