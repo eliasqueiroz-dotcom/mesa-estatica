@@ -14,6 +14,7 @@ import { ATRIBUTOS } from '../../../rules/data/pericias';
 import { NOME_TIER_RUIDO } from '../../ruido/RuidoOverlay';
 import { useStore } from '../../../state/store';
 import BarraSegmentada from '../BarraSegmentada';
+import InputNumeroDraft from '../../../components/InputNumeroDraft';
 import type { SecaoFichaProps } from '../tipos';
 
 export default function AtributosDerivadosSection({ ficha, onChange, souMestre }: SecaoFichaProps) {
@@ -60,17 +61,16 @@ export default function AtributosDerivadosSection({ ficha, onChange, souMestre }
         {ATRIBUTOS.map((a) => (
           <div key={a.id}>
             <label htmlFor={`atr-${a.id}`}>{a.nome}</label>
-            <input
+            <InputNumeroDraft
               id={`atr-${a.id}`}
-              type="number"
               min={0}
               max={5}
               value={ficha.atributos[a.id]}
-              onChange={(e) =>
+              onCommit={(valor) =>
                 onChange({
                   atributos: {
                     ...ficha.atributos,
-                    [a.id]: Math.max(0, Math.min(5, Number(e.target.value) || 0)),
+                    [a.id]: Math.max(0, Math.min(5, valor)),
                   },
                 })
               }
@@ -85,11 +85,7 @@ export default function AtributosDerivadosSection({ ficha, onChange, souMestre }
           <div className="derivado-card__valor">{pvMaximo}</div>
           <div className="derivado-card__atual">
             <span className="vazio">atual</span>
-            <input
-              type="number"
-              value={ficha.pvAtual}
-              onChange={(e) => ajustarPvAtual(ficha.id, Number(e.target.value) || 0)}
-            />
+            <InputNumeroDraft value={ficha.pvAtual} onCommit={(valor) => ajustarPvAtual(ficha.id, valor)} />
           </div>
           <BarraSegmentada atual={ficha.pvAtual} maximo={pvMaximo} variante="pv" />
           {ferido && <span className="badge" style={{ marginTop: '0.4rem' }}>ferido</span>}
@@ -100,11 +96,7 @@ export default function AtributosDerivadosSection({ ficha, onChange, souMestre }
           <div className="derivado-card__valor">{sanidadeMaxima}</div>
           <div className="derivado-card__atual">
             <span className="vazio">atual</span>
-            <input
-              type="number"
-              value={ficha.sanidadeAtual}
-              onChange={(e) => handleSanidade(Number(e.target.value) || 0)}
-            />
+            <InputNumeroDraft value={ficha.sanidadeAtual} onCommit={handleSanidade} />
           </div>
           <BarraSegmentada atual={ficha.sanidadeAtual} maximo={sanidadeMaxima} variante="sanidade" tier={tierRuido} />
           <div className="vazio" style={{ marginTop: '0.3rem' }}>
@@ -117,10 +109,9 @@ export default function AtributosDerivadosSection({ ficha, onChange, souMestre }
           <div className="derivado-card__valor">{defesa}</div>
           <div className="derivado-card__atual">
             <span className="vazio">equip.</span>
-            <input
-              type="number"
+            <InputNumeroDraft
               value={ficha.equipamentoModificadorDefesa}
-              onChange={(e) => onChange({ equipamentoModificadorDefesa: Number(e.target.value) || 0 })}
+              onCommit={(valor) => onChange({ equipamentoModificadorDefesa: valor })}
             />
           </div>
         </div>

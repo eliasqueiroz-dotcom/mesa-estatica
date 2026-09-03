@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
+import InputNumeroDraft from '../../components/InputNumeroDraft';
 import { corPv, useIniciativa } from '../../hooks/useIniciativa';
 import { comprimirImagemAvatar } from '../../lib/comprimirImagem';
 import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
@@ -264,19 +265,19 @@ export default function NpcsTab() {
                         <div className="npc-card__grid">
                           <div>
                             <label htmlFor={`npc-pv-${n.id}`}>PV atual</label>
-                            <input id={`npc-pv-${n.id}`} type="number" value={n.pvAtual} onChange={(e) => atualizarNpc(n.id, { pvAtual: Number(e.target.value) || 0 })} />
+                            <InputNumeroDraft id={`npc-pv-${n.id}`} value={n.pvAtual} onCommit={(valor) => atualizarNpc(n.id, { pvAtual: valor })} />
                           </div>
                           <div>
                             <label htmlFor={`npc-pvmax-${n.id}`}>PV máximo</label>
-                            <input id={`npc-pvmax-${n.id}`} type="number" value={n.pvMaximo} onChange={(e) => atualizarNpc(n.id, { pvMaximo: Number(e.target.value) || 0 })} />
+                            <InputNumeroDraft id={`npc-pvmax-${n.id}`} value={n.pvMaximo} onCommit={(valor) => atualizarNpc(n.id, { pvMaximo: valor })} />
                           </div>
                           <div>
                             <label htmlFor={`npc-defesa-${n.id}`}>Defesa</label>
-                            <input id={`npc-defesa-${n.id}`} type="number" value={n.defesa} onChange={(e) => atualizarNpc(n.id, { defesa: Number(e.target.value) || 0 })} />
+                            <InputNumeroDraft id={`npc-defesa-${n.id}`} value={n.defesa} onCommit={(valor) => atualizarNpc(n.id, { defesa: valor })} />
                           </div>
                           <div>
                             <label htmlFor={`npc-agi-${n.id}`}>Agilidade</label>
-                            <input id={`npc-agi-${n.id}`} type="number" value={n.agilidade} onChange={(e) => atualizarNpc(n.id, { agilidade: Number(e.target.value) || 0 })} />
+                            <InputNumeroDraft id={`npc-agi-${n.id}`} value={n.agilidade} onCommit={(valor) => atualizarNpc(n.id, { agilidade: valor })} />
                           </div>
                         </div>
                       </div>

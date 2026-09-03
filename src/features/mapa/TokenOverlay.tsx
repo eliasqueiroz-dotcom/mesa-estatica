@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Avatar from '../../components/Avatar';
+import InputNumeroDraft from '../../components/InputNumeroDraft';
 import { estaMorto } from '../../rules/combate';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PERICIAS } from '../../rules/data/pericias';
@@ -272,39 +273,19 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
             <div className="campos-grid">
               <div>
                 <label htmlFor="ov-npc-pv">PV atual</label>
-                <input
-                  id="ov-npc-pv"
-                  type="number"
-                  value={npc.pvAtual}
-                  onChange={(e) => atualizarNpc(npc.id, { pvAtual: Number(e.target.value) || 0 })}
-                />
+                <InputNumeroDraft id="ov-npc-pv" value={npc.pvAtual} onCommit={(valor) => atualizarNpc(npc.id, { pvAtual: valor })} />
               </div>
               <div>
                 <label htmlFor="ov-npc-pvmax">PV máximo</label>
-                <input
-                  id="ov-npc-pvmax"
-                  type="number"
-                  value={npc.pvMaximo}
-                  onChange={(e) => atualizarNpc(npc.id, { pvMaximo: Number(e.target.value) || 0 })}
-                />
+                <InputNumeroDraft id="ov-npc-pvmax" value={npc.pvMaximo} onCommit={(valor) => atualizarNpc(npc.id, { pvMaximo: valor })} />
               </div>
               <div>
                 <label htmlFor="ov-npc-defesa">Defesa</label>
-                <input
-                  id="ov-npc-defesa"
-                  type="number"
-                  value={npc.defesa}
-                  onChange={(e) => atualizarNpc(npc.id, { defesa: Number(e.target.value) || 0 })}
-                />
+                <InputNumeroDraft id="ov-npc-defesa" value={npc.defesa} onCommit={(valor) => atualizarNpc(npc.id, { defesa: valor })} />
               </div>
               <div>
                 <label htmlFor="ov-npc-agi">Agilidade</label>
-                <input
-                  id="ov-npc-agi"
-                  type="number"
-                  value={npc.agilidade}
-                  onChange={(e) => atualizarNpc(npc.id, { agilidade: Number(e.target.value) || 0 })}
-                />
+                <InputNumeroDraft id="ov-npc-agi" value={npc.agilidade} onCommit={(valor) => atualizarNpc(npc.id, { agilidade: valor })} />
               </div>
             </div>
             <textarea
