@@ -22,19 +22,15 @@ Fix: os inputs afetados (`AtributosDerivadosSection.tsx`, `NpcsTab.tsx`, `TokenO
 
 ## 3. Bug de tela branca ao voltar de aba durante deploy
 
-**Plano, não implementado ainda.**
+**Implementado nesta rodada.**
 
-Diagnóstico (alta confiança, código lido diretamente):
-- O sistema de abas do jogador é `visibility`/`pointer-events`, todas as 7 abas montadas estaticamente, **sem** `React.lazy`/`import()` dinâmico em produção (`PlayerApp.tsx:3-16,251-385`) — descarta a hipótese de "chunk de aba obsoleto" ao trocar de aba dentro do app.
-- Mecanismo mais provável: o navegador descarta a aba em background (tab discarding/"memory saver", comum ao trocar pro Discord durante a sessão) e, ao voltar o foco, força uma **navegação nova completa** de `jogador.html`. Se isso cair na janela de propagação de um deploy no Cloudflare Pages, o HTML pode vir com hash de asset que já não bate com o que está publicado — o `<script type="module">` de entrada dá 404 antes do React sequer inicializar.
-- `ErrorBoundary.tsx` **não cobre esse caso** (só pega exceção de render de componente já montado, e o React nunca chega a montar nada). `globalErrorHandler.ts:23-25` também não cobriria (listener sem fase de captura, e só é registrado depois que o script de entrada já carregou — o que não aconteceu).
-- Nenhum listener de `visibilitychange` existente (`store.ts:298-300`, `filaPendencias.ts:95-97`, `useRegua.ts:134-137`) mexe em rede de assets — todos fazem só flush de gravação local, não causam o bug.
+Diagnóstico: navegador descarta a aba em background (tab discarding, comum ao trocar pro Discord) e, ao voltar o foco, força uma navegação nova completa. Se isso cair na janela de propagação de um deploy no Cloudflare Pages, o HTML pode vir com hash de asset que já não bate com o publicado — o `<script type="module">` de entrada dá 404 antes do React sequer inicializar, e nada DENTRO do bundle (`ErrorBoundary`, `globalErrorHandler`) roda pra recuperar, porque o bundle nunca carregou.
 
-Correção recomendada (duas partes complementares):
-1. **`public/_headers`** (Cloudflare Pages) — política explícita de cache: `index.html`/`jogador.html` com `Cache-Control: no-cache`, assets hasheados (`/assets/*`) com `Cache-Control: immutable`. Reduz a janela de inconsistência entre HTML e asset servidos.
-2. **Listener de erro em fase de captura** nos entries (`src/entries/jogador.tsx`, `src/entries/mestre.tsx`) — detecta falha de carregamento do `<script>`/`<link>` de entrada e faz **um único** reload automático (guardar flag em `sessionStorage` pra não entrar em loop se o problema for outro).
+Fix (duas partes):
+1. **`public/_headers`** — HTML (`/`, `/index.html`, `/jogador.html`) sempre `Cache-Control: no-cache`; assets hasheados (`/assets/*`) `immutable`. Reduz a janela de inconsistência entre HTML e asset servidos pelo Cloudflare Pages.
+2. **Listener de erro em fase de captura**, inline no `<head>` de `index.html`/`jogador.html` (não dentro do bundle React — precisa estar registrado ANTES da tag do módulo começar a carregar, e o próprio bundle não roda se o carregamento falhar). Detecta falha de carregamento de `<script>`/`<link>` e faz um reload automático, guardado por flag em `sessionStorage` pra não entrar em loop. `src/entries/jogador.tsx`/`mestre.tsx` limpam essa flag assim que o bundle carrega de verdade, pra um deploy seguinte na mesma aba ainda ganhar uma nova tentativa.
 
-Arquivos a tocar quando for implementar: `vite.config.ts` (conferir build), `public/_headers` (novo), `src/entries/jogador.tsx`, `src/entries/mestre.tsx`.
+Achado importante durante a implementação: o Vite **promove `<script type="module">` pro `<head>` no build**, mesmo declarado no `<body>` na fonte (confirmado no `dist/index.html` gerado) — o listener precisou ir pro `<head>`, antes de qualquer outra tag, senão registraria tarde demais pra pegar a falha. Verificado isolado (HTML de teste fora do bundle, fora do Supabase de produção): script quebrado gera exatamente 1 reload automático, depois o guard de `sessionStorage` impede o segundo — sem loop.
 
 ## 4. Dado do jogador no header em vez de abrir QuickRollOverlay
 

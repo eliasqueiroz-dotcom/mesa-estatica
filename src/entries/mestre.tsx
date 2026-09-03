@@ -34,6 +34,16 @@ instalarHandlerGlobalDeErro();
 instalarDetectorConectividade();
 instalarRetentativaAutomatica();
 
+// Este módulo rodou — o bundle carregou de verdade. Limpa a flag que o listener inline de
+// index.html usa pra evitar loop de reload (ver comentário lá) — sem isso, um 2º deploy na
+// mesma aba (sessão longa, sem fechar) ficaria sem nenhuma tentativa de recuperação automática,
+// já que a flag do 1º incidente continuaria presa até a aba fechar.
+try {
+  sessionStorage.removeItem('estatica-bundle-recarregado');
+} catch {
+  // sem acesso a storage — nada a limpar
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>{ehControle ? <ControlPanel /> : <App />}</ErrorBoundary>

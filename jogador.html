@@ -2,6 +2,32 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Se o script/CSS de entrada (hash embutido pelo build) der 404 — HTML velho servido por
+      // um edge node durante a janela de propagação de um deploy novo, ou a aba voltando de
+      // background depois que o navegador a descartou da memória — o React nunca chega a
+      // inicializar, e nenhum handler DENTRO do bundle (ErrorBoundary, globalErrorHandler) roda
+      // pra recuperar, porque o bundle em si nunca carregou. Só um listener em FASE DE CAPTURA
+      // pega esse erro de carregamento de recurso (que não borbulha em fase normal) — e só conta
+      // se registrado ANTES da tag do módulo começar a carregar. Vite promove `<script
+      // type="module">` pro <head> no build (mesmo declarado no <body> na fonte), então este
+      // script também precisa estar no <head>, o mais cedo possível — reload já busca o
+      // HTML/hash atual; sessionStorage evita loop se o problema for outra coisa (rede fora, CDN
+      // fora).
+      (function () {
+        window.addEventListener('error', function (ev) {
+          var alvo = ev.target;
+          if (!(alvo instanceof HTMLScriptElement) && !(alvo instanceof HTMLLinkElement)) return;
+          try {
+            if (sessionStorage.getItem('estatica-bundle-recarregado')) return;
+            sessionStorage.setItem('estatica-bundle-recarregado', '1');
+          } catch (erro) {
+            return;
+          }
+          location.reload();
+        }, true);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Estática — Jogador</title>

@@ -1,0 +1,16 @@
+# Cloudflare Pages — cache explícito (.claude/docs/melhorias-pendentes-2026-09-02.md §3).
+# Sem isso, HTML pode ficar em cache num edge node por um tempo depois de um deploy novo,
+# referenciando hash de asset que o deploy novo já substituiu — script/CSS de entrada dá 404 e
+# o React nunca inicializa. HTML sempre revalidado; assets hasheados (nome muda a cada build)
+# podem cachear pra sempre sem risco de servir conteúdo velho com nome novo.
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/jogador.html
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
