@@ -160,15 +160,32 @@
 }
 
 /* Fora de combate (0 PV OU marcação manual do mestre — MapaTab.tsx/MapaJogadorView.tsx já
-   combinam os dois) — token dessaturado e apagado, sem cobrir o avatar. */
+   combinam os dois) — token dessaturado e apagado, sem cobrir o avatar. Símbolo de sono (💤)
+   por cima, grande o suficiente pra ler à distância — mesmo raciocínio do `::after` de "morto"
+   logo abaixo: emoji ignora `color`/preenchimento de texto, o `text-shadow` só ajuda a separar
+   do fundo variado do token. */
 .mapa-token[data-desacordado='true'] {
   filter: grayscale(0.85);
   opacity: 0.6;
 }
 
+.mapa-token[data-desacordado='true']::after {
+  content: '💤';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
 /* Morto (PV na metade negativa OU marcação manual) — precedência sobre "desacordado" (o
    componente já garante que os dois `data-*` nunca vêm juntos): dessaturação total + caveira
-   por cima, pra distinguir de "só caído/estabilizável" à distância. */
+   por cima, pra distinguir de "só caído/estabilizável" à distância. Tamanho aumentado (18px →
+   28px, achado 03/09: ficava pequena demais pra ler à distância/print, ainda mais em cima de um
+   token já com opacidade reduzida). */
 .mapa-token[data-morto='true'] {
   filter: grayscale(1);
   opacity: 0.5;
@@ -181,7 +198,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 28px;
   color: var(--ink);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   pointer-events: none;
