@@ -247,7 +247,11 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
           else if (t.desacordado) partesTitulo.push('desacordado');
           if (t.podeMover) partesTitulo.push('seu token — arraste pra mover');
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
-          if (t.condicoes.length > 0) partesTitulo.push(t.condicoes.map(nomeCondicao).join(', '));
+          // exclui 'morto'/'desacordado' daqui — já cobertos acima (que também reflete o cálculo
+          // automático de PV, não só o toggle manual que vive em t.condicoes); sem isso, duplicava
+          // ("morto — Morto") sempre que a marcação vinha do toggle manual.
+          const condicoesExtras = t.condicoes.filter((c) => c !== 'morto' && c !== 'desacordado');
+          if (condicoesExtras.length > 0) partesTitulo.push(condicoesExtras.map(nomeCondicao).join(', '));
           const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
           const topo = imgRenderRect ? `${imgRenderRect.offsetY + t.y * imgRenderRect.renderH}px` : `${t.y * 100}%`;
           return (
@@ -264,7 +268,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
               title={partesTitulo.join(' — ')}
             >
               <Avatar nome={t.nome} cor={t.cor} foto={t.foto} silhueta={t.silhueta} tamanho={36} />
-              {t.condicoes.length > 0 && <span className="mapa-token__condicoes">{badgeCondicoes(t.condicoes)}</span>}
+              {condicoesExtras.length > 0 && <span className="mapa-token__condicoes">{badgeCondicoes(condicoesExtras)}</span>}
             </div>
           );
         })}
