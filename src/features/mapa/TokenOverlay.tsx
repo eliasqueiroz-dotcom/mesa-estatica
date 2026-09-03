@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Avatar from '../../components/Avatar';
 import InputNumeroDraft from '../../components/InputNumeroDraft';
+import { comprimirImagemAvatar } from '../../lib/comprimirImagem';
+import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
 import { estaMorto } from '../../rules/combate';
 import { calcularDefesa, calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { PERICIAS } from '../../rules/data/pericias';
@@ -100,6 +102,28 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
   const alternarCondicaoCombate = useStore((s) => s.alternarCondicaoCombate);
   const definirDuracaoCondicao = useStore((s) => s.definirDuracaoCondicao);
   const atualizarFicha = useStore((s) => s.atualizarFicha);
+  const [comprimindoFoto, setComprimindoFoto] = useState(false);
+
+  // mesmo fluxo de NpcsTab.tsx (handleFoto) — pinta local otimista com a dataUrl comprimida,
+  // depois sobe pro Storage e substitui pela URL real quando disponível. Só 1 NPC por vez aqui
+  // (o popover é modal), então um boolean simples basta — NpcsTab precisa de um Set de ids
+  // porque lida com vários cards ao mesmo tempo.
+  const handleFotoNpc = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arquivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!arquivo || !npc) return;
+    setComprimindoFoto(true);
+    try {
+      const { dataUrl, blob } = await comprimirImagemAvatar(arquivo);
+      atualizarNpc(npc.id, { foto: dataUrl });
+      const { url } = await uploadImagemStorage(`npcs/${npc.id}`, blob);
+      if (url) atualizarNpc(npc.id, { foto: url });
+    } catch {
+      window.alert('sinal corrompido — não foi possível ler essa imagem.');
+    } finally {
+      setComprimindoFoto(false);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -261,6 +285,27 @@ export default function TokenOverlay({ tipo, id, onFechar }: Props) {
 
           {tipo === 'npc' && npc && (
           <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+              <label className="mapa-upload-botao" style={{ fontSize: 10 }}>
+                {comprimindoFoto ? 'comprimindo…' : npc.foto ? 'trocar foto' : 'carregar foto'}
+                <input type="file" accept="image/*" hidden onChange={handleFotoNpc} disabled={comprimindoFoto} />
+              </label>
+              {npc.foto && (
+                <button className="icone-botao" onClick={() => atualizarNpc(npc.id, { foto: null })} title="remover foto" style={{ fontSize: 10 }}>
+                  ×
+                </button>
+              )}
+              <span
+                className="icone-botao"
+                role="button"
+                tabIndex={0}
+                onClick={() => atualizarNpc(npc.id, { visivel: !npc.visivel })}
+                title={npc.visivel ? 'ocultar dos jogadores' : 'revelar aos jogadores'}
+                style={{ color: npc.visivel ? 'var(--rede)' : 'var(--ink-faint)', fontSize: 14, marginLeft: 'auto' }}
+              >
+                {npc.visivel ? '👁' : '👁‍🗨'}
+              </span>
+            </div>
             <div style={{ marginBottom: '0.5rem' }}>
             <span className="vazio" style={{ fontSize: 12, color: 'var(--real)' }}>🛡 defesa: <span className="mono">{npc.defesa}</span></span>
             </div>
