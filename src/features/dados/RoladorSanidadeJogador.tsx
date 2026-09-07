@@ -74,6 +74,9 @@ export default function RoladorSanidadeJogador({ ficha, ready, rolar, pedidoRapi
             tipo: `Sanidade: ${gatilhoAlvo.nome}`,
             grupos: [{ notacao: '1d20', resultados: [d20] }, { notacao: gatilhoAlvo.dado, resultados: [perdaRolada] }],
             total: d20,
+            // sem sucesso/falha ainda (só o mestre confirma, comparando com a DT) — só avisa
+            // que o resultado está pendente, no mesmo tom do banner acima.
+            sufixo: '· aguardando confirmação do mestre',
           }),
           ficha.id,
           'publica',
