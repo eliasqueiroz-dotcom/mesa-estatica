@@ -166,7 +166,7 @@
    do fundo variado do token. */
 .mapa-token[data-desacordado='true'] {
   filter: grayscale(0.85);
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 .mapa-token[data-desacordado='true']::after {
@@ -188,7 +188,7 @@
    token já com opacidade reduzida). */
 .mapa-token[data-morto='true'] {
   filter: grayscale(1);
-  opacity: 0.5;
+  opacity: 0.75;
 }
 
 .mapa-token[data-morto='true']::after {
