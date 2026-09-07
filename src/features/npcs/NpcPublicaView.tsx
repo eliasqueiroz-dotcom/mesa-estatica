@@ -21,7 +21,7 @@ export default function NpcPublicaView({ nome, corVisual, visivel, foto, silhuet
         </h3>
       </div>
       {notas && (
-        <p className="vazio" style={{ fontSize: 11, margin: '0.4rem 0 0', color: 'var(--ruido)', fontStyle: 'italic' }}>
+        <p className="vazio" style={{ fontSize: 11, margin: '0.4rem 0 0', color: 'var(--ink-dim)', fontStyle: 'italic' }}>
           {notas}
         </p>
       )}

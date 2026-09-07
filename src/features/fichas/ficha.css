@@ -323,7 +323,7 @@
 }
 
 .vazio {
-  color: var(--ink-faint);
+  color: var(--ink-dim);
   font-size: 13px;
   font-family: var(--font-mono);
 }

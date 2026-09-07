@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import { IconeAlerta } from '../features/combate/icones';
 
 /**
  * Só aparece em build de PRODUÇÃO (`import.meta.env.PROD`) sem Supabase configurado — o CI
@@ -22,9 +23,14 @@ export default function AvisoSupabaseAusente() {
         padding: '0.4rem 1rem',
         fontSize: 12,
         textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.4em',
       }}
     >
-      ⚠ multiplayer desligado neste deploy — as credenciais do Supabase não chegaram no build (confira os secrets do
+      <IconeAlerta size={12} style={{ flexShrink: 0 }} />
+      multiplayer desligado neste deploy — as credenciais do Supabase não chegaram no build (confira os secrets do
       GitHub Actions)
     </div>
   );

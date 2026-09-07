@@ -1,5 +1,6 @@
 import { limparErroRuntime, statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
 import { usePendenciasDetalhe } from '../multiplayer/filaPendencias';
+import { IconeAlerta } from '../features/combate/icones';
 
 /**
  * Substitui o "● registrado" estático que sempre dizia "salvo", mesmo quando a gravação
@@ -23,14 +24,14 @@ export default function StatusIndicador() {
   const pendencias = usePendenciasDetalhe();
 
   const corLocal = local === 'ok' ? 'var(--rede)' : 'var(--ruido)';
-  const textoLocal = local === 'ok' ? '● registrado' : '⚠ não salvou local';
+  const textoLocal = local === 'ok' ? '● registrado' : 'não salvou local';
   const tituloLocal =
     local === 'ok'
       ? 'salva a cada alteração — localStorage deste navegador'
       : 'gravação local falhou (quota cheia ou navegador em modo privado) — exporte um backup agora';
 
   const corSync = sync === 'erro' ? 'var(--ruido)' : sync === 'conectado' ? 'var(--rede)' : 'var(--ink-dim)';
-  const textoSync = sync === 'erro' ? '⚠ sync com erro' : sync === 'conectado' ? '● sync ok' : '— local';
+  const textoSync = sync === 'erro' ? 'sync com erro' : sync === 'conectado' ? '● sync ok' : '— local';
   // nomear os canais caídos é o que separa "a rede oscilou" de "esta feature está quebrada" —
   // um canal específico sempre com erro aponta pra policy/migração faltando no banco.
   const nomesComErro = [...canaisComErro].sort().join(', ');
@@ -43,10 +44,12 @@ export default function StatusIndicador() {
 
   return (
     <span className="mono" style={{ display: 'flex', gap: '0.6rem', fontSize: '11px' }}>
-      <span style={{ color: corLocal }} title={tituloLocal}>
+      <span style={{ color: corLocal, display: 'inline-flex', alignItems: 'center', gap: '0.3em' }} title={tituloLocal}>
+        {local !== 'ok' && <IconeAlerta size={11} />}
         {textoLocal}
       </span>
-      <span style={{ color: corSync }} title={tituloSync}>
+      <span style={{ color: corSync, display: 'inline-flex', alignItems: 'center', gap: '0.3em' }} title={tituloSync}>
+        {sync === 'erro' && <IconeAlerta size={11} />}
         {textoSync}
       </span>
       {erroRuntime && (
@@ -54,15 +57,17 @@ export default function StatusIndicador() {
           role="button"
           tabIndex={0}
           onClick={() => limparErroRuntime()}
-          style={{ color: 'var(--ruido)', cursor: 'pointer' }}
+          style={{ color: 'var(--ruido)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3em' }}
           title={`${erroRuntime} — clique pra dispensar`}
         >
-          ⚠ erro inesperado
+          <IconeAlerta size={11} />
+          erro inesperado
         </span>
       )}
       {!online && (
-        <span style={{ color: 'var(--ruido)' }} title="sem internet — a mesa continua funcionando só nesta tela">
-          ⚠ offline
+        <span style={{ color: 'var(--ruido)', display: 'inline-flex', alignItems: 'center', gap: '0.3em' }} title="sem internet — a mesa continua funcionando só nesta tela">
+          <IconeAlerta size={11} />
+          offline
         </span>
       )}
       {pendencias.length > 0 && (

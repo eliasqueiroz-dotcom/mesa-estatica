@@ -128,7 +128,7 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                   <span
                     style={{
                       width: 10, height: 10, borderRadius: '50%',
-                      background: corMap?.[e.participanteId] ?? '#666',
+                      background: corMap?.[e.participanteId] ?? 'var(--ink-faint)',
                       display: 'inline-block', flexShrink: 0,
                     }}
                   />
@@ -185,9 +185,21 @@ export default function CombateJogadorView({ iniciativa, minhaFicha, semMoldura,
                       <span className="combate-rotulo">defesa</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <span style={{ color: 'var(--real)', display: 'inline-flex' }}><IconeEscudo size={12} /></span>
-                        <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>−</button>
+                        <button
+                          className="icone-botao"
+                          onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) - 1 })}
+                          style={{ minWidth: 34, minHeight: 34, padding: 0, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          −
+                        </button>
                         <span className="mono" style={{ fontSize: 11, minWidth: 20, textAlign: 'center' }}>{defesa}</span>
-                        <button className="icone-botao" onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) + 1 })} style={{ fontSize: 10, padding: '0.1em 0.35em' }}>+</button>
+                        <button
+                          className="icone-botao"
+                          onClick={() => atualizarFicha(minhaFicha.id, { equipamentoModificadorDefesa: (minhaFicha.equipamentoModificadorDefesa ?? 0) + 1 })}
+                          style={{ minWidth: 34, minHeight: 34, padding: 0, fontSize: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                   </div>

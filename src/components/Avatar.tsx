@@ -104,6 +104,19 @@ export default function Avatar({ nome, foto, silhueta, tamanho = 32, bordaCor, a
         <span
           style={{ ...base, cursor: ampliavel ? 'zoom-in' : undefined }}
           onClick={ampliavel ? () => setAberta(true) : undefined}
+          role={ampliavel ? 'button' : undefined}
+          tabIndex={ampliavel ? 0 : undefined}
+          aria-label={ampliavel ? `ampliar foto de ${nome || 'jogador'}` : undefined}
+          onKeyDown={
+            ampliavel
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setAberta(true);
+                  }
+                }
+              : undefined
+          }
         >
           <img
             src={foto}

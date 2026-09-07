@@ -10,6 +10,7 @@ import { criarNpcAcao } from '../../state/factories';
 import { useStore } from '../../state/store';
 import type { NpcAcao } from '../../state/types';
 import ArmasCombateNpc from '../combate/ArmasCombateNpc';
+import { IconeDuplicar, IconeEngrenagem, IconeEscudo, IconeLamina, IconeOlho, IconeOlhoFechado } from '../combate/icones';
 import IniciativaPanel from '../iniciativa/IniciativaPanel';
 import './npcs.css';
 import SeletorSilhueta from './SeletorSilhueta';
@@ -219,45 +220,41 @@ export default function NpcsTab() {
                           title="cor do token"
                           style={{ width: 26, height: 26, padding: 0, border: 'none', cursor: 'pointer', background: 'none' }}
                         />
-                        <span
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => atualizarNpc(n.id, { visivel: !n.visivel })}
                           title={n.visivel ? 'visível aos jogadores' : 'oculto dos jogadores'}
-                          style={{ color: n.visivel ? 'var(--rede)' : 'var(--ink-faint)', fontSize: 14 }}
+                          style={{ color: n.visivel ? 'var(--rede)' : 'var(--ink-faint)', display: 'inline-flex', alignItems: 'center' }}
                         >
-                          {n.visivel ? '👁' : '👁‍🗨'}
-                        </span>
-                        <span
+                          {n.visivel ? <IconeOlho size={14} /> : <IconeOlhoFechado size={14} />}
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => toggleEditando(n.id)}
                           title="fechar edição"
-                          style={{ fontSize: 14 }}
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
                         >
-                          ⚙
-                        </span>
-                        <span
+                          <IconeEngrenagem size={14} />
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => duplicarNpc(n.id)}
                           title="duplicar"
-                          style={{ fontSize: 13 }}
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
                         >
-                          ⊞
-                        </span>
-                        <span
+                          <IconeDuplicar size={13} />
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => remover(n.id, n.nome)}
                           style={{ color: 'var(--ruido)' }}
                         >
                           ×
-                        </span>
+                        </button>
                       </div>
 
                       <div className="npc-card__secao" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
@@ -378,16 +375,16 @@ export default function NpcsTab() {
                                   title="editar ação"
                                   style={{ fontSize: 10, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', alignSelf: 'flex-start' }}
                                 >
-                                  🗡 {a.nome}{a.bonus > 0 ? ` +${a.bonus}` : a.bonus < 0 ? ` ${a.bonus}` : ''}{a.dano ? ` · ${a.dano}` : ''}
-                                  <span
+                                  <IconeLamina size={11} style={{ flexShrink: 0 }} />
+                                  {a.nome}{a.bonus > 0 ? ` +${a.bonus}` : a.bonus < 0 ? ` ${a.bonus}` : ''}{a.dano ? ` · ${a.dano}` : ''}
+                                  <button
+                                    type="button"
                                     className="icone-botao"
-                                    role="button"
-                                    tabIndex={0}
                                     onClick={(ev) => { ev.stopPropagation(); removerAcao(n.id, a.id); }}
                                     style={{ color: 'var(--ruido)', fontSize: 10, padding: 0, marginLeft: '0.15rem', lineHeight: 1 }}
                                   >
                                     ×
-                                  </span>
+                                  </button>
                                 </div>
                               );
                             })}
@@ -415,45 +412,41 @@ export default function NpcsTab() {
                             visível
                           </span>
                         )}
-                        <span
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => atualizarNpc(n.id, { visivel: !n.visivel })}
                           title={n.visivel ? 'ocultar dos jogadores' : 'revelar aos jogadores'}
-                          style={{ color: n.visivel ? 'var(--rede)' : 'var(--ink-faint)', fontSize: 13 }}
+                          style={{ color: n.visivel ? 'var(--rede)' : 'var(--ink-faint)', display: 'inline-flex', alignItems: 'center' }}
                         >
-                          {n.visivel ? '👁' : '👁‍🗨'}
-                        </span>
-                        <span
+                          {n.visivel ? <IconeOlho size={13} /> : <IconeOlhoFechado size={13} />}
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => toggleEditando(n.id)}
                           title="editar"
-                          style={{ fontSize: 13 }}
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
                         >
-                          ⚙
-                        </span>
-                        <span
+                          <IconeEngrenagem size={13} />
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => duplicarNpc(n.id)}
                           title="duplicar"
-                          style={{ fontSize: 12 }}
+                          style={{ display: 'inline-flex', alignItems: 'center' }}
                         >
-                          ⊞
-                        </span>
-                        <span
+                          <IconeDuplicar size={12} />
+                        </button>
+                        <button
+                          type="button"
                           className="icone-botao"
-                          role="button"
-                          tabIndex={0}
                           onClick={() => remover(n.id, n.nome)}
                           style={{ color: 'var(--ruido)' }}
                         >
                           ×
-                        </span>
+                        </button>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem', flexWrap: 'wrap' }}>
@@ -470,8 +463,8 @@ export default function NpcsTab() {
                         <span className="mono" style={{ fontSize: 11, minWidth: 48, textAlign: 'right', flexShrink: 0 }}>
                           {n.pvAtual}/{n.pvMaximo}
                         </span>
-                        <span className="mono" style={{ fontSize: 12, color: 'var(--real)', flexShrink: 0 }}>
-                          🛡{n.defesa}
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--real)', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}>
+                          <IconeEscudo size={12} />{n.defesa}
                         </span>
                       </div>
 

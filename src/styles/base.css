@@ -48,6 +48,12 @@ button:hover {
   box-shadow: 0 0 0 1px var(--rede-glow);
 }
 
+button:focus-visible {
+  outline: none;
+  border-color: var(--rede-dim);
+  box-shadow: 0 0 0 1px var(--rede-glow);
+}
+
 button:disabled {
   opacity: 0.4;
   cursor: default;

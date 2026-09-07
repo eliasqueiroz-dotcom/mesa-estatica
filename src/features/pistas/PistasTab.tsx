@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import type { Pista, StatusPista } from '../../state/types';
+import { IconeCheck, IconeMegafone, IconePrancheta } from '../combate/icones';
 import './pistas.css';
 
 const COLUNAS: { status: StatusPista; titulo: string; cor: string; vazio: string }[] = [
@@ -80,7 +81,7 @@ function PistaCard({ pista }: { pista: Pista }) {
             }
             onClick={revelarNoLog}
           >
-            {pista.reveladoEm ? '✓' : '📣'}
+            {pista.reveladoEm ? <IconeCheck size={11} /> : <IconeMegafone size={11} />}
           </button>
           <button
             className="icone-botao"
@@ -88,7 +89,7 @@ function PistaCard({ pista }: { pista: Pista }) {
             style={{ color: copiado ? 'var(--rede)' : undefined }}
             onClick={() => void copiar()}
           >
-            {copiado ? '✓' : '⧉'}
+            {copiado ? <IconeCheck size={11} /> : <IconePrancheta size={11} />}
           </button>
         </div>
         <button className="icone-botao perigo" onClick={() => removerPista(pista.id)}>

@@ -298,7 +298,9 @@ export default function PlayerApp() {
             overflowY: 'auto',
           }}
         >
-          {possuiFicha && minhaFicha ? (
+          {carregando ? (
+            <p className="vazio">sintonizando...</p>
+          ) : possuiFicha && minhaFicha ? (
             <DadosTabJogador ficha={minhaFicha} active={aba === 'dados'} pedidoRapidoSanidade={pedidosSanidadeRapida} />
           ) : (
             <p className="vazio">sem ficha vinculada — nada pra rolar.</p>
@@ -313,7 +315,9 @@ export default function PlayerApp() {
             height: '100%',
           }}
         >
-          {possuiFicha && minhaFicha ? (
+          {carregando ? (
+            <p className="vazio" style={{ padding: '1.5rem' }}>sintonizando...</p>
+          ) : possuiFicha && minhaFicha ? (
             <MapaJogadorView minhaFicha={minhaFicha} outrasFichas={outrasFichas} npcs={npcs} iniciativa={iniciativa} />
           ) : (
             <p className="vazio" style={{ padding: '1.5rem' }}>

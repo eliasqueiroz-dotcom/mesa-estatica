@@ -46,7 +46,7 @@ export default function CropFotoModal({ arquivo, onCancelar, onConfirmar }: Prop
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(11, 13, 17, 0.6)',
+        background: 'var(--overlay-backdrop)',
         zIndex: 60,
         display: 'flex',
         alignItems: 'center',

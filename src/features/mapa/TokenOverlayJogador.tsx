@@ -46,7 +46,7 @@ export default function TokenOverlayJogador({ minhaFicha, nome, cor, foto, silhu
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(11, 13, 17, 0.6)',
+        background: 'var(--overlay-backdrop)',
         zIndex: 60,
         display: 'flex',
         alignItems: 'center',

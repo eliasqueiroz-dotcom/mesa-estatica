@@ -210,30 +210,28 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     title="selecionar pra aplicar dano/condição em área"
                     style={{ flexShrink: 0 }}
                   />
-                  <span
+                  <button
+                    type="button"
                     className="icone-botao"
-                    role="button"
-                    tabIndex={0}
                     onClick={(ev) => { ev.stopPropagation(); removerDaIniciativa(e.id); }}
                     title="remover"
                     style={{ color: 'var(--ruido)', padding: '0.1em 0.3em', fontSize: 11, lineHeight: 1, flexShrink: 0 }}
                   >
                     ×
-                  </span>
-                  <span
+                  </button>
+                  <button
+                    type="button"
                     className="icone-botao"
-                    role="button"
-                    tabIndex={0}
                     onClick={(ev) => { ev.stopPropagation(); rerolarIniciativaDe(e.participanteId); }}
                     title="rerrolar iniciativa (d20+Agilidade)"
                     style={{ padding: '0.1em 0.3em', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
                   >
                     <IconeDado />
-                  </span>
-                  <span
+                  </button>
+                  <button
+                    type="button"
                     className="icone-botao"
-                    role={podeAdiar ? 'button' : undefined}
-                    tabIndex={podeAdiar ? 0 : undefined}
+                    disabled={!podeAdiar}
                     onClick={podeAdiar ? (ev) => {
                       ev.stopPropagation();
                       reordenarIniciativa(i, iniciativa.length - 1);
@@ -259,7 +257,7 @@ export default function IniciativaPanel({ hook, header, banner, estiloItem, pode
                     }}
                   >
                     <IconeAdiar />
-                  </span>
+                  </button>
                   <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', minWidth: 16, flexShrink: 0 }} title="posição na ordem de turno">
                     {i + 1}
                   </span>

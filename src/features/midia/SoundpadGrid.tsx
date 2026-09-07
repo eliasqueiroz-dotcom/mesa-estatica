@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { IconeStop } from '../combate/icones';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { deletarR2, extrairMensagemErro, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
 import { useSoundpadUiStore } from '../../state/soundpadUiStore';
@@ -214,12 +215,15 @@ export default function SoundpadGrid() {
                         style={{
                           flex: 1,
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.3em',
                           outline: tocando ? '2px solid var(--rede)' : undefined,
                         }}
                       >
-                        {tocando ? `■ ${som.nome}` : som.nome}
+                        {tocando && <IconeStop size={10} style={{ flexShrink: 0 }} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{som.nome}</span>
                       </button>
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
                         <button
@@ -288,7 +292,7 @@ export default function SoundpadGrid() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(11, 13, 17, 0.6)',
+            background: 'var(--overlay-backdrop)',
             zIndex: 60,
             display: 'flex',
             alignItems: 'center',

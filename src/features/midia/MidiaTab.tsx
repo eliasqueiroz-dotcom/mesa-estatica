@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { IconePause, IconePlay } from '../combate/icones';
 import { calcularPosicaoEsperada } from '../../multiplayer/posicaoMidia';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { deletarR2, isUrlSupabaseStorage, uploadR2 } from '../../multiplayer/uploadR2';
@@ -242,9 +243,9 @@ export default function MidiaTab() {
                   cursor: 'pointer',
                 }}
               >
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {faixa.id === midia.faixaAtualId && (midia.tocando ? '▶ ' : '❚❚ ')}
-                  {faixa.nome}
+                <span style={{ flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center', gap: '0.3em' }}>
+                  {faixa.id === midia.faixaAtualId && (midia.tocando ? <IconePlay size={11} style={{ flexShrink: 0 }} /> : <IconePause size={11} style={{ flexShrink: 0 }} />)}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{faixa.nome}</span>
                 </span>
                 <input
                   type="text"
@@ -276,10 +277,9 @@ export default function MidiaTab() {
                 >
                   ↓
                 </button>
-                <span
+                <button
+                  type="button"
                   className="icone-botao"
-                  role="button"
-                  tabIndex={0}
                   onClick={(e) => {
                     e.stopPropagation();
                     void excluir(faixa);
@@ -287,7 +287,7 @@ export default function MidiaTab() {
                   style={{ color: 'var(--ruido)' }}
                 >
                   ×
-                </span>
+                </button>
               </div>
             );
           })

@@ -1,4 +1,5 @@
 import { statusSincronizacao, useStatusMesa } from '../lib/statusMesa';
+import { IconeAlerta } from '../features/combate/icones';
 
 /**
  * Versão mínima do `StatusIndicador.tsx` do mestre, só pro jogador. Diferente do painel do
@@ -19,8 +20,9 @@ export default function DesyncIndicadorJogador() {
     : 'sincronização com o mestre falhando — dados podem estar desatualizados';
 
   return (
-    <span className="mono" style={{ color: 'var(--ruido)', fontSize: '11px' }} title={titulo}>
-      ⚠ desconectado
+    <span className="mono" style={{ color: 'var(--ruido)', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '0.3em' }} title={titulo}>
+      <IconeAlerta size={11} />
+      desconectado
     </span>
   );
 }
