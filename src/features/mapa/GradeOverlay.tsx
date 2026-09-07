@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import InputNumeroDraft from '../../components/InputNumeroDraft';
 import { useStore } from '../../state/store';
 import { useMapaAtivo } from './useMapaAtivo';
 
@@ -42,79 +43,72 @@ export default function GradeOverlay() {
             <div className="campos-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <div>
                 <label htmlFor="grade-colunas">colunas</label>
-                <input
+                <InputNumeroDraft
                   id="grade-colunas"
-                  type="number"
                   min={1}
                   max={100}
                   value={grade.colunas}
-                  onChange={(e) => atualizarGrade({ colunas: clamp(Number(e.target.value) || 1, 1, 100) })}
+                  onCommit={(valor) => atualizarGrade({ colunas: clamp(valor, 1, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-linhas">linhas</label>
-                <input
+                <InputNumeroDraft
                   id="grade-linhas"
-                  type="number"
                   min={1}
                   max={100}
                   value={grade.linhas}
-                  onChange={(e) => atualizarGrade({ linhas: clamp(Number(e.target.value) || 1, 1, 100) })}
+                  onCommit={(valor) => atualizarGrade({ linhas: clamp(valor, 1, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-x">x (%)</label>
-                <input
+                <InputNumeroDraft
                   id="grade-x"
-                  type="number"
                   min={0}
                   max={100}
                   value={grade.x}
-                  onChange={(e) => atualizarGrade({ x: clamp(Number(e.target.value) || 0, 0, 100) })}
+                  onCommit={(valor) => atualizarGrade({ x: clamp(valor, 0, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-y">y (%)</label>
-                <input
+                <InputNumeroDraft
                   id="grade-y"
-                  type="number"
                   min={0}
                   max={100}
                   value={grade.y}
-                  onChange={(e) => atualizarGrade({ y: clamp(Number(e.target.value) || 0, 0, 100) })}
+                  onCommit={(valor) => atualizarGrade({ y: clamp(valor, 0, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-largura">largura (%)</label>
-                <input
+                <InputNumeroDraft
                   id="grade-largura"
-                  type="number"
                   min={0}
                   max={100}
                   value={grade.largura}
-                  onChange={(e) => atualizarGrade({ largura: clamp(Number(e.target.value) || 0, 0, 100) })}
+                  onCommit={(valor) => atualizarGrade({ largura: clamp(valor, 0, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-altura">altura (%)</label>
-                <input
+                <InputNumeroDraft
                   id="grade-altura"
-                  type="number"
                   min={0}
                   max={100}
                   value={grade.altura}
-                  onChange={(e) => atualizarGrade({ altura: clamp(Number(e.target.value) || 0, 0, 100) })}
+                  onCommit={(valor) => atualizarGrade({ altura: clamp(valor, 0, 100) })}
                 />
               </div>
               <div>
                 <label htmlFor="grade-escala">escala (por célula)</label>
-                <input
+                <InputNumeroDraft
                   id="grade-escala"
-                  type="number"
                   min={0.1}
                   step={0.1}
                   value={grade.escala}
-                  onChange={(e) => atualizarGrade({ escala: Math.max(0.1, Number(e.target.value) || 0.1) })}
+                  onCommit={(valor) => atualizarGrade({ escala: Math.max(0.1, valor) })}
                 />
               </div>
               <div>

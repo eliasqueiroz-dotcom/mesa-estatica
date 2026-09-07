@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import InputNumeroDraft from '../../../components/InputNumeroDraft';
 import { usePedidoRolagemDanoStore } from '../../../state/pedidoRolagemDanoStore';
 import { usePedidoRolagemTesteStore } from '../../../state/pedidoRolagemTesteStore';
 import { ARMAS, PROTECOES } from '../../../rules/data/armas';
@@ -237,12 +238,9 @@ export default function ArmasSection({ ficha, onChange, souMestre }: SecaoFichaP
           </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
             <span className="vazio">bônus de defesa</span>
-            <input
-              type="number"
+            <InputNumeroDraft
               value={ficha.equipamentoModificadorDefesa}
-              onChange={(e) =>
-                onChange({ equipamentoModificadorDefesa: Number(e.target.value) || 0, equipamentoProtecaoNome: null })
-              }
+              onCommit={(valor) => onChange({ equipamentoModificadorDefesa: valor, equipamentoProtecaoNome: null })}
               style={{ width: 72 }}
             />
           </label>
