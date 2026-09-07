@@ -86,12 +86,18 @@ export function iniciarSyncMidiaEstado(): () => void {
     if (aplicandoRemotoContagem > 0) return;
     const { faixaAtualId, tocando, posicaoSegundos, modoLoop, atualizadoEm, volume } = state.midia;
     const anterior = prevState.midia;
+    // inclui atualizadoEm na comparação: no restart do loop individual (MidiaPlayerGM.tsx,
+    // aoTerminar) faixaAtualId/tocando/posicaoSegundos voltam pro MESMO valor de antes de
+    // terminar — sem checar atualizadoEm (recarimbado em toda atualizarEstadoMidia) esse
+    // restart não parecia mudança nenhuma e o push nunca saía, deixando os jogadores sem o
+    // sinal de reinício (achado 31/08).
     if (
       faixaAtualId === anterior.faixaAtualId &&
       tocando === anterior.tocando &&
       posicaoSegundos === anterior.posicaoSegundos &&
       modoLoop === anterior.modoLoop &&
-      volume === anterior.volume
+      volume === anterior.volume &&
+      atualizadoEm === anterior.atualizadoEm
     ) {
       return;
     }

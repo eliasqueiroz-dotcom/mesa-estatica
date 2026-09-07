@@ -164,3 +164,38 @@ describe('iniciarSyncMidiaEstado — eco remoto atrasado não reverte clique loc
     expect(useStore.getState().midia.tocando).toBe(false);
   });
 });
+
+// ===== restart do loop individual (achado 31/08: mestre ouvia, jogadores não) =====
+describe('iniciarSyncMidiaEstado — restart do loop individual sempre agenda push', () => {
+  let cleanup: (() => void) | undefined;
+
+  beforeEach(() => {
+    useStore.setState(criarEstadoInicial());
+    h.clienteAtual = criarClienteMinimo();
+  });
+
+  afterEach(() => {
+    cleanup?.();
+    cleanup = undefined;
+    h.clienteAtual = null;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('atualizarEstadoMidia com os mesmos valores de antes (tocando/posicaoSegundos) ainda marca "em voo"', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('localStorage', criarStorageFalso());
+
+    useStore.setState((s) => ({
+      midia: { ...s.midia, faixaAtualId: 'faixa-1', tocando: true, posicaoSegundos: 0 },
+    }));
+    cleanup = iniciarSyncMidiaEstado();
+
+    // simula o handler `aoTerminar` do loop individual: reseta pra posicaoSegundos 0/tocando
+    // true, os MESMOS valores que já estavam — só atualizadoEm muda.
+    useStore.getState().atualizarEstadoMidia({ posicaoSegundos: 0, tocando: true });
+
+    expect(retomarPendenciasPersistidas('midia-estado-sync')).toContain('midia');
+  });
+});
