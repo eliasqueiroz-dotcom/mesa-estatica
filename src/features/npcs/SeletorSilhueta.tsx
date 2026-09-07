@@ -7,8 +7,9 @@ interface Props {
 
 /** Swatches curados de silhueta (mesmo espírito de SeletorCor.tsx) — sem rosto real, tema
  *  investigação/rua. "Ø" = nenhuma, cai pro fallback iniciais+cor. Fundo `var(--concrete-1)`
- *  explícito nos botões — os ícones usam recortes dessa MESMA cor pra criar contraste real
- *  (badge, friso do capacete, sombra do capuz); sem o fundo combinando, o recorte desalinha. */
+ *  explícito nos botões pra igualar o disco do Avatar: a maioria das silhuetas vaza o recorte
+ *  de verdade e funciona sobre qualquer cor, mas `guarda`, `policial` e `medico` ainda simulam
+ *  furo pintando com `var(--concrete-1)` (ver silhuetas.tsx) e dependem desse fundo. */
 export default function SeletorSilhueta({ valor, onEscolher }: Props) {
   return (
     <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
