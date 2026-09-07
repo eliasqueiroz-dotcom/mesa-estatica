@@ -44,6 +44,11 @@ export function iniciarSyncMapaAtivo(): () => void {
       .upsert({ id: ID_MAPA, mapa_ativo_id: useStore.getState().mapa.mapaAtivoId })
       .then((resultado) => {
         pendente = false;
+        // outra sessão de mestre (ou reconexão) pode ter escrito por cima enquanto este push
+        // estava em voo — `aplicarLinha` só ignorava o PRÓPRIO eco, sem isso a troca alheia
+        // ficava perdida até o próximo evento chegar por acaso. Last-write-wins de propósito
+        // (mesa-estatica-multiplayer-completo.md §8): relê o servidor pra corrigir.
+        if (!resultado?.error) void refetchMapaAtivo();
         return resultado;
       });
 
