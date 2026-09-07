@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
-import { estaForaDeCombate, estaMorto } from '../../rules/combate';
+import { calcularEstadoTokenCombate, condicoesExtrasToken } from '../../rules/combate';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
 import { useStore } from '../../state/store';
@@ -263,10 +263,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
     const pvAtual = p.ficha?.pvAtual ?? p.npc?.pvAtual;
     const pvMaximo = p.ficha ? calcularPvMaximo(basePV, p.ficha.atributos.vigor) : p.npc?.pvMaximo;
-    // "desacordado"/"morto" combinam o cálculo automático de PV (rules/combate.ts) com o toggle
-    // manual do mestre (CONDICOES_COMBATE) — o mestre pode marcar mesmo quando o PV não bate.
-    const desacordado = (pvAtual !== undefined && estaForaDeCombate(pvAtual)) || condicoes.includes('desacordado');
-    const morto = (pvAtual !== undefined && pvMaximo !== undefined && estaMorto(pvAtual, pvMaximo)) || condicoes.includes('morto');
+    const { desacordado, morto } = calcularEstadoTokenCombate(pvAtual, pvMaximo, condicoes);
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, desacordado, morto, nome: p.nome, foto: p.foto, silhueta: p.silhueta };
   });
 
@@ -373,10 +370,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
           if (t.morto) partesTitulo.push('morto');
           else if (t.desacordado) partesTitulo.push('desacordado');
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
-          // exclui 'morto'/'desacordado' daqui — já cobertos acima (que também reflete o cálculo
-          // automático de PV, não só o toggle manual que vive em t.condicoes); sem isso, duplicava
-          // ("morto — Morto") sempre que a marcação vinha do toggle manual.
-          const condicoesExtras = t.condicoes.filter((c) => c !== 'morto' && c !== 'desacordado');
+          const condicoesExtras = condicoesExtrasToken(t.condicoes);
           if (condicoesExtras.length > 0) partesTitulo.push(condicoesExtras.map(nomeCondicao).join(', '));
           const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
           const topo = imgRenderRect ? `${imgRenderRect.offsetY + t.y * imgRenderRect.renderH}px` : `${t.y * 100}%`;

@@ -73,6 +73,34 @@ export function estaMorto(pvAtual: number, pvMaximo: number): boolean {
   return pvAtual <= -metade(pvMaximo);
 }
 
+export interface EstadoTokenCombate {
+  desacordado: boolean;
+  morto: boolean;
+}
+
+/** Combina o cálculo automático de PV (`estaForaDeCombate`/`estaMorto`) com o toggle manual do
+ *  mestre em `CONDICOES_COMBATE` — o mestre pode marcar mesmo quando o PV não bate (nocauteado
+ *  por outro meio, morte narrativa sem seguir a fórmula). Usado por TokenOverlay.tsx,
+ *  MapaTab.tsx e MapaJogadorView.tsx — extraído aqui pra mestre e jogador nunca desalinharem
+ *  numa mudança futura dessa regra (já aconteceu 3x nesta base: 599a778/164ba8f/ea83e6c). */
+export function calcularEstadoTokenCombate(
+  pvAtual: number | undefined,
+  pvMaximo: number | undefined,
+  condicoes: string[],
+): EstadoTokenCombate {
+  const desacordado = (pvAtual !== undefined && estaForaDeCombate(pvAtual)) || condicoes.includes('desacordado');
+  const morto = (pvAtual !== undefined && pvMaximo !== undefined && estaMorto(pvAtual, pvMaximo)) || condicoes.includes('morto');
+  return { desacordado, morto };
+}
+
+/** Condições "extras" pro badge/tooltip do token — exclui 'morto'/'desacordado' porque esses já
+ *  aparecem separados via `calcularEstadoTokenCombate` (que também reflete o cálculo automático
+ *  de PV, não só o toggle manual que vive em `condicoes`); sem isso, duplicava a marcação
+ *  manual ("morto — Morto") no título/badge do token. */
+export function condicoesExtrasToken(condicoes: string[]): string[] {
+  return condicoes.filter((c) => c !== 'morto' && c !== 'desacordado');
+}
+
 export interface ResultadoEstabilizar {
   teste: ResultadoTeste;
   estabilizou: boolean;

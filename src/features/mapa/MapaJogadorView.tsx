@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
-import { estaForaDeCombate, estaMorto } from '../../rules/combate';
+import { calcularEstadoTokenCombate, condicoesExtrasToken } from '../../rules/combate';
 import { badgeCondicoes, nomeCondicao } from '../../rules/data/condicoesCombate';
 import { surtosAtivosNaSessao } from '../../rules/surto';
 import { COR_NPC_PADRAO } from '../../state/factories';
@@ -133,8 +133,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
       const turnoAtivo = participanteNaVez === t.participanteId;
       const condicoes = (condicoesCombate ?? {})[t.participanteId] ?? [];
       const podeMover = t.participanteId === minhaFicha.id;
-      const desacordado = (p.pvAtual !== undefined && estaForaDeCombate(p.pvAtual)) || condicoes.includes('desacordado');
-      const morto = (p.pvAtual !== undefined && p.pvMaximo !== undefined && estaMorto(p.pvAtual, p.pvMaximo)) || condicoes.includes('morto');
+      const { desacordado, morto } = calcularEstadoTokenCombate(p.pvAtual, p.pvMaximo, condicoes);
       return {
         id: t.id,
         participanteId: t.participanteId,
@@ -264,10 +263,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
           else if (t.desacordado) partesTitulo.push('desacordado');
           if (t.podeMover) partesTitulo.push('seu token — arraste pra mover');
           if (t.surtoAtivo) partesTitulo.push(`surto${t.surtoEscolha ? `: ${t.surtoEscolha}` : ' ativo'}`);
-          // exclui 'morto'/'desacordado' daqui — já cobertos acima (que também reflete o cálculo
-          // automático de PV, não só o toggle manual que vive em t.condicoes); sem isso, duplicava
-          // ("morto — Morto") sempre que a marcação vinha do toggle manual.
-          const condicoesExtras = t.condicoes.filter((c) => c !== 'morto' && c !== 'desacordado');
+          const condicoesExtras = condicoesExtrasToken(t.condicoes);
           if (condicoesExtras.length > 0) partesTitulo.push(condicoesExtras.map(nomeCondicao).join(', '));
           const esq = imgRenderRect ? `${imgRenderRect.offsetX + t.x * imgRenderRect.renderW}px` : `${t.x * 100}%`;
           const topo = imgRenderRect ? `${imgRenderRect.offsetY + t.y * imgRenderRect.renderH}px` : `${t.y * 100}%`;
