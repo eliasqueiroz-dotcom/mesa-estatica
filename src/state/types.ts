@@ -335,13 +335,35 @@ export interface GradeMapa {
   unidade: UnidadeMedida;
 }
 
-export interface EstadoMapa {
-  imagemDataUrl: string | null;
-  tokens: TokenMapa[];
+/** Um mapa da biblioteca — imagem própria + grid/FoW calibrados pra ELA (decisão do usuário:
+ *  trocar de mapa ativo e voltar restaura grid/FoW exatamente como ficaram, em vez de um
+ *  estado único recalibrado toda vez). Sincroniza via `mapasBibliotecaSync.ts` (migração
+ *  0039), mesmo padrão de lista de `FaixaMidia`/`midia_faixas`. */
+export interface MapaBiblioteca {
+  id: string;
+  nome: string;
+  /** path no bucket Storage 'midia' (pasta 'mapas') — só o suficiente pra dar delete no
+   *  Storage ao remover o item. String vazia em dois casos: upload ainda em voo/sem Supabase
+   *  configurado (ver `imagemUrl`), ou item legado (mapa migrado da era anterior à biblioteca,
+   *  sem path conhecido — nunca dá pra excluir o arquivo desse item específico). */
+  imagemPath: string;
+  /** URL pública já resolvida, OU uma `data:` URI local (pintura otimista — `ehDataUrl()`)
+   *  enquanto o upload pro Storage não confirma, ou sem Supabase configurado (modo 100%
+   *  local). `mapasBibliotecaSync.ts` nunca sincroniza o item enquanto for dataURL. */
+  imagemUrl: string;
   grade: GradeMapa;
-  /** Fog of war — máscara de revelação controlada pelo mestre (ROADMAP F1). Persiste entre
-   *  sessões (reabrir o mapa segue onde parou) e sincroniza via `fowSync.ts` (migration 0027). */
   fow: EstadoFoW;
+  ordem: number;
+  criadoEm: string; // ISO
+}
+
+export interface EstadoMapa {
+  biblioteca: MapaBiblioteca[];
+  /** id do item de `biblioteca` em cena agora — `null` = nenhum mapa selecionado. */
+  mapaAtivoId: string | null;
+  /** Tokens são globais, sem vínculo com o mapa ativo (decisão do usuário) — trocar de mapa
+   *  não mexe nas posições. */
+  tokens: TokenMapa[];
 }
 
 /** Variante por zona do chiado do FoW (arte.md: --real=rua/analógico, --rede=corporativo).

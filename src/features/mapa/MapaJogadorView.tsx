@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FichaPublica } from '../../multiplayer/fichaSplit';
 import type { NpcPublico } from '../../multiplayer/npcsSync';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
@@ -19,9 +19,16 @@ import { podeMoverTokenParaFoW } from './fowGeometria';
 import PingOverlay from './PingOverlay';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlayJogador from './TokenOverlayJogador';
+import { criarFoWVazio, criarGradeInicial } from '../../state/factories';
 import './mapa.css';
 import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaUtils';
+import { useMapaAtivo } from './useMapaAtivo';
 import { useRegua } from './useRegua';
+
+/** Defaults quando o mestre ainda não escolheu um mapa — constantes por fora do componente
+ *  (mesmo motivo de `EMPTY_CONDICOES`/`GRADE_PADRAO` em `MapaTab.tsx`). */
+const GRADE_PADRAO = criarGradeInicial();
+const FOW_PADRAO = criarFoWVazio();
 
 const LIMIAR_CLIQUE = 5; // px — abaixo disso, pointerdown+pointerup no próprio token conta como clique, não arrasto
 
@@ -33,7 +40,8 @@ interface Props {
 }
 
 export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, iniciativa }: Props) {
-  const mapa = useStore((s) => s.mapa);
+  const mapaAtivo = useMapaAtivo();
+  const tokens = useStore((s) => s.mapa.tokens);
   const moverTokenMapa = useStore((s) => s.moverTokenMapa);
   const basePV = useStore((s) => s.config.basePV);
   const modoCombate = useStore((s) => s.sessaoPublica.modoCombate);
@@ -41,6 +49,10 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   const rodada = useStore((s) => s.sessaoPublica.rodada);
   const turnoAtualId = useStore((s) => s.sessaoPublica.turnoAtualId);
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
+
+  const imagemUrl = mapaAtivo?.imagemUrl ?? null;
+  const grade = mapaAtivo?.grade ?? GRADE_PADRAO;
+  const fow = mapaAtivo?.fow ?? FOW_PADRAO;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -63,16 +75,16 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
 
   useEffect(() => {
     setImgNatural(null);
-  }, [mapa.imagemDataUrl]);
+  }, [imagemUrl]);
 
   useEffect(() => {
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth > 0) {
       setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
     }
-  }, [mapa.imagemDataUrl]);
+  }, [imagemUrl]);
 
-  const meuToken = mapa.tokens.find((t) => t.participanteId === minhaFicha.id);
+  const meuToken = tokens.find((t) => t.participanteId === minhaFicha.id);
   const participanteNaVez = modoCombate ? iniciativa.find((e) => e.id === turnoAtualId)?.participanteId ?? null : null;
 
   const corMap: Record<string, string> = {};
@@ -111,7 +123,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     return null;
   };
 
-  const tokensVisuais = mapa.tokens
+  const tokensVisuais = tokens
     .map((t) => {
       const p = participantePorId(t.participanteId);
       if (!p) return null;
@@ -149,13 +161,18 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
     ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
     : null;
 
+  // getter, não valor — lido no momento do pointerdown da régua, nunca congelado num render
+  // (ver comentário de `UseReguaOpts.bloqueado` em useRegua.ts). `arrastandoRef` é estável,
+  // então deps vazias bastam.
+  const reguaBloqueada = useCallback(() => arrastandoRef.current, []);
+
   const regua = useRegua({
     autorId: minhaFicha.id,
     cor: minhaFicha.corVisual,
-    grade: mapa.grade,
+    grade,
     containerRef,
     imgRef,
-    bloqueado: arrastandoRef.current,
+    bloqueado: reguaBloqueada,
   });
 
   const posicaoDoPonteiro = (e: React.PointerEvent) => {
@@ -180,7 +197,7 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
   const mover = (e: React.PointerEvent) => {
     if (!arrastandoRef.current || !meuToken || !containerRef.current) return;
     const { x, y } = posicaoDoPonteiro(e);
-    if (!podeMoverTokenParaFoW(mapa.fow, { x, y })) return;
+    if (!podeMoverTokenParaFoW(fow, { x, y })) return;
     moverTokenMapa(meuToken.id, x, y);
   };
 
@@ -206,10 +223,10 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
         onPointerCancel={(e) => { soltar(e); regua.onPointerCancel(); }}
         onContextMenu={regua.onContextMenu}
       >
-        {mapa.imagemDataUrl ? (
+        {imagemUrl ? (
           <img
             ref={imgRef}
-            src={mapa.imagemDataUrl}
+            src={imagemUrl}
             alt="mapa da cena"
             className="mapa-imagem"
             draggable={false}
@@ -218,22 +235,22 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             }}
           />
         ) : (
-          <p className="vazio mapa-vazio">o mestre ainda não carregou um mapa.</p>
+          <p className="vazio mapa-vazio">o mestre ainda não escolheu um mapa.</p>
         )}
 
-        {mapa.grade.ativa && (
+        {grade.ativa && (
           <>
             <div
               className="mapa-grade"
               style={
                 {
-                  ...retanguloGradeEmPx(imgRenderRect, mapa.grade),
-                  '--grade-colunas': mapa.grade.colunas,
-                  '--grade-linhas': mapa.grade.linhas,
+                  ...retanguloGradeEmPx(imgRenderRect, grade),
+                  '--grade-colunas': grade.colunas,
+                  '--grade-linhas': grade.linhas,
                 } as React.CSSProperties
               }
             />
-            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, mapa.grade)} />
+            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, grade)} />
           </>
         )}
 
@@ -272,9 +289,9 @@ export default function MapaJogadorView({ minhaFicha, outrasFichas, npcs, inicia
             </div>
           );
         })}
-        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={grade} />
         <PingOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
-        <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <AoEViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={grade} />
         <FoWViewOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
         <CombatOverlayJogador iniciativa={iniciativa} minhaFicha={minhaFicha} corMap={corMap} npcs={npcs} />
         <CrachasOverlayJogador minhaFicha={minhaFicha} outrasFichas={outrasFichas} />

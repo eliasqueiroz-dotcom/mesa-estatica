@@ -2,6 +2,10 @@ import { supabase } from '../lib/supabaseClient';
 
 export interface ResultadoUploadImagem {
   url: string | null;
+  /** Path no bucket — só presente junto de `url` (upload bem-sucedido). Quem precisa dar
+   *  delete no objeto depois (ex.: excluir um mapa da biblioteca) guarda isto, não extrai da
+   *  URL pública. */
+  path?: string;
   /** Só presente quando TODAS as tentativas falharam — quem chama usa isso pra avisar o
    *  usuário em vez de deixar a falha silenciosa (achado ao vivo em 28/08: sem isso, um
    *  upload que falhasse — RLS, rede, timeout — deixava a ficha presa com a dataURL local
@@ -40,7 +44,7 @@ export async function uploadImagemStorage(pasta: string, blob: Blob): Promise<Re
     if (ATRASOS_MS[tentativa]) await esperar(ATRASOS_MS[tentativa]);
     const path = `img/${pasta}/${crypto.randomUUID()}.jpg`;
     const { error } = await cliente.storage.from('midia').upload(path, blob, { contentType: 'image/jpeg' });
-    if (!error) return { url: cliente.storage.from('midia').getPublicUrl(path).data.publicUrl };
+    if (!error) return { url: cliente.storage.from('midia').getPublicUrl(path).data.publicUrl, path };
     console.error(`[uploadImagemStorage] tentativa ${tentativa + 1}/${TENTATIVAS} falhou`, error);
   }
   return { url: null, erro: 'não foi possível enviar a foto pro servidor — por enquanto só você está vendo ela.' };

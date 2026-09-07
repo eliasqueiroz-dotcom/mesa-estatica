@@ -17,6 +17,7 @@ import {
   criarFichaVazia,
   criarFoWVazio,
   criarGradeInicial,
+  criarMapaBiblioteca,
   criarNpcVazio,
   criarPistaVazia,
   criarSessaoPrivada,
@@ -29,12 +30,14 @@ import type {
   EntradaLog,
   EntradaRoll,
   EntradaTabela,
+  EstadoFoW,
   EstadoGlobal,
   EstadoMapa,
   EstadoMidia,
   FaixaMidia,
   Ficha,
   GradeMapa,
+  MapaBiblioteca,
   Npc,
   Pista,
   RegiaoFoW,
@@ -58,6 +61,74 @@ const ATRIBUTOS_ZERO: Record<'vigor' | 'agilidade' | 'intelecto' | 'percepcao' |
 
 /** tipos de log que representam uma rolagem de dado — conta pra `estatisticas.rolagens`. */
 const TIPOS_ROLAGEM: TipoLog[] = ['teste', 'rolagem-livre', 'surto', 'iniciativa'];
+
+/** Merge num item específico da biblioteca de mapas — no-op (devolve `mapa` intacto) se `id`
+ *  não existir mais (item removido enquanto uma edição estava em voo). */
+function patchMapa(mapa: EstadoMapa, id: string, atualizar: (m: MapaBiblioteca) => MapaBiblioteca): { mapa: EstadoMapa } {
+  return { mapa: { ...mapa, biblioteca: mapa.biblioteca.map((m) => (m.id === id ? atualizar(m) : m)) } };
+}
+
+/** Todas as ações de grid/FoW mexem no MAPA ATIVO, nunca num singleton solto — no-op sem mapa
+ *  selecionado (`mapaAtivoId === null`). */
+function patchMapaAtivo(mapa: EstadoMapa, atualizar: (m: MapaBiblioteca) => MapaBiblioteca): { mapa: EstadoMapa } {
+  if (!mapa.mapaAtivoId) return { mapa };
+  return patchMapa(mapa, mapa.mapaAtivoId, atualizar);
+}
+
+function patchFowAtivo(mapa: EstadoMapa, atualizar: (fow: EstadoFoW) => EstadoFoW): { mapa: EstadoMapa } {
+  return patchMapaAtivo(mapa, (m) => ({ ...m, fow: atualizar(m.fow) }));
+}
+
+/** Normaliza `mapa` de um JSON importado (`importarJSON` abaixo) — aceita o formato atual
+ *  (`biblioteca`/`mapaAtivoId`) e o legado pré-biblioteca (`imagemDataUrl`/`grade`/`fow` direto
+ *  em `mapa`, virando um item só), mesmo espírito de outros fallbacks de import já existentes
+ *  neste arquivo (ex.: `zonaAtual ?? proximoIdZona`). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizarMapaBiblioteca(m: any, ordemPadrao: number): MapaBiblioteca {
+  return {
+    id: typeof m?.id === 'string' ? m.id : crypto.randomUUID(),
+    nome: typeof m?.nome === 'string' ? m.nome : '',
+    imagemPath: typeof m?.imagemPath === 'string' ? m.imagemPath : '',
+    imagemUrl: typeof m?.imagemUrl === 'string' ? m.imagemUrl : '',
+    grade: { ...criarGradeInicial(), ...m?.grade },
+    fow: m?.fow
+      ? {
+          vistas: Array.isArray(m.fow.vistas) ? m.fow.vistas : [],
+          visiveisAgora: Array.isArray(m.fow.visiveisAgora) ? m.fow.visiveisAgora : [],
+          zonaAtual: m.fow.zonaAtual ?? m.fow.proximoIdZona ?? null,
+          ativa: m.fow.ativa ?? false,
+        }
+      : criarFoWVazio(),
+    ordem: typeof m?.ordem === 'number' ? m.ordem : ordemPadrao,
+    criadoEm: typeof m?.criadoEm === 'string' ? m.criadoEm : new Date().toISOString(),
+  };
+}
+
+function normalizarMapa(d: unknown): EstadoMapa {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bruto = (d ?? {}) as any;
+  const tokens: TokenMapa[] = (Array.isArray(bruto.tokens) ? bruto.tokens : []).map((t: Partial<TokenMapa>) => ({
+    id: t.id ?? crypto.randomUUID(),
+    participanteId: t.participanteId ?? '',
+    tipo: t.tipo ?? 'pc',
+    x: typeof t.x === 'number' ? t.x : 0.5,
+    y: typeof t.y === 'number' ? t.y : 0.5,
+  }));
+
+  if (Array.isArray(bruto.biblioteca)) {
+    const biblioteca = bruto.biblioteca.map(normalizarMapaBiblioteca);
+    const mapaAtivoId = biblioteca.some((m: MapaBiblioteca) => m.id === bruto.mapaAtivoId) ? bruto.mapaAtivoId : null;
+    return { biblioteca, mapaAtivoId, tokens };
+  }
+
+  // formato legado (pré-biblioteca, v33 e antes): imagemDataUrl/grade/fow direto em `mapa`.
+  if (bruto.imagemDataUrl) {
+    const item = normalizarMapaBiblioteca({ nome: 'mapa importado', imagemUrl: bruto.imagemDataUrl, grade: bruto.grade, fow: bruto.fow }, 0);
+    return { biblioteca: [item], mapaAtivoId: item.id, tokens };
+  }
+
+  return { biblioteca: [], mapaAtivoId: null, tokens };
+}
 
 export interface AlertaSanidade {
   cruzouLinhaSanidade: boolean;
@@ -150,14 +221,24 @@ interface Acoes {
    *  prazo). Decrementa sozinha no fim do turno do afetado (`avancarTurno`). */
   definirDuracaoCondicao: (participanteId: string, condicaoId: string, rodadas: number | null) => void;
 
-  atualizarMapa: (patch: Partial<EstadoMapa>) => void;
+  // ===== Biblioteca de mapas =====
+  /** Cria um item novo na biblioteca (grid/FoW no default) — `ordem` = maior atual + 1.
+   *  Retorna o id gerado. Não muda `mapaAtivoId` sozinho. */
+  adicionarMapaBiblioteca: (nome: string, path: string, url: string) => string;
+  /** Remove da lista; se era o ativo, `mapaAtivoId` vira `null`. */
+  removerMapaBiblioteca: (id: string) => void;
+  renomearMapaBiblioteca: (id: string, nome: string) => void;
+  /** Re-upload/substituição da imagem de um item já existente — mesmo padrão de pintura
+   *  otimista do upload original (dataURL local até o Storage resolver). */
+  atualizarImagemMapaBiblioteca: (id: string, path: string, url: string) => void;
+  selecionarMapaAtivo: (id: string | null) => void;
   atualizarGrade: (patch: Partial<GradeMapa>) => void;
   /** Ignora se o participante já tem token no mapa (evita duplicar ao clicar 2x). */
   adicionarTokenMapa: (participanteId: string, tipo: 'pc' | 'npc') => void;
   moverTokenMapa: (id: string, x: number, y: number) => void;
   removerTokenMapa: (id: string) => void;
 
-  // ===== Fog of war (ROADMAP F1) =====
+  // ===== Fog of war (ROADMAP F1) — sempre do MAPA ATIVO; no-op sem mapa ativo =====
   /** Revela região (entra em `vistas` ∪ `visiveisAgora`). Se `cobrirLuz`-only, retira de
    *  `visiveisAgora` mantendo `vistas` (memória corrompida persiste). */
   adicionarRegiaoFoW: (regiao: Omit<RegiaoFoW, 'id'>) => string | undefined;
@@ -560,6 +641,32 @@ export function migrate(persistedState: unknown, versaoAnterior: number): Store 
   if (versaoAnterior < 33 && estado.fichas) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     estado.fichas = (estado.fichas as any[]).map((f: any) => ({ antecedenteCustom: '', ...f }));
+  }
+  // v33 → v34: mapa único vira biblioteca de mapas (mestre escolhe qual está ativo a qualquer
+  // momento) — grid/FoW passam a ser lembrados POR MAPA, não mais num objeto único (decisão do
+  // usuário). O mapa em uso vira o primeiro item da biblioteca, já ativo — não perde a
+  // calibração de quem já jogava. Sem imagem carregada ainda, biblioteca nasce vazia.
+  if (versaoAnterior < 34 && estado.mapa && !estado.mapa.biblioteca) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const antigo = estado.mapa as any;
+    // qualquer rastro de mapa anterior (imagem, grid customizado ou FoW já revelado) vira um
+    // item — não só quando há imagem, senão grid/FoW configurados sem imagem carregada ainda
+    // (estado transitório, mas real) se perderiam na migração.
+    if (antigo.imagemDataUrl || antigo.grade || antigo.fow) {
+      const item = {
+        id: crypto.randomUUID(),
+        nome: 'mapa importado',
+        imagemPath: '',
+        imagemUrl: antigo.imagemDataUrl ?? '',
+        grade: antigo.grade ?? criarGradeInicial(),
+        fow: antigo.fow ?? criarFoWVazio(),
+        ordem: 0,
+        criadoEm: new Date().toISOString(),
+      };
+      estado.mapa = { biblioteca: [item], mapaAtivoId: item.id, tokens: antigo.tokens ?? [] };
+    } else {
+      estado.mapa = { biblioteca: [], mapaAtivoId: null, tokens: antigo.tokens ?? [] };
+    }
   }
   return estado as Store;
 }
@@ -1192,8 +1299,29 @@ export const useStore = create<Store>()(
           return { sessaoPublica: { ...s.sessaoPublica, condicaoDuracao: mapa } };
         }),
 
-      atualizarMapa: (patch) => set((s) => ({ mapa: { ...s.mapa, ...patch } })),
-      atualizarGrade: (patch) => set((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ...patch } } })),
+      adicionarMapaBiblioteca: (nome, path, url) => {
+        const id = crypto.randomUUID();
+        set((s) => {
+          const ordem = s.mapa.biblioteca.reduce((max, m) => Math.max(max, m.ordem), -1) + 1;
+          const item: MapaBiblioteca = { ...criarMapaBiblioteca(nome, path, url, ordem), id };
+          return { mapa: { ...s.mapa, biblioteca: [...s.mapa.biblioteca, item] } };
+        });
+        return id;
+      },
+      removerMapaBiblioteca: (id) =>
+        set((s) => ({
+          mapa: {
+            ...s.mapa,
+            biblioteca: s.mapa.biblioteca.filter((m) => m.id !== id),
+            mapaAtivoId: s.mapa.mapaAtivoId === id ? null : s.mapa.mapaAtivoId,
+          },
+        })),
+      renomearMapaBiblioteca: (id, nome) => set((s) => patchMapa(s.mapa, id, (m) => ({ ...m, nome }))),
+      atualizarImagemMapaBiblioteca: (id, path, url) =>
+        set((s) => patchMapa(s.mapa, id, (m) => ({ ...m, imagemPath: path, imagemUrl: url }))),
+      selecionarMapaAtivo: (id) => set((s) => ({ mapa: { ...s.mapa, mapaAtivoId: id } })),
+      atualizarGrade: (patch) =>
+        set((s) => patchMapaAtivo(s.mapa, (m) => ({ ...m, grade: { ...m.grade, ...patch } }))),
       adicionarTokenMapa: (participanteId, tipo) =>
         set((s) => {
           if (s.mapa.tokens.some((t) => t.participanteId === participanteId)) return s;
@@ -1212,36 +1340,28 @@ export const useStore = create<Store>()(
       removerTokenMapa: (id) =>
         set((s) => ({ mapa: { ...s.mapa, tokens: s.mapa.tokens.filter((t) => t.id !== id) } })),
 
-      // ===== Fog of war (ROADMAP F1) =====
+      // ===== Fog of war (ROADMAP F1) — sempre do mapa ATIVO (patchFowAtivo é no-op sem um) =====
       adicionarRegiaoFoW: (regiao) => {
         const id = crypto.randomUUID();
-        set((s) => ({
-          mapa: {
-            ...s.mapa,
-            fow: {
-              ...s.mapa.fow,
-              vistas: [...s.mapa.fow.vistas, { ...regiao, id }],
-              visiveisAgora: [...s.mapa.fow.visiveisAgora, { ...regiao, id }],
-            },
-          },
-        }));
+        set((s) =>
+          patchFowAtivo(s.mapa, (fow) => ({
+            ...fow,
+            vistas: [...fow.vistas, { ...regiao, id }],
+            visiveisAgora: [...fow.visiveisAgora, { ...regiao, id }],
+          })),
+        );
         return id;
       },
       removerRegiaoFoW: (id) =>
-        set((s) => ({
-          mapa: {
-            ...s.mapa,
-            fow: {
-              ...s.mapa.fow,
-              vistas: s.mapa.fow.vistas.filter((r) => r.id !== id),
-              visiveisAgora: s.mapa.fow.visiveisAgora.filter((r) => r.id !== id),
-            },
-          },
-        })),
+        set((s) =>
+          patchFowAtivo(s.mapa, (fow) => ({
+            ...fow,
+            vistas: fow.vistas.filter((r) => r.id !== id),
+            visiveisAgora: fow.visiveisAgora.filter((r) => r.id !== id),
+          })),
+        ),
       cobrirLuzFoW: (id) =>
-        set((s) => ({
-          mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: s.mapa.fow.visiveisAgora.filter((r) => r.id !== id) } },
-        })),
+        set((s) => patchFowAtivo(s.mapa, (fow) => ({ ...fow, visiveisAgora: fow.visiveisAgora.filter((r) => r.id !== id) }))),
       /** Apaga a luz EXATAMENTE na área desenhada: cada região iluminada que o retângulo toca é
        *  recortada (`subtrairCaixa`), sobrando as bordas que ficaram de fora. O pedaço coberto
        *  continua em `vistas`, então vira memória — não volta a ser chiado de nunca-visto.
@@ -1249,43 +1369,44 @@ export const useStore = create<Store>()(
        *  Antes isto removia a região INTEIRA por interseção: cobrir um cantinho apagava o cômodo
        *  todo, e cobrir onde não havia luz não fazia nada. */
       cobrirAreaFoW: (area) =>
-        set((s) => {
-          const atuais = s.mapa.fow.visiveisAgora;
-          if (atuais.length === 0) return s;
-          const restantes = atuais.flatMap((r) =>
-            caixasIntersectam(r, area)
-              ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
-              : [r],
-          );
-          if (restantes.length === atuais.length && restantes.every((r, i) => r === atuais[i])) return s;
-          return { mapa: { ...s.mapa, fow: { ...s.mapa.fow, visiveisAgora: restantes } } };
-        }),
+        set((s) =>
+          patchFowAtivo(s.mapa, (fow) => {
+            const atuais = fow.visiveisAgora;
+            if (atuais.length === 0) return fow;
+            const restantes = atuais.flatMap((r) =>
+              caixasIntersectam(r, area)
+                ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
+                : [r],
+            );
+            if (restantes.length === atuais.length && restantes.every((r, i) => r === atuais[i])) return fow;
+            return { ...fow, visiveisAgora: restantes };
+          }),
+        ),
       /** "Esquecer": devolve a área desenhada pro nunca-visto, recortando (`subtrairCaixa`) TANTO
        *  `vistas` quanto `visiveisAgora` — ao contrário de `cobrirAreaFoW`, que só apaga a luz e
        *  mantém a memória, isto some com a visita inteira naquele pedaço. Único jeito de reverter
        *  uma área específica sem usar o `×` (que zera o mapa todo). */
       esquecerAreaFoW: (area) =>
-        set((s) => {
-          const cortar = (lista: RegiaoFoW[]) =>
-            lista.flatMap((r) =>
-              caixasIntersectam(r, area)
-                ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
-                : [r],
-            );
-          const vistas = cortar(s.mapa.fow.vistas);
-          const visiveisAgora = cortar(s.mapa.fow.visiveisAgora);
-          const vistasMudou = vistas.length !== s.mapa.fow.vistas.length || vistas.some((r, i) => r !== s.mapa.fow.vistas[i]);
-          const visiveisMudou =
-            visiveisAgora.length !== s.mapa.fow.visiveisAgora.length ||
-            visiveisAgora.some((r, i) => r !== s.mapa.fow.visiveisAgora[i]);
-          if (!vistasMudou && !visiveisMudou) return s;
-          return { mapa: { ...s.mapa, fow: { ...s.mapa.fow, vistas, visiveisAgora } } };
-        }),
-      limparFoW: () => set((s) => ({ mapa: { ...s.mapa, fow: criarFoWVazio() } })),
-      definirZonaFoW: (zona) =>
-        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, zonaAtual: zona } } })),
-      definirFoWAtivo: (ativa) =>
-        set((s) => ({ mapa: { ...s.mapa, fow: { ...s.mapa.fow, ativa } } })),
+        set((s) =>
+          patchFowAtivo(s.mapa, (fow) => {
+            const cortar = (lista: RegiaoFoW[]) =>
+              lista.flatMap((r) =>
+                caixasIntersectam(r, area)
+                  ? subtrairCaixa(r, area).map((c) => ({ ...r, ...c, id: crypto.randomUUID() }))
+                  : [r],
+              );
+            const vistas = cortar(fow.vistas);
+            const visiveisAgora = cortar(fow.visiveisAgora);
+            const vistasMudou = vistas.length !== fow.vistas.length || vistas.some((r, i) => r !== fow.vistas[i]);
+            const visiveisMudou =
+              visiveisAgora.length !== fow.visiveisAgora.length || visiveisAgora.some((r, i) => r !== fow.visiveisAgora[i]);
+            if (!vistasMudou && !visiveisMudou) return fow;
+            return { ...fow, vistas, visiveisAgora };
+          }),
+        ),
+      limparFoW: () => set((s) => patchFowAtivo(s.mapa, () => criarFoWVazio())),
+      definirZonaFoW: (zona) => set((s) => patchFowAtivo(s.mapa, (fow) => ({ ...fow, zonaAtual: zona }))),
+      definirFoWAtivo: (ativa) => set((s) => patchFowAtivo(s.mapa, (fow) => ({ ...fow, ativa }))),
 
       adicionarFaixaMidia: (nome, path, url) => {
         const id = crypto.randomUUID();
@@ -1568,30 +1689,7 @@ export const useStore = create<Store>()(
           })),
           iniciativa: d.iniciativa ?? [],
           pistas: d.pistas ?? [],
-          mapa: {
-            imagemDataUrl: d.mapa?.imagemDataUrl ?? null,
-            tokens: (d.mapa?.tokens ?? []).map((t) => ({
-              id: t.id ?? crypto.randomUUID(),
-              participanteId: t.participanteId ?? '',
-              tipo: t.tipo ?? 'pc',
-              x: typeof t.x === 'number' ? t.x : 0.5,
-              y: typeof t.y === 'number' ? t.y : 0.5,
-            })),
-            grade: { ...base.mapa.grade, ...d.mapa?.grade },
-            // FoW: aceita `fow` do payload; importa o que vier (por região: campos opcionais
-            // caem no default). Imports sem `fow` (pré-F1) ficam com máscara vazia — mesa
-            // sem FoW, mesmo que antes de existir o recurso. `zonaAtual ?? proximoIdZona`
-            // aceita export feito antes da v28 (campo renomeado — ver `migrate`).
-            fow: d.mapa?.fow
-              ? {
-                  vistas: Array.isArray(d.mapa.fow.vistas) ? d.mapa.fow.vistas : [],
-                  visiveisAgora: Array.isArray(d.mapa.fow.visiveisAgora) ? d.mapa.fow.visiveisAgora : [],
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  zonaAtual: d.mapa.fow.zonaAtual ?? (d.mapa.fow as any).proximoIdZona ?? null,
-                  ativa: d.mapa.fow.ativa ?? false,
-                }
-              : base.mapa.fow,
-          },
+          mapa: normalizarMapa(d.mapa),
           midia: {
             faixas: (d.midia?.faixas ?? []).map((f) => ({
               id: f.id ?? crypto.randomUUID(),

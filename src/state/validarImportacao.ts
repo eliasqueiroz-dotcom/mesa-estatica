@@ -76,7 +76,11 @@ export function validarTiposEstado(dados: Record<string, unknown>): string[] {
   }
 
   if (dados.mapa && typeof dados.mapa === 'object' && !Array.isArray(dados.mapa)) {
-    listarDeObjetos('mapa.tokens', (dados.mapa as Record<string, unknown>).tokens);
+    const mapa = dados.mapa as Record<string, unknown>;
+    listarDeObjetos('mapa.tokens', mapa.tokens);
+    // `biblioteca` só existe no formato atual — export legado (pré-biblioteca) não tem essa
+    // chave, e `normalizarMapa` (store.ts) já sabe converter esse formato antigo.
+    listarDeObjetos('mapa.biblioteca', mapa.biblioteca);
   }
 
   return problemas;

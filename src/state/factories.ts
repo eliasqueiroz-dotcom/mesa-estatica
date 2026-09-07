@@ -1,6 +1,6 @@
 import type { Atributo } from '../rules/data/pericias';
 import { criarTabelasSeed } from '../rules/data/tabelasSeed';
-import type { EstadoFoW, EstadoGlobal, EstadoMidia, EstadoSoundpad, Ficha, GradeMapa, Npc, NpcAcao, Pista, SessaoPrivada, SessaoPublica } from './types';
+import type { EstadoFoW, EstadoGlobal, EstadoMidia, EstadoSoundpad, Ficha, GradeMapa, MapaBiblioteca, Npc, NpcAcao, Pista, SessaoPrivada, SessaoPublica } from './types';
 
 export { criarTabelasSeed };
 
@@ -98,6 +98,21 @@ export function criarFoWVazio(): EstadoFoW {
   return { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false };
 }
 
+/** Novo item da biblioteca de mapas — grid/FoW nascem no default, calibrados depois pelo
+ *  mestre pra ESTA imagem (`store.ts: adicionarMapaBiblioteca`). */
+export function criarMapaBiblioteca(nome: string, imagemPath: string, imagemUrl: string, ordem: number): MapaBiblioteca {
+  return {
+    id: gerarId(),
+    nome,
+    imagemPath,
+    imagemUrl,
+    grade: criarGradeInicial(),
+    fow: criarFoWVazio(),
+    ordem,
+    criadoEm: new Date().toISOString(),
+  };
+}
+
 export function criarSessaoPublica(): SessaoPublica {
   return {
     nomeDaMesa: 'Estática',
@@ -153,7 +168,7 @@ export function criarEstadoSoundpad(): EstadoSoundpad {
   return { sons: [], volume: 0.8, ultimoDisparo: null };
 }
 
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 export function criarEstadoInicial(): EstadoGlobal {
   return {
@@ -165,7 +180,7 @@ export function criarEstadoInicial(): EstadoGlobal {
     npcs: [],
     pistas: [],
     iniciativa: [],
-    mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial(), fow: criarFoWVazio() },
+    mapa: { biblioteca: [], mapaAtivoId: null, tokens: [] },
     midia: criarEstadoMidia(),
     soundpad: criarEstadoSoundpad(),
     log: [],

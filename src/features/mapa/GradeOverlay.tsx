@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
+import { useMapaAtivo } from './useMapaAtivo';
 
 // arredonda pro campo numérico ficar digitável (arrastar produz float; digitar quer inteiro).
 const clamp = (valor: number, min: number, max: number) => Math.round(Math.max(min, Math.min(max, valor)));
@@ -11,9 +12,13 @@ const clamp = (valor: number, min: number, max: number) => Math.round(Math.max(m
  * este `position:fixed`, apesar de fixed normalmente escapar do layout do ancestral.
  */
 export default function GradeOverlay() {
-  const grade = useStore((s) => s.mapa.grade);
+  const mapaAtivo = useMapaAtivo();
   const atualizarGrade = useStore((s) => s.atualizarGrade);
   const [aberto, setAberto] = useState(false);
+
+  // nada pra calibrar sem um mapa selecionado — evita mostrar uma ferramenta que não faz nada.
+  if (!mapaAtivo) return null;
+  const grade = mapaAtivo.grade;
 
   return (
     <div style={{ position: 'fixed', left: '1.25rem', bottom: '1.25rem', zIndex: 50 }}>

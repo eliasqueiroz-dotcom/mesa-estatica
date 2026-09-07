@@ -19,12 +19,12 @@ import { usePedidoRolagemDanoStore } from '../state/pedidoRolagemDanoStore';
 import { usePedidoRolagemTesteStore } from '../state/pedidoRolagemTesteStore';
 import { useStore } from '../state/store';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
-import { iniciarSyncFoW } from '../multiplayer/fowSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import { iniciarSyncFichas } from '../multiplayer/fichasSync';
 import { iniciarSyncIniciativa } from '../multiplayer/iniciativaSync';
 import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
-import { iniciarSyncMapaPublico } from '../multiplayer/mapaPublicoSync';
+import { iniciarSyncMapaAtivo } from '../multiplayer/mapaAtivoSync';
+import { iniciarSyncMapasBiblioteca } from '../multiplayer/mapasBibliotecaSync';
 import { iniciarSyncMidiaEstado } from '../multiplayer/midiaEstadoSync';
 import { iniciarSyncMidiaFaixas } from '../multiplayer/midiaFaixasSync';
 import { iniciarSyncNpcs } from '../multiplayer/npcsSync';
@@ -317,7 +317,8 @@ export default function App() {
     let pararNpcs = () => {};
     let pararSessaoPublica = () => {};
     let pararIniciativa = () => {};
-    let pararMapaPublico = () => {};
+    let pararMapasBiblioteca = () => {};
+    let pararMapaAtivo = () => {};
     let pararMidiaFaixas = () => {};
     let pararMidiaEstado = () => {};
     let pararLogRolls = () => {};
@@ -325,7 +326,6 @@ export default function App() {
     let pararPing = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
-    let pararFoW = () => {};
     let pararRolagemAoVivo = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
@@ -335,7 +335,8 @@ export default function App() {
       pararNpcs = iniciarSyncNpcs();
       pararSessaoPublica = iniciarSyncSessaoPublica();
       pararIniciativa = iniciarSyncIniciativa();
-      pararMapaPublico = iniciarSyncMapaPublico();
+      pararMapasBiblioteca = iniciarSyncMapasBiblioteca();
+      pararMapaAtivo = iniciarSyncMapaAtivo();
       pararMidiaFaixas = iniciarSyncMidiaFaixas();
       pararMidiaEstado = iniciarSyncMidiaEstado();
       pararLogRolls = iniciarSyncLogRolls();
@@ -343,7 +344,6 @@ export default function App() {
       pararPing = iniciarSyncPing();
       pararSoundpad = iniciarSyncSoundpad();
       pararAoE = iniciarSyncAoE();
-      pararFoW = iniciarSyncFoW();
       pararRolagemAoVivo = iniciarSyncRolagemAoVivo();
     });
     return () => {
@@ -353,7 +353,8 @@ export default function App() {
       pararNpcs();
       pararSessaoPublica();
       pararIniciativa();
-      pararMapaPublico();
+      pararMapasBiblioteca();
+      pararMapaAtivo();
       pararMidiaFaixas();
       pararMidiaEstado();
       pararLogRolls();
@@ -361,7 +362,6 @@ export default function App() {
       pararPing();
       pararSoundpad();
       pararAoE();
-      pararFoW();
       pararRolagemAoVivo();
     };
   }, []);

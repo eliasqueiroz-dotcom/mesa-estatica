@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Avatar from '../../components/Avatar';
 import { calcularPvMaximo, calcularSanidadeMaxima } from '../../rules/derivados';
 import { estaForaDeCombate, estaMorto } from '../../rules/combate';
@@ -8,9 +8,9 @@ import { useStore } from '../../state/store';
 import type { GradeMapa } from '../../state/types';
 import TokenScene from '../../tokens3d/TokenScene';
 import { badgeCondicoes, nomeCondicao } from '../../rules/data/condicoesCombate';
+import { criarGradeInicial } from '../../state/factories';
 import AoEOverlay from './AoEOverlay';
-import { comprimirImagem } from '../../lib/comprimirImagem';
-import { uploadImagemStorage } from '../../multiplayer/uploadImagemStorage';
+import BibliotecaMapas from './BibliotecaMapas';
 import CombatOverlay from './CombatOverlay';
 import CrachasOverlay from './CrachasOverlay';
 import FoWOverlay from './FoWOverlay';
@@ -20,9 +20,15 @@ import { getImgRenderRect, retanguloConteudo, retanguloGradeEmPx } from './mapaU
 import PingOverlay from './PingOverlay';
 import ReguaOverlay from './ReguaOverlay';
 import TokenOverlay from './TokenOverlay';
+import { useMapaAtivo } from './useMapaAtivo';
 import { useRegua } from './useRegua';
 import { marcarRemocaoExplicita } from '../../multiplayer/remocaoExplicita';
 import { desmarcarTokenEmArrasto, marcarTokenEmArrasto } from '../../multiplayer/tokensSync';
+
+/** Grid default quando não há mapa ativo — régua/handlers de arrasto continuam funcionando
+ *  sobre a área vazia. Constante por fora do componente (mesmo motivo de `EMPTY_CONDICOES`):
+ *  um `?? criarGradeInicial()` inline criaria um objeto novo a cada render. */
+const GRADE_PADRAO = criarGradeInicial();
 
 /** O mestre não tem ficha própria — cor fixa de "mestre" pra régua, nunca a cor de um
  *  personagem (decisão fechada). */
@@ -54,8 +60,8 @@ type EstadoArrasto =
   | { tipo: 'grade-alca'; alca: Alca };
 
 export default function MapaTab({ active = true }: { active?: boolean }) {
-  const mapa = useStore((s) => s.mapa);
-  const atualizarMapa = useStore((s) => s.atualizarMapa);
+  const mapaAtivo = useMapaAtivo();
+  const tokens = useStore((s) => s.mapa.tokens);
   const atualizarGrade = useStore((s) => s.atualizarGrade);
   const fichas = useStore((s) => s.fichas);
   const npcs = useStore((s) => s.npcs);
@@ -71,12 +77,13 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
   const condicoesCombate = useStore((s) => s.sessaoPublica.condicoesCombate);
   const iniciativa = useStore((s) => s.iniciativa);
 
+  const imagemUrl = mapaAtivo?.imagemUrl ?? null;
+  const grade = mapaAtivo?.grade ?? GRADE_PADRAO;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
   const [tokenOverlay, setTokenOverlay] = useState<{ tipo: 'pc' | 'npc'; id: string } | null>(null);
   const arrastoRef = useRef<EstadoArrasto | null>(null);
   /** posição do ponteiro (% de .mapa-area) e grade no instante em que o arrasto começou — os
@@ -101,7 +108,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
   useEffect(() => {
     setImgNatural(null);
-  }, [mapa.imagemDataUrl]);
+  }, [imagemUrl]);
 
   // `onLoad` sozinho perde a corrida quando o navegador já decodificou a imagem antes do
   // React religar o listener (comum em `data:` URI) — sem isso, `imgNatural` fica preso no
@@ -112,7 +119,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     if (img && img.complete && img.naturalWidth > 0) {
       setImgNatural({ w: img.naturalWidth, h: img.naturalHeight });
     }
-  }, [mapa.imagemDataUrl]);
+  }, [imagemUrl]);
 
   const participantePorId = (id: string) => {
     const ficha = fichas.find((f) => f.id === id);
@@ -120,27 +127,6 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     const npc = npcs.find((n) => n.id === id);
     if (npc) return { nome: npc.nome || 'sem nome', cor: npc.corVisual ?? COR_NPC_PADRAO, foto: npc.foto, silhueta: npc.silhueta, ficha: null as null, npc };
     return { nome: '?', cor: COR_NPC_PADRAO, foto: null as string | null, silhueta: null as string | null, ficha: null as null, npc: null as null };
-  };
-
-  const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const arquivo = e.target.files?.[0];
-    e.target.value = '';
-    if (!arquivo) return;
-    setErro(null);
-    setCarregando(true);
-    try {
-      const { dataUrl, blob } = await comprimirImagem(arquivo);
-      // pintura otimista: imediata, funciona sem Supabase configurado (modo local). Se o
-      // upload pro Storage completar, troca pela URL leve — é o que sai sincronizado em vez
-      // do base64 (egress; ver mapaPublicoSync.ts).
-      atualizarMapa({ imagemDataUrl: dataUrl });
-      const { url } = await uploadImagemStorage('mapa', blob);
-      if (url) atualizarMapa({ imagemDataUrl: url });
-    } catch {
-      setErro('não foi possível carregar essa imagem.');
-    } finally {
-      setCarregando(false);
-    }
   };
 
   /** Posição do ponteiro em % da IMAGEM renderizada (não do container) — mesma base de
@@ -176,7 +162,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     e.stopPropagation();
     if (!containerRef.current) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    inicioArrastoRef.current = { ...posPercentual(e), grade: mapa.grade };
+    inicioArrastoRef.current = { ...posPercentual(e), grade };
     arrastoRef.current = { tipo: 'grade-mover' };
   };
 
@@ -185,7 +171,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     e.stopPropagation();
     if (!containerRef.current) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    inicioArrastoRef.current = { ...posPercentual(e), grade: mapa.grade };
+    inicioArrastoRef.current = { ...posPercentual(e), grade };
     arrastoRef.current = { tipo: 'grade-alca', alca };
   };
 
@@ -253,7 +239,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
       if (inicioClique) {
         const dist = Math.hypot(e.clientX - inicioClique.x, e.clientY - inicioClique.y);
         if (dist < LIMIAR_CLIQUE) {
-          const token = mapa.tokens.find((t) => t.id === estado.id);
+          const token = tokens.find((t) => t.id === estado.id);
           if (token) setTokenOverlay({ tipo: token.tipo, id: token.participanteId });
         }
       }
@@ -265,7 +251,7 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
 
   const participanteNaVez = modoCombate ? iniciativa.find((e) => e.id === turnoAtualId)?.participanteId ?? null : null;
 
-  const tokensVisuais = mapa.tokens.map((t) => {
+  const tokensVisuais = tokens.map((t) => {
     const p = participantePorId(t.participanteId);
     const sanidadeCritica = p.ficha
       ? p.ficha.sanidadeAtual <= calcularSanidadeMaxima(p.ficha.atributos.vontade) * 0.25
@@ -284,30 +270,31 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
     return { id: t.id, x: t.x, y: t.y, cor: p.cor, sanidadeCritica, surtoAtivo, surtoEscolha, turnoAtivo, condicoes, desacordado, morto, nome: p.nome, foto: p.foto, silhueta: p.silhueta };
   });
 
-  const fichasDisponiveis = fichas.filter((f) => !mapa.tokens.some((t) => t.participanteId === f.id));
-  const npcsDisponiveis = npcs.filter((n) => !mapa.tokens.some((t) => t.participanteId === n.id));
+  const fichasDisponiveis = fichas.filter((f) => !tokens.some((t) => t.participanteId === f.id));
+  const npcsDisponiveis = npcs.filter((n) => !tokens.some((t) => t.participanteId === n.id));
 
   const imgRenderRect = imgNatural && tamanho.width > 0
     ? getImgRenderRect(tamanho.width, tamanho.height, imgNatural.w, imgNatural.h)
     : null;
 
+  // getter, não valor — lido no momento do pointerdown da régua, nunca congelado num render
+  // (ver comentário de `UseReguaOpts.bloqueado` em useRegua.ts). `arrastoRef` é estável, então
+  // deps vazias bastam.
+  const reguaBloqueada = useCallback(() => arrastoRef.current !== null, []);
+
   const regua = useRegua({
     autorId: AUTOR_ID_MESTRE,
     cor: COR_REGUA_MESTRE,
-    grade: mapa.grade,
+    grade,
     containerRef,
     imgRef,
-    bloqueado: arrastoRef.current !== null,
+    bloqueado: reguaBloqueada,
   });
 
   return (
     <div className="mapa-tab">
       <div className="mapa-toolbar">
-        <label className="mapa-upload-botao">
-          {carregando ? 'comprimindo…' : 'carregar mapa'}
-          <input type="file" accept="image/*" hidden onChange={importar} />
-        </label>
-        {erro && <span style={{ color: 'var(--ruido)', fontSize: '12px' }}>{erro}</span>}
+        <BibliotecaMapas />
         <div className="mapa-toolbar__espaco" />
         {fichasDisponiveis.length + npcsDisponiveis.length > 0 && (
           <div className="mapa-toolbar__add">
@@ -337,26 +324,26 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
         onPointerCancel={(e) => { soltarArrasto(e); regua.onPointerCancel(); }}
         onContextMenu={regua.onContextMenu}
       >
-        {mapa.imagemDataUrl ? (
-          <img ref={imgRef} src={mapa.imagemDataUrl} alt="mapa da cena" className="mapa-imagem" draggable={false}
+        {imagemUrl ? (
+          <img ref={imgRef} src={imagemUrl} alt="mapa da cena" className="mapa-imagem" draggable={false}
             onLoad={() => { if (imgRef.current) setImgNatural({ w: imgRef.current.naturalWidth, h: imgRef.current.naturalHeight }); }} />
         ) : (
-          <p className="vazio mapa-vazio">nenhum mapa carregado — clique em &quot;carregar mapa&quot;.</p>
+          <p className="vazio mapa-vazio">nenhum mapa selecionado — escolha um na biblioteca.</p>
         )}
 
-        {mapa.grade.ativa && (
+        {grade.ativa && (
           <>
             <div
               className="mapa-grade"
               style={
                 {
-                  ...retanguloGradeEmPx(imgRenderRect, mapa.grade),
-                  '--grade-colunas': mapa.grade.colunas,
-                  '--grade-linhas': mapa.grade.linhas,
+                  ...retanguloGradeEmPx(imgRenderRect, grade),
+                  '--grade-colunas': grade.colunas,
+                  '--grade-linhas': grade.linhas,
                 } as React.CSSProperties
               }
             />
-            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, mapa.grade)}>
+            <div className="mapa-grade-caixa" style={retanguloGradeEmPx(imgRenderRect, grade)}>
               <div
                 className="mapa-grade-mover"
                 onPointerDown={iniciarMoverGrade}
@@ -422,9 +409,9 @@ export default function MapaTab({ active = true }: { active?: boolean }) {
             </div>
           );
         })}
-        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} />
+        <ReguaOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={grade} />
         <PingOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} />
-        <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={mapa.grade} containerRef={containerRef} imgRef={imgRef} />
+        <AoEOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} grade={grade} containerRef={containerRef} imgRef={imgRef} />
         <FoWOverlay imgRenderRect={imgRenderRect} tamanho={tamanho} containerRef={containerRef} imgRef={imgRef} />
         <CombatOverlay />
         <CrachasOverlay />

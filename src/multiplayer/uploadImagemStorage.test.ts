@@ -39,14 +39,15 @@ describe('uploadImagemStorage', () => {
     expect(resultado).toEqual({ url: null });
   });
 
-  it('upload ok: devolve a URL pública, path com prefixo img/ e extensão .jpg', async () => {
+  it('upload ok: devolve a URL pública e o path com prefixo img/ e extensão .jpg', async () => {
     const cliente = criarClienteFalso({ urlPublica: 'https://exemplo.supabase.co/storage/v1/object/public/midia/img/mapa/abc.jpg' });
     h.clienteAtual = cliente;
     const resultado = await uploadImagemStorage('mapa', new Blob(['x']));
-    expect(resultado).toEqual({ url: 'https://exemplo.supabase.co/storage/v1/object/public/midia/img/mapa/abc.jpg' });
+    expect(resultado.url).toBe('https://exemplo.supabase.co/storage/v1/object/public/midia/img/mapa/abc.jpg');
+    expect(resultado.path).toMatch(/^img\/mapa\/[0-9a-f-]+\.jpg$/);
     expect(cliente.storage.from).toHaveBeenCalledWith('midia');
     const chamadaUpload = cliente.storage.from.mock.results[0].value.upload.mock.calls[0];
-    expect(chamadaUpload[0]).toMatch(/^img\/mapa\/[0-9a-f-]+\.jpg$/);
+    expect(chamadaUpload[0]).toBe(resultado.path);
     expect(chamadaUpload[2]).toEqual({ contentType: 'image/jpeg' });
   });
 
@@ -74,7 +75,8 @@ describe('uploadImagemStorage', () => {
       await vi.advanceTimersByTimeAsync(2000); // cobre os dois backoffs (400ms + 1200ms)
       const resultado = await promessa;
 
-      expect(resultado).toEqual({ url: 'https://x/depois-de-2-falhas.jpg' });
+      expect(resultado.url).toBe('https://x/depois-de-2-falhas.jpg');
+      expect(resultado.path).toMatch(/^img\/mapa\/[0-9a-f-]+\.jpg$/);
       expect(cliente.storage.from().upload).toHaveBeenCalledTimes(3);
     });
 

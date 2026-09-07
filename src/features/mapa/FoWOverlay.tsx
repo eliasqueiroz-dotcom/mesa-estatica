@@ -4,6 +4,7 @@ import { useStore } from '../../state/store';
 import type { ZonaFoW } from '../../state/types';
 import FoWViewOverlay from './FoWViewOverlay';
 import { retanguloConteudo, getImgRenderRect, type Ponto } from './mapaUtils';
+import { useMapaAtivo } from './useMapaAtivo';
 
 type Modo = 'revelar' | 'cobrirLuz' | 'esquecer' | 'desligado';
 
@@ -50,7 +51,7 @@ interface Props {
  *    sempre que `fow` está ligado, não só durante `revelar`.
  */
 export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRef }: Props) {
-  const fow = useStore((s) => s.mapa.fow);
+  const mapaAtivo = useMapaAtivo();
   const adicionarRegiaoFoW = useStore((s) => s.adicionarRegiaoFoW);
   const cobrirAreaFoW = useStore((s) => s.cobrirAreaFoW);
   const esquecerAreaFoW = useStore((s) => s.esquecerAreaFoW);
@@ -159,6 +160,11 @@ export default function FoWOverlay({ imgRenderRect, tamanho, containerRef, imgRe
       esquecerAreaFoW({ x: r.x, y: r.y, w: r.w, h: r.h });
     }
   }, [adicionarRegiaoFoW, cobrirAreaFoW, esquecerAreaFoW, definirRascunho]);
+
+  // nada pra revelar sem um mapa selecionado — evita mostrar uma ferramenta que não faz nada.
+  // Depois de todos os hooks acima (rules-of-hooks): early return é seguro aqui.
+  if (!mapaAtivo) return null;
+  const fow = mapaAtivo.fow;
 
   const trocarModo = (m: 'revelar' | 'cobrirLuz' | 'esquecer') => {
     const proximo = modo === m ? 'desligado' : m;

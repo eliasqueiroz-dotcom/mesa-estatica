@@ -29,9 +29,8 @@ const LIMITE_TENTATIVAS_GLOBAL = 5;
 const JANELA_BLOQUEIO_MINUTOS = 15;
 
 // todas usam `id` como PK (conferido migração a migração) — um `.delete().not('id','is',null)`
-// uniforme serve tanto pras tabelas de conteúdo quanto pros singletons (sessao_publica,
-// mapa_publico, midia_estado, soundpad_estado), mesma lógica de DELETE-não-upsert que
-// resetMesa.ts já usa pra fow_estado, agora estendida aos outros três.
+// uniforme serve tanto pras tabelas de conteúdo (incluindo listas como mapas_biblioteca) quanto
+// pros singletons (sessao_publica, mapa_publico, midia_estado, soundpad_estado).
 const TABELAS_PARA_ESVAZIAR = [
   'characters_publico',
   'characters_privado',
@@ -43,7 +42,7 @@ const TABELAS_PARA_ESVAZIAR = [
   'iniciativa',
   'log_publico',
   'rolls_publicas',
-  'fow_estado',
+  'mapas_biblioteca',
   'sessao_publica',
   'mapa_publico',
   'midia_estado',

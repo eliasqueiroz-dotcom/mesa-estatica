@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFowStore } from '../../state/fowStore';
-import { useStore } from '../../state/store';
+import { criarFoWVazio } from '../../state/factories';
 import { montarMaskSvg, regiaoEmPx, subtrairRegioes } from './fowGeometria';
+import { useMapaAtivo } from './useMapaAtivo';
 
 interface Props {
   imgRenderRect: { offsetX: number; offsetY: number; renderW: number; renderH: number } | null;
@@ -28,12 +29,17 @@ interface Props {
  *
  * A `mask-image` é montada em `fowGeometria.montarMaskSvg` — SVG inline, sem asset externo.
  *
- * Sem sincronização aqui: o lado do jogador recebe `mapa.fow` via `fowSync.ts` (novo módulo,
- * mesmo padrão de `mapaPublicoSync.ts`), e só lê. Sem JS por frame: os três `mask` são
- * strings recompute só quando `vistas`/`visiveisAgora` mudam (raro — ~dezenas de regiões).
+ * Sem sincronização aqui: o lado do jogador recebe a biblioteca de mapas via
+ * `mapasBibliotecaSync.ts`, e só lê. Sem JS por frame: os três `mask` são strings recompute só
+ * quando `vistas`/`visiveisAgora` mudam (raro — ~dezenas de regiões).
  */
+// FoW vazio quando não há mapa ativo — constante por fora do componente (não recriar objeto
+// novo a cada render, mesmo motivo de `EMPTY_CONDICOES` no store: um `??` inline aqui quebraria
+// a comparação de referência que o burst de sintonia (useEffect abaixo) depende.
+const FOW_VAZIO = criarFoWVazio();
+
 export default function FoWViewOverlay({ imgRenderRect, tamanho, visaoMestre = false }: Props) {
-  const fow = useStore((s) => s.mapa.fow);
+  const fow = useMapaAtivo()?.fow ?? FOW_VAZIO;
 
   // burst de sintonia: quando `visiveisAgora` ganha uma região NOVA (não meramente perde),
   // marquise o parente com `data-burst="true"` por 280ms, que casa o keyframe `fow-sintonia`

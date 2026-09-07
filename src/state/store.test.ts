@@ -6,10 +6,33 @@ import { TABELA_SURTO } from '../rules/data/surto';
 import { personagemEstaEmSurto } from '../rules/surto';
 import { limparConsumidorForcados, registrarConsumidorForcados } from '../dice/registroForcados';
 import { useStatusMesa } from '../lib/statusMesa';
+import type { EstadoFoW } from './types';
 
 beforeEach(() => {
   useStore.setState(criarEstadoInicial());
 });
+
+/** Cria um item na biblioteca de mapas e seleciona como ativo — as ações de grid/FoW são
+ *  no-op sem um mapa ativo (`patchMapaAtivo`/`patchFowAtivo` em store.ts), então os testes que
+ *  exercitam essas ações precisam de um antes de mais nada. Com `fow`, sobrescreve o FoW vazio
+ *  default do item recém-criado (mesmo padrão do `useStore.setState({ mapa: { ...fow } })`
+ *  usado antes da biblioteca existir). Retorna o id do item ativo. */
+function prepararMapaDeTeste(fow?: EstadoFoW): string {
+  const id = useStore.getState().adicionarMapaBiblioteca('mapa de teste', 'img/mapas/teste.jpg', 'https://exemplo.test/mapa.jpg');
+  useStore.getState().selecionarMapaAtivo(id);
+  if (fow) {
+    useStore.setState((s) => ({
+      mapa: { ...s.mapa, biblioteca: s.mapa.biblioteca.map((m) => (m.id === id ? { ...m, fow } : m)) },
+    }));
+  }
+  return id;
+}
+
+/** `fow` do mapa ativo agora — equivalente ao antigo `useStore.getState().mapa.fow`. */
+function fowAtivo(): EstadoFoW {
+  const s = useStore.getState();
+  return s.mapa.biblioteca.find((m) => m.id === s.mapa.mapaAtivoId)!.fow;
+}
 
 describe('avancarCena', () => {
   it('incrementa contadorCena', () => {
@@ -1242,7 +1265,7 @@ describe('adicionar combatente com combate em andamento', () => {
 describe('cobrirAreaFoW', () => {
   /** Revela a metade esquerda do mapa e devolve a região criada. */
   function revelarMetadeEsquerda() {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 });
   }
 
@@ -1251,7 +1274,7 @@ describe('cobrirAreaFoW', () => {
     // buraco central dentro da área revelada
     useStore.getState().cobrirAreaFoW({ x: 0.125, y: 0.25, w: 0.25, h: 0.5 });
 
-    const { visiveisAgora, vistas } = useStore.getState().mapa.fow;
+    const { visiveisAgora, vistas } = fowAtivo();
     const areaVisivel = visiveisAgora.reduce((t, r) => t + r.w * r.h, 0);
     // 0.5 de área revelada menos 0.25*0.5 do buraco
     expect(areaVisivel).toBeCloseTo(0.5 - 0.125, 6);
@@ -1263,28 +1286,28 @@ describe('cobrirAreaFoW', () => {
 
   it('cobrir fora de qualquer área revelada não muda nada', () => {
     revelarMetadeEsquerda();
-    const antes = useStore.getState().mapa.fow.visiveisAgora;
+    const antes = fowAtivo().visiveisAgora;
     useStore.getState().cobrirAreaFoW({ x: 0.8, y: 0.8, w: 0.1, h: 0.1 });
-    expect(useStore.getState().mapa.fow.visiveisAgora).toBe(antes); // mesma referência
+    expect(fowAtivo().visiveisAgora).toBe(antes); // mesma referência
   });
 
   it('cobrir a área toda apaga a luz por completo, sem apagar a memória', () => {
     revelarMetadeEsquerda();
     useStore.getState().cobrirAreaFoW({ x: 0, y: 0, w: 1, h: 1 });
-    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
-    expect(useStore.getState().mapa.fow.vistas).toHaveLength(1);
+    expect(fowAtivo().visiveisAgora).toEqual([]);
+    expect(fowAtivo().vistas).toHaveLength(1);
   });
 
   it('sem nada revelado é no-op (antes o arrasto de cobrir simplesmente não fazia nada)', () => {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     expect(() => useStore.getState().cobrirAreaFoW({ x: 0, y: 0, w: 1, h: 1 })).not.toThrow();
-    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
+    expect(fowAtivo().visiveisAgora).toEqual([]);
   });
 });
 
 describe('esquecerAreaFoW', () => {
   function revelarMetadeEsquerda() {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 });
   }
 
@@ -1292,7 +1315,7 @@ describe('esquecerAreaFoW', () => {
     revelarMetadeEsquerda();
     useStore.getState().esquecerAreaFoW({ x: 0.125, y: 0.25, w: 0.25, h: 0.5 });
 
-    const { visiveisAgora, vistas } = useStore.getState().mapa.fow;
+    const { visiveisAgora, vistas } = fowAtivo();
     const areaEsperada = 0.5 - 0.125;
     expect(visiveisAgora.reduce((t, r) => t + r.w * r.h, 0)).toBeCloseTo(areaEsperada, 6);
     // diferente de cobrirAreaFoW: a MEMÓRIA também é recortada, não só a luz
@@ -1302,24 +1325,24 @@ describe('esquecerAreaFoW', () => {
   it('esquecer a área toda zera vistas e visiveisAgora — volta a ser nunca-visto', () => {
     revelarMetadeEsquerda();
     useStore.getState().esquecerAreaFoW({ x: 0, y: 0, w: 1, h: 1 });
-    expect(useStore.getState().mapa.fow.vistas).toEqual([]);
-    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
+    expect(fowAtivo().vistas).toEqual([]);
+    expect(fowAtivo().visiveisAgora).toEqual([]);
   });
 
   it('esquecer fora de qualquer área revelada não muda nada (mesma referência)', () => {
     revelarMetadeEsquerda();
-    const { vistas, visiveisAgora } = useStore.getState().mapa.fow;
+    const { vistas, visiveisAgora } = fowAtivo();
     useStore.getState().esquecerAreaFoW({ x: 0.8, y: 0.8, w: 0.1, h: 0.1 });
-    expect(useStore.getState().mapa.fow.vistas).toBe(vistas);
-    expect(useStore.getState().mapa.fow.visiveisAgora).toBe(visiveisAgora);
+    expect(fowAtivo().vistas).toBe(vistas);
+    expect(fowAtivo().visiveisAgora).toBe(visiveisAgora);
   });
 
   it('esquecer área já coberta (fora da luz, mas na memória) some só da memória', () => {
     revelarMetadeEsquerda();
     useStore.getState().cobrirAreaFoW({ x: 0, y: 0, w: 0.5, h: 1 }); // apaga toda a luz, mantém memória
-    expect(useStore.getState().mapa.fow.visiveisAgora).toEqual([]);
+    expect(fowAtivo().visiveisAgora).toEqual([]);
     useStore.getState().esquecerAreaFoW({ x: 0, y: 0, w: 0.5, h: 1 });
-    expect(useStore.getState().mapa.fow.vistas).toEqual([]);
+    expect(fowAtivo().vistas).toEqual([]);
   });
 });
 
@@ -1327,39 +1350,40 @@ describe('definirFoWAtivo', () => {
   it('liga/desliga sem tocar vistas/visiveisAgora', () => {
     revelarMetadeEsquerdaGlobal();
     useStore.getState().definirFoWAtivo(true);
-    expect(useStore.getState().mapa.fow.ativa).toBe(true);
-    const { vistas, visiveisAgora } = useStore.getState().mapa.fow;
+    expect(fowAtivo().ativa).toBe(true);
+    const { vistas, visiveisAgora } = fowAtivo();
     useStore.getState().definirFoWAtivo(false);
-    expect(useStore.getState().mapa.fow.ativa).toBe(false);
-    expect(useStore.getState().mapa.fow.vistas).toBe(vistas);
-    expect(useStore.getState().mapa.fow.visiveisAgora).toBe(visiveisAgora);
+    expect(fowAtivo().ativa).toBe(false);
+    expect(fowAtivo().vistas).toBe(vistas);
+    expect(fowAtivo().visiveisAgora).toBe(visiveisAgora);
   });
 
   function revelarMetadeEsquerdaGlobal() {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false });
     useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 });
   }
 });
 
 describe('definirZonaFoW', () => {
   it('define a atmosfera da cena — não é mais por região', () => {
+    prepararMapaDeTeste();
     useStore.getState().definirZonaFoW('rua');
-    expect(useStore.getState().mapa.fow.zonaAtual).toBe('rua');
+    expect(fowAtivo().zonaAtual).toBe('rua');
     useStore.getState().definirZonaFoW(null);
-    expect(useStore.getState().mapa.fow.zonaAtual).toBeNull();
+    expect(fowAtivo().zonaAtual).toBeNull();
   });
 });
 
 describe('limparFoW', () => {
   beforeEach(() => {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 });
     useStore.getState().definirZonaFoW('rua');
   });
 
   it('zera vistas, visiveisAgora E ativa', () => {
     useStore.getState().limparFoW();
-    const fow = useStore.getState().mapa.fow;
+    const fow = fowAtivo();
     expect(fow.vistas).toEqual([]);
     expect(fow.visiveisAgora).toEqual([]);
     expect(fow.ativa).toBe(false);
@@ -1369,11 +1393,11 @@ describe('limparFoW', () => {
 
 describe('removerRegiaoFoW', () => {
   it('remove de vistas e visiveisAgora pelo id, mantendo outras regiões', () => {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     const idA = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 })!;
     const idB = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0.5, y: 0, w: 0.5, h: 1 })!;
     useStore.getState().removerRegiaoFoW(idA);
-    const fow = useStore.getState().mapa.fow;
+    const fow = fowAtivo();
     expect(fow.vistas.map((r) => r.id)).toEqual([idB]);
     expect(fow.visiveisAgora.map((r) => r.id)).toEqual([idB]);
   });
@@ -1381,10 +1405,10 @@ describe('removerRegiaoFoW', () => {
 
 describe('cobrirLuzFoW', () => {
   it('remove só de visiveisAgora — a região permanece em vistas', () => {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     const id = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 })!;
     useStore.getState().cobrirLuzFoW(id);
-    const fow = useStore.getState().mapa.fow;
+    const fow = fowAtivo();
     expect(fow.visiveisAgora).toEqual([]);
     expect(fow.vistas).toHaveLength(1);
     expect(fow.vistas[0].id).toBe(id);
@@ -1393,16 +1417,22 @@ describe('cobrirLuzFoW', () => {
 
 describe('adicionarRegiaoFoW', () => {
   it('gera id, entra em vistas E visiveisAgora', () => {
-    useStore.setState({ mapa: { ...useStore.getState().mapa, fow: { vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true } } });
+    prepararMapaDeTeste({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: true });
     const id = useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
     expect(id).toBeDefined();
     expect(typeof id).toBe('string');
-    const fow = useStore.getState().mapa.fow;
+    const fow = fowAtivo();
     expect(fow.vistas).toHaveLength(1);
     expect(fow.visiveisAgora).toHaveLength(1);
     expect(fow.vistas[0].id).toBe(id);
     expect(fow.visiveisAgora[0].id).toBe(id);
     expect(fow.vistas[0]).toMatchObject({ x: 0.1, y: 0.2, w: 0.3, h: 0.4 });
+  });
+
+  it('sem mapa ativo é no-op (não lança, não gera regiões perdidas)', () => {
+    expect(useStore.getState().mapa.mapaAtivoId).toBeNull();
+    expect(() => useStore.getState().adicionarRegiaoFoW({ forma: 'rect', x: 0, y: 0, w: 0.5, h: 1 })).not.toThrow();
+    expect(useStore.getState().mapa.biblioteca).toEqual([]);
   });
 });
 
@@ -1411,15 +1441,15 @@ describe('adicionarRegiaoFoW', () => {
 // localStorage pelo zustand/persist. Cobre as migrações mais recentes/arriscadas, não as
 // 23 versões uma por uma.
 describe('migrate', () => {
-  it('v1 → v2: injeta grade default quando mapa não tem grade', () => {
-    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [] } }, 1);
-    expect(estado.mapa.grade).toEqual(criarGradeInicial());
+  it('v1 → v2: injeta grade default quando mapa não tem grade (e v34 depois vira o item único da biblioteca)', () => {
+    const estado = migrate({ mapa: { imagemDataUrl: 'data:image/jpeg;base64,x', tokens: [] } }, 1);
+    expect(estado.mapa.biblioteca[0].grade).toEqual(criarGradeInicial());
   });
 
   it('v1 → v2: não mexe em mapa que já tem grade', () => {
     const gradeCustom = { ...criarGradeInicial(), colunas: 20 };
-    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [], grade: gradeCustom } }, 1);
-    expect(estado.mapa.grade).toEqual(gradeCustom);
+    const estado = migrate({ mapa: { imagemDataUrl: 'data:image/jpeg;base64,x', tokens: [], grade: gradeCustom } }, 1);
+    expect(estado.mapa.biblioteca[0].grade).toEqual(gradeCustom);
   });
 
   it('v10 → v11: converte surtoAtivo/surtoEscolha soltos em surtosAtivos (depois zerado pela v30 — ver teste abaixo)', () => {
@@ -1471,29 +1501,30 @@ describe('migrate', () => {
     expect(estado.soundpad).toEqual({ sons: [], volume: 0.8, ultimoDisparo: null });
   });
 
-  it('v25 → v26: injeta fow vazio em mapa pré-FoW', () => {
-    const estado = migrate({ mapa: { imagemDataUrl: null, tokens: [], grade: criarGradeInicial() } }, 25);
-    expect(estado.mapa.fow).toEqual({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false });
+  it('v25 → v26: injeta fow vazio em mapa pré-FoW (e v34 depois vira o item único da biblioteca)', () => {
+    const estado = migrate({ mapa: { imagemDataUrl: 'data:image/jpeg;base64,x', tokens: [], grade: criarGradeInicial() } }, 25);
+    expect(estado.mapa.biblioteca[0].fow).toEqual({ vistas: [], visiveisAgora: [], zonaAtual: null, ativa: false });
   });
 
   it('v25 → v26: preserva fow já existente (via cadeia de migrações até v28)', () => {
     // simula uma linha real de v25: campo ainda se chamava `proximoIdZona` — a cadeia de
-    // migrações (chamada inteira num só `migrate()`) deve renomear pro nome atual.
+    // migrações (chamada inteira num só `migrate()`) deve renomear pro nome atual. `fow` sozinho
+    // (sem imagem) já basta pra v34 criar um item — ver comentário do bloco v34 em store.ts.
     const fow = { vistas: [], visiveisAgora: [], proximoIdZona: 'rua' as const, ativa: false };
     const estado = migrate({ mapa: { fow } }, 25);
-    expect(estado.mapa.fow.zonaAtual).toBe('rua');
+    expect(estado.mapa.biblioteca[0].fow.zonaAtual).toBe('rua');
   });
 
   it('v26 → v27: injeta ativa:false em fow existente sem o campo', () => {
     const fow = { vistas: [], visiveisAgora: [], proximoIdZona: null };
     const estado = migrate({ mapa: { fow } }, 26);
-    expect(estado.mapa.fow.ativa).toBe(false);
+    expect(estado.mapa.biblioteca[0].fow.ativa).toBe(false);
   });
 
   it('v26 → v27: preserva ativa já existente', () => {
     const fow = { vistas: [], visiveisAgora: [], proximoIdZona: null, ativa: true };
     const estado = migrate({ mapa: { fow } }, 26);
-    expect(estado.mapa.fow.ativa).toBe(true);
+    expect(estado.mapa.biblioteca[0].fow.ativa).toBe(true);
   });
 
   it('v27 → v28: renomeia proximoIdZona pra zonaAtual e derruba zona por região', () => {
@@ -1504,16 +1535,17 @@ describe('migrate', () => {
       ativa: true,
     };
     const estado = migrate({ mapa: { fow } }, 27);
-    expect(estado.mapa.fow.zonaAtual).toBe('corporativo');
-    expect(estado.mapa.fow).not.toHaveProperty('proximoIdZona');
-    expect(estado.mapa.fow.vistas[0]).not.toHaveProperty('zona');
-    expect(estado.mapa.fow.visiveisAgora[0]).not.toHaveProperty('zona');
+    const fowFinal = estado.mapa.biblioteca[0].fow;
+    expect(fowFinal.zonaAtual).toBe('corporativo');
+    expect(fowFinal).not.toHaveProperty('proximoIdZona');
+    expect(fowFinal.vistas[0]).not.toHaveProperty('zona');
+    expect(fowFinal.visiveisAgora[0]).not.toHaveProperty('zona');
   });
 
   it('v27 → v28: fow já em v28 (zonaAtual presente) passa sem alteração', () => {
     const fow = { vistas: [], visiveisAgora: [], zonaAtual: 'rua' as const, ativa: true };
     const estado = migrate({ mapa: { fow } }, 27);
-    expect(estado.mapa.fow).toEqual(fow);
+    expect(estado.mapa.biblioteca[0].fow).toEqual(fow);
   });
 
   it('v28 → v29: injeta 3 tabelas default quando ausente', () => {

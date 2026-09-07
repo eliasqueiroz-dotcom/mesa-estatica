@@ -15,17 +15,17 @@ import AlertaOverlayJogador from '../features/sessao/AlertaOverlayJogador';
 import DestaqueSuperior from '../features/sessao/DestaqueSuperior';
 import SessaoPublicaView from '../features/sessao/SessaoPublicaView';
 import { iniciarSyncAoE } from '../multiplayer/aoeSync';
-import { iniciarSyncFoW } from '../multiplayer/fowSync';
 import { iniciarAuthMultiplayer } from '../multiplayer/auth';
 import {
   useFichasPublicas,
-  useHidratarMapaPublico,
   useHidratarMidia,
   useHidratarSessaoPublica,
   useIniciativaPublica,
   useNpcsPublicos,
 } from '../multiplayer/hidratacaoJogador';
 import { iniciarSyncLogRolls } from '../multiplayer/logRollsSync';
+import { iniciarSyncMapaAtivo } from '../multiplayer/mapaAtivoSync';
+import { iniciarSyncMapasBiblioteca } from '../multiplayer/mapasBibliotecaSync';
 import { useMinhaFicha } from '../multiplayer/minhaFicha';
 import { iniciarSyncPing } from '../multiplayer/pingSync';
 import { iniciarSyncReguas } from '../multiplayer/reguasSync';
@@ -74,7 +74,6 @@ export default function PlayerApp() {
   const mostrandoRolagemAoVivo = useRolagemAoVivoStore((s) => s.mostrando);
 
   useHidratarSessaoPublica();
-  useHidratarMapaPublico();
   useHidratarMidia();
   const { carregando, possuiFicha } = useMinhaFicha();
   const minhaFicha = useStore((s) => s.fichas.find((f) => f.id === s.fichaAtivaId) ?? null);
@@ -106,7 +105,8 @@ export default function PlayerApp() {
     let pararPing = () => {};
     let pararSoundpad = () => {};
     let pararAoE = () => {};
-    let pararFoW = () => {};
+    let pararMapasBiblioteca = () => {};
+    let pararMapaAtivo = () => {};
     let pararRolagemAoVivo = () => {};
     let cancelado = false;
     iniciarAuthMultiplayer().then(() => {
@@ -122,10 +122,12 @@ export default function PlayerApp() {
       // idem — só o AoEOverlay.tsx (GM-only, fora deste bundle) escreve no aoeStore; aqui é
       // sempre leitura.
       pararAoE = iniciarSyncAoE();
-      // FoW: só leitura. O jogador nunca tem `FoWOverlay.tsx` no bundle, e a RLS
+      // biblioteca de mapas + mapa ativo: só leitura na prática. O jogador nunca tem
+      // `BibliotecaMapas.tsx`/`GradeOverlay.tsx`/`FoWOverlay.tsx` (GM-only) no bundle, e a RLS
       // (`is_gm()` no insert/update/delete) garante no servidor que nem vazar a anon key
       // permite escrever no banco.
-      pararFoW = iniciarSyncFoW();
+      pararMapasBiblioteca = iniciarSyncMapasBiblioteca();
+      pararMapaAtivo = iniciarSyncMapaAtivo();
       // simétrico: aqui é quem de fato PUBLICA (DadosTabJogador.tsx/QuickRollOverlayJogador.tsx
       // chamam rolagemAoVivoStore.definirAtual), o mestre só recebe.
       pararRolagemAoVivo = iniciarSyncRolagemAoVivo();
@@ -138,7 +140,8 @@ export default function PlayerApp() {
       pararPing();
       pararSoundpad();
       pararAoE();
-      pararFoW();
+      pararMapasBiblioteca();
+      pararMapaAtivo();
       pararRolagemAoVivo();
     };
   }, []);

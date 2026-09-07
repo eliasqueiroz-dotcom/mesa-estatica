@@ -20,8 +20,12 @@ interface UseReguaOpts {
   containerRef: React.RefObject<HTMLElement | null>;
   imgRef: React.RefObject<HTMLImageElement | null>;
   /** true enquanto outra interação já está em andamento (arrasto de token, mover/redimensionar
-   *  grid) — a régua nunca assume o pointerdown nesse caso. */
-  bloqueado: boolean;
+   *  grid) — a régua nunca assume o pointerdown nesse caso. Getter, não valor: lido no momento
+   *  do pointerdown, nunca congelado num render — um `boolean` capturado por closure ficava
+   *  preso em `true` depois que o arrasto de um token soltava (mutar a ref de arrasto não
+   *  dispara re-render, então o `onPointerDown` memoizado nunca via a volta pra `false` até
+   *  algum re-render não relacionado acontecer por outro motivo). */
+  bloqueado: () => boolean;
 }
 
 /**
@@ -141,7 +145,7 @@ export function useRegua({ autorId, cor, grade, containerRef, imgRef, bloqueado 
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (bloqueado || e.button !== 0) return;
+      if (bloqueado() || e.button !== 0) return;
       if (e.target !== e.currentTarget) return; // não rouba clique de token/alça por cima
       const p = posicaoNormalizada(e);
       if (!p) return;

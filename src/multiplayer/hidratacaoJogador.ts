@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EntradaIniciativa, GradeMapa } from '../state/types';
+import type { EntradaIniciativa } from '../state/types';
 import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
@@ -61,54 +61,6 @@ export function useHidratarSessaoPublica(): void {
     return () => {
       cancelado = true;
       desconectarCanal('jogador-sessao-publica');
-      cliente.removeChannel(canal);
-    };
-  }, []);
-}
-
-/**
- * Fundo do mapa (`imagemDataUrl`/`grade`) — mesmo padrão de `useHidratarSessaoPublica`: vai
- * pro `useStore` compartilhado porque `MapaJogadorView` reusa a mesma leitura `s.mapa` que o
- * `MapaTab` do mestre. `mapa.tokens` fica de fora — isso é `tokensSync.ts` (tabela própria),
- * ligado direto no `PlayerApp` igual ao `GmApp`, RLS já aberta pra tokens desde a Fase A.
- */
-export function useHidratarMapaPublico(): void {
-  useEffect(() => {
-    const cliente = supabase;
-    if (!cliente) return;
-
-    let cancelado = false;
-
-    // busca inicial E refetch de reconexão — mesmo motivo de `useHidratarSessaoPublica`.
-    const refetch = () =>
-      cliente
-        .from('mapa_publico')
-        .select('*')
-        .eq('id', 'mapa')
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (cancelado) return;
-          if (error) return console.error('[hidratacaoJogador] busca de mapa_publico falhou', error);
-          if (!data) return;
-          const linha = data as { imagem_data_url: string | null; grade: GradeMapa };
-          // merge, não substituição: uma linha antiga no banco (de antes de `escala`/`unidade`
-          // existirem em GradeMapa) não pode apagar os defaults locais desses campos.
-          useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
-        });
-    void refetch();
-
-    const canal = cliente
-      .channel('jogador-mapa-publico')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'mapa_publico' }, (payload) => {
-        if (payload.eventType === 'DELETE') return;
-        const linha = payload.new as { imagem_data_url: string | null; grade: GradeMapa };
-        useStore.setState((s) => ({ mapa: { ...s.mapa, imagemDataUrl: linha.imagem_data_url, grade: { ...s.mapa.grade, ...linha.grade } } }));
-      })
-      .subscribe(assinarStatusCanalComRefetch('jogador-mapa-publico', refetch));
-
-    return () => {
-      cancelado = true;
-      desconectarCanal('jogador-mapa-publico');
       cliente.removeChannel(canal);
     };
   }, []);

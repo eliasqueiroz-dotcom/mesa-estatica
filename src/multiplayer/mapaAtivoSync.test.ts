@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { criarEstadoInicial } from '../state/factories';
 import { useStore } from '../state/store';
 
-// ===== marcarEmVoo na janela do debounce (iniciarSyncMapaPublico) =====
-// Sem cobertura geral do módulo aqui de propósito — só o comportamento de durabilidade
-// (mesmo achado de 23/08 que motivou `marcarEmVoo` em filaPendencias.ts). Módulo não tinha
-// nenhum teste antes disto.
+// ===== marcarEmVoo na janela do debounce (iniciarSyncMapaAtivo) =====
+// Mesmo achado de 23/08 que motivou `marcarEmVoo` em filaPendencias.ts, aplicado ao ponteiro
+// "qual mapa está ativo" (substitui o antigo mapaPublicoSync.ts, que sincronizava imagem/grid
+// direto na mesma linha — agora isso é mapasBibliotecaSync.ts).
 const h = vi.hoisted(() => ({ clienteAtual: null as unknown }));
 vi.mock('../lib/supabaseClient', () => ({
   get supabase() {
@@ -33,11 +33,10 @@ vi.mock('../lib/statusMesa', () => ({
   },
 }));
 
-const { iniciarSyncMapaPublico } = await import('./mapaPublicoSync');
+const { iniciarSyncMapaAtivo } = await import('./mapaAtivoSync');
 const { retomarPendenciasPersistidas } = await import('./filaPendencias');
 
-/** Cliente mínimo — só o suficiente pra `iniciarSyncMapaPublico()` montar sem lançar. Não
- *  precisa simular sucesso/falha de rede porque o teste abaixo nunca deixa o debounce disparar. */
+/** Cliente mínimo — só o suficiente pra `iniciarSyncMapaAtivo()` montar sem lançar. */
 function criarClienteMinimo() {
   const resolvido = { data: null, error: null };
   const builder: any = {};
@@ -66,7 +65,7 @@ function criarStorageFalso() {
   };
 }
 
-describe('iniciarSyncMapaPublico — marca "em voo" antes do debounce disparar', () => {
+describe('iniciarSyncMapaAtivo — marca "em voo" antes do debounce disparar', () => {
   let cleanup: (() => void) | undefined;
 
   beforeEach(() => {
@@ -83,16 +82,13 @@ describe('iniciarSyncMapaPublico — marca "em voo" antes do debounce disparar',
     vi.useRealTimers();
   });
 
-  it('marca "em voo" (chave fixa "mapa") no momento em que agenda o push — antes do debounce disparar', () => {
-    vi.useFakeTimers();
+  it('marca "em voo" (chave fixa "mapa") no momento em que a troca de mapa ativo dispara — não espera round-trip de rede', () => {
     vi.stubGlobal('localStorage', criarStorageFalso());
 
-    cleanup = iniciarSyncMapaPublico();
-    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, ativa: true } } }));
+    cleanup = iniciarSyncMapaAtivo();
+    useStore.getState().selecionarMapaAtivo('mapa-1');
 
-    // o timer do debounce nem chegou a disparar (fake timers, nunca avançados) — se a marca já
-    // existe aqui, uma aba fechada NESSE exato meio-tempo não perde o ajuste (achado de 23/08).
-    expect(retomarPendenciasPersistidas('mapa-publico-sync')).toContain('mapa');
+    expect(retomarPendenciasPersistidas('mapa-ativo-sync')).toContain('mapa');
   });
 });
 
@@ -130,7 +126,7 @@ function criarClienteComControle() {
   };
 }
 
-describe('iniciarSyncMapaPublico — refetch de reconexão', () => {
+describe('iniciarSyncMapaAtivo — refetch de reconexão', () => {
   let mock: ReturnType<typeof criarClienteComControle>;
   let cleanup: (() => void) | undefined;
 
@@ -147,34 +143,34 @@ describe('iniciarSyncMapaPublico — refetch de reconexão', () => {
     vi.restoreAllMocks();
   });
 
-  it('canal cai e reconecta rebusca o mapa, mesmo sem evento Realtime durante a queda', async () => {
-    cleanup = iniciarSyncMapaPublico();
+  it('canal cai e reconecta rebusca qual mapa está ativo, mesmo sem evento Realtime durante a queda', async () => {
+    cleanup = iniciarSyncMapaAtivo();
 
     await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(1));
     mock.resolvers[0](null); // busca inicial: sem linha ainda
 
-    // canal cai e reconecta — o mestre trocou o fundo do mapa em outra aba enquanto este
-    // cliente estava desconectado, sem nenhum evento `postgres_changes` chegar aqui.
+    // canal cai e reconecta — o mestre trocou de mapa em outra aba enquanto este cliente
+    // estava desconectado, sem nenhum evento `postgres_changes` chegar aqui.
     mock.statusCb?.('CHANNEL_ERROR');
     mock.statusCb?.('SUBSCRIBED');
 
     await vi.waitFor(() => expect(mock.resolvers.length).toBeGreaterThanOrEqual(2));
-    mock.resolvers[1]({ id: 'mapa', imagem_data_url: 'https://cdn.exemplo/mapa-novo.jpg', grade: { ativa: true } });
+    mock.resolvers[1]({ id: 'mapa', mapa_ativo_id: 'mapa-novo' });
 
     await vi.waitFor(() => {
-      expect(useStore.getState().mapa.imagemDataUrl).toBe('https://cdn.exemplo/mapa-novo.jpg');
+      expect(useStore.getState().mapa.mapaAtivoId).toBe('mapa-novo');
     });
   });
 });
 
-// ===== eco remoto durante a janela de debounce não reverte a edição local (achado pré-sessão) =====
+// ===== eco remoto durante a janela de debounce não reverte a troca local (mesmo achado de mapaPublicoSync.ts original) =====
 function criarClienteComEventoRealtime() {
   let handlerPostgresChanges: ((payload: { new: unknown }) => void) | undefined;
 
   const builder: any = {};
   builder.select = () => builder;
   builder.eq = () => builder;
-  builder.maybeSingle = () => Promise.resolve({ data: null, error: null }); // sem linha ainda
+  builder.maybeSingle = () => Promise.resolve({ data: null, error: null });
   builder.upsert = () => Promise.resolve({ error: null });
 
   const channelObj: any = {};
@@ -195,7 +191,7 @@ function criarClienteComEventoRealtime() {
   };
 }
 
-describe('iniciarSyncMapaPublico — eco remoto atrasado não reverte edição local em voo', () => {
+describe('iniciarSyncMapaAtivo — eco remoto atrasado não reverte troca local em voo', () => {
   let cleanup: (() => void) | undefined;
 
   beforeEach(() => {
@@ -207,20 +203,17 @@ describe('iniciarSyncMapaPublico — eco remoto atrasado não reverte edição l
     cleanup = undefined;
   });
 
-  it('grid ajustado duas vezes rápido: eco do 1o push não apaga o 2o ajuste ainda não pushado', async () => {
+  it('mapa ativo trocado duas vezes rápido: eco da 1a troca não reverte a 2a ainda não pushada', () => {
     const mock = criarClienteComEventoRealtime();
     h.clienteAtual = mock;
-    cleanup = iniciarSyncMapaPublico();
+    cleanup = iniciarSyncMapaAtivo();
 
-    // 1a edição — agenda o push (debounce ainda não disparou).
-    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, colunas: 8 } } }));
-    // 2a edição, ainda dentro da janela de debounce — o valor que deve sobreviver.
-    useStore.setState((s) => ({ mapa: { ...s.mapa, grade: { ...s.mapa.grade, colunas: 12 } } }));
+    useStore.getState().selecionarMapaAtivo('mapa-a'); // 1a troca — agenda o push
+    useStore.getState().selecionarMapaAtivo('mapa-b'); // 2a troca, ainda dentro da janela — deve sobreviver
 
-    // eco Realtime do 1o push chega ANTES do debounce da 2a edição disparar — payload reflete
-    // o valor antigo (colunas: 8), não a edição mais recente do mestre.
-    mock.dispararPostgresChanges({ id: 'mapa', imagem_data_url: null, grade: { ...useStore.getState().mapa.grade, colunas: 8 } });
+    // eco Realtime do push da 1a troca chega ANTES da 2a confirmar.
+    mock.dispararPostgresChanges({ id: 'mapa', mapa_ativo_id: 'mapa-a' });
 
-    expect(useStore.getState().mapa.grade.colunas).toBe(12);
+    expect(useStore.getState().mapa.mapaAtivoId).toBe('mapa-b');
   });
 });
