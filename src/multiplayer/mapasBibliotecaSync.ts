@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient';
 import { assinarStatusCanalComRefetch, desconectarCanal } from '../lib/statusMesa';
 import { useStore } from '../state/store';
 import { criarDebouncePorChave } from './debounce';
-import { executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
+import { ehErroPermissaoNegada, executarComRetentativa, marcarEmVoo, resolverPendencia, retomarPendenciasPersistidas } from './filaPendencias';
 import { ehDataUrl } from './imagemPendente';
 import { computarDiffMapas } from './mapasBibliotecaDiff';
 import { eraRemocaoExplicita } from './remocaoExplicita';
@@ -57,6 +57,12 @@ export const paraMapa = (r: LinhaMapa): MapaBiblioteca => ({
 /** Ids com upsert local agendado (debounce ainda não disparou) ou em voo — mesmo papel de
  *  `pendencias` em `tokensSync.ts`. Um refetch de reconexão nunca pisa num item marcado aqui. */
 const pendencias = new Set<string>();
+
+/** Ids que sofreram DELETE remoto enquanto um upsert local pra eles ainda estava em voo — sem
+ *  isso, o upsert (agendado ANTES do DELETE chegar) ressuscitava a linha no servidor logo depois
+ *  de apagada (ex.: duas sessões de mestre, uma apaga o mapa enquanto a outra ainda tem um
+ *  arrasto de grid pendente pra ele). Resolvido quando esse upsert em voo finalmente conclui. */
+const exclusoesDuranteEnvio = new Set<string>();
 
 /**
  * Sincroniza `mapa.biblioteca` — a lista de mapas que o mestre subiu (aba Mapa). Mesmo padrão
@@ -116,7 +122,16 @@ export function iniciarSyncMapasBiblioteca(): () => void {
       Promise.resolve(
         cliente.from('mapas_biblioteca').upsert(paraLinha(useStore.getState().mapa.biblioteca.find((m) => m.id === mapa.id) ?? mapa)),
       ).then((resultado) => {
-        if (!resultado?.error) pendencias.delete(_id);
+        // negação de RLS não vai passar a funcionar com retry (ver `ehErroPermissaoNegada`) —
+        // sem soltar aqui, o id ficava preso em `pendencias` pra sempre, fora de refetch e de
+        // updates remotos (mesmo cuidado de `tokensSync.ts`).
+        if (!resultado?.error || ehErroPermissaoNegada(resultado.error)) pendencias.delete(_id);
+        if (!resultado?.error && exclusoesDuranteEnvio.delete(_id)) {
+          // apagado remotamente enquanto este upsert estava em voo — desfaz a ressurreição
+          // que o upsert acabou de causar, tanto local quanto no servidor.
+          useStore.setState((s) => ({ mapa: { ...s.mapa, biblioteca: s.mapa.biblioteca.filter((m) => m.id !== _id) } }));
+          void cliente.from('mapas_biblioteca').delete().eq('id', _id);
+        }
         return resultado;
       }),
     );
@@ -168,7 +183,10 @@ export function iniciarSyncMapasBiblioteca(): () => void {
         const s = useStore.getState();
         if (payload.eventType === 'DELETE') {
           const idRemovido = (payload.old as { id: string }).id;
-          if (pendencias.has(idRemovido)) return;
+          if (pendencias.has(idRemovido)) {
+            exclusoesDuranteEnvio.add(idRemovido);
+            return;
+          }
           useStore.setState({ mapa: { ...s.mapa, biblioteca: s.mapa.biblioteca.filter((m) => m.id !== idRemovido) } });
         } else {
           const mapa = paraMapa(payload.new as LinhaMapa);
